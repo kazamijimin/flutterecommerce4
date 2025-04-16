@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # flutterecommerce4
 
 A new Flutter project.
@@ -14,3 +15,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# flutterecommerce4
+>>>>>>> 5f5822f191606dec847f46f33200ef5f5f6b8e87
