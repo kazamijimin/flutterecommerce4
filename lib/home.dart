@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutterecommerce4/authentication_page.dart';
 import 'package:flutterecommerce4/main.dart';
+import 'Authentication_page.dart';
 import 'add_product.dart';
 import 'dart:async';
 import 'cart.dart';
