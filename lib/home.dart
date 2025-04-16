@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutterecommerce4/authentication_page.dart';
-import 'package:flutterecommerce4/main.dart';
-import 'Authentication_page.dart';
 import 'add_product.dart';
 import 'dart:async';
 import 'cart.dart';
@@ -13,7 +11,7 @@ import 'login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'product_details.dart';
 import 'wishlist.dart';
-
+import 'category.dart';
 // New SearchPage class to handle search functionality
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -644,8 +642,15 @@ class _HomepageState extends State<Homepage> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildBottomNavItem(Icons.home, "HOME", Colors.red),
-            _buildBottomNavItem(Icons.category, "CATEGORY", Colors.white),
-            if (user != null)
+GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CategoryPage()),
+    );
+  },
+  child: _buildBottomNavItem(Icons.category, "CATEGORY", Colors.white),
+),            if (user != null)
               _buildBottomNavItem(Icons.message, "MESSAGE", Colors.white),
             if (user != null)
               _buildBottomNavItem(Icons.shopping_bag, "SHOP", Colors.white),

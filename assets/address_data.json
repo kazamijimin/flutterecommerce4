@@ -1,0 +1,54 @@
+{
+    "Philippines": {
+      "states": [
+        {
+          "name": "Metro Manila",
+          "cities": [
+            {
+              "name": "Quezon City",
+              "barangays": ["Bagumbayan", "Batasan Hills", "Commonwealth"]
+            },
+            {
+              "name": "Manila",
+              "barangays": ["Binondo", "Ermita", "Malate"]
+            }
+          ]
+        },
+        {
+          "name": "Cebu",
+          "cities": [
+            {
+              "name": "Cebu City",
+              "barangays": ["Banilad", "Lahug", "Mabolo"]
+            }
+          ]
+        }
+      ]
+    },
+    "United States": {
+      "states": [
+        {
+          "name": "California",
+          "cities": [
+            {
+              "name": "Los Angeles",
+              "barangays": []
+            },
+            {
+              "name": "San Francisco",
+              "barangays": []
+            }
+          ]
+        },
+        {
+          "name": "New York",
+          "cities": [
+            {
+              "name": "New York City",
+              "barangays": []
+            }
+          ]
+        }
+      ]
+    }
+  }

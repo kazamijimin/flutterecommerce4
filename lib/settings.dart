@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
+import 'terms_condition.dart'; // Import the Terms and Conditions page
+import 'address.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -39,28 +41,31 @@ class _SettingsPageState extends State<SettingsPage> {
       });
     }
   }
-Future<void> _fetchUserData() async {
-  try {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-      if (userDoc.exists) {
-        setState(() {
-          // Replace 'displayName' and 'photoURL' with the actual field names in your Firestore document
-          userName = userDoc['displayName'] ?? userName; // Update field name
-          userPhotoUrl = userDoc['photoURL'] ?? userPhotoUrl; // Update field name
-        });
+
+  Future<void> _fetchUserData() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+        if (userDoc.exists) {
+          setState(() {
+            userName = userDoc['displayName'] ?? userName;
+            userPhotoUrl = userDoc['photoURL'] ?? userPhotoUrl;
+          });
+        }
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to fetch user data: $e'),
+          backgroundColor: const Color(0xFFFF0055),
+        ),
+      );
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Failed to fetch user data: $e'),
-        backgroundColor: const Color(0xFFFF0055),
-      ),
-    );
   }
-}
 
   Future<void> _logout() async {
     try {
@@ -79,27 +84,44 @@ Future<void> _fetchUserData() async {
     }
   }
 
+  IconData _getIconForTitle(String title) {
+    // Map of titles to icons
+    const iconMap = {
+      'My Profile': Icons.person,
+      'My Addresses': Icons.location_on,
+      'Bank Account/Cards': Icons.credit_card,
+      'Chat Settings': Icons.chat,
+      'Notification Settings': Icons.notifications,
+      'Privacy Settings': Icons.privacy_tip,
+      'Blocked users': Icons.block,
+      'Language': Icons.language,
+      'ABOUT': Icons.info,
+      'Help Centre': Icons.help_center,
+      'Shopee Policies': Icons.policy,
+      'Rate us': Icons.star_rate,
+      'HELP': Icons.help_outline,
+      'TERMS AND CONDITIONS': Icons.description,
+      'Request Account Deletion': Icons.delete_forever,
+    };
+
+    // Return the corresponding icon or a default icon
+    return iconMap[title] ?? Icons.settings;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Cyberpunk color scheme
     final ColorScheme colorScheme = isDarkMode
         ? const ColorScheme.dark(
-            // Dark mode (cyberpunk night)
-            primary: Color(0xFFFF0077), // Neon pink/magenta
-            secondary: Color(0xFF00E5FF), // Cyan/teal
-            tertiary: Color(0xFFFFDD00), // Yellow accent
-            surface: Color(0xFF1A1A2E), // Deep blue-purple
-            background: Color(0xFF0F0F1B), // Very dark blue-purple
-            error: Color(0xFFFF3D00),
+            primary: Color(0xFFFF0077),
+            secondary: Color(0xFF00E5FF),
+            surface: Color(0xFF1A1A2E),
+            background: Color(0xFF0F0F1B),
           )
-        : const ColorScheme.dark(
-            // Light mode (still cyberpunk-inspired but brighter)
-            primary: Color(0xFFFF0077), // Neon pink/magenta
-            secondary: Color(0xFF00E5FF), // Cyan/teal
-            tertiary: Color(0xFFFFDD00), // Yellow accent
-            surface: Color(0xFF2E2E44), // Lighter blue-purple
-            background: Color(0xFF232339), // Medium blue-purple
-            error: Color(0xFFFF3D00),
+        : const ColorScheme.light(
+            primary: Color(0xFFFF0077),
+            secondary: Color(0xFF00E5FF),
+            surface: Color(0xFF2E2E44),
+            background: Color(0xFF232339),
           );
 
     return Theme(
@@ -111,59 +133,12 @@ Future<void> _fetchUserData() async {
             fontSize: textSize,
             color: Colors.white,
           ),
-          bodyMedium: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: textSize - 2,
-            color: Colors.white.withOpacity(0.9),
-          ),
           titleLarge: TextStyle(
             fontFamily: 'PixelFont',
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
-          labelLarge: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.primary,
-          ),
-        ),
-        switchTheme: SwitchThemeData(
-          thumbColor: MaterialStateProperty.resolveWith((states) {
-            return states.contains(MaterialState.selected)
-                ? colorScheme.primary
-                : Colors.grey;
-          }),
-          trackColor: MaterialStateProperty.resolveWith((states) {
-            return states.contains(MaterialState.selected)
-                ? colorScheme.primary.withOpacity(0.5)
-                : Colors.grey.withOpacity(0.5);
-          }),
-        ),
-        sliderTheme: SliderThemeData(
-          activeTrackColor: colorScheme.primary,
-          thumbColor: colorScheme.primary,
-          overlayColor: colorScheme.primary.withOpacity(0.2),
-          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: colorScheme.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4.0),
-            ),
-          ),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: colorScheme.background,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        dividerTheme: DividerThemeData(
-          color: colorScheme.primary.withOpacity(0.2),
-          thickness: 1.0,
         ),
       ),
       child: Scaffold(
@@ -178,213 +153,148 @@ Future<void> _fetchUserData() async {
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colorScheme.background,
-                colorScheme.background.withBlue((colorScheme.background.blue - 15).clamp(0, 255)),
-              ],
+        body: ListView(
+          children: [
+            // SYSTEM Section
+            _buildSettingCategory('MY ACCOUNT'),
+            _buildSettingTile(
+              title: 'My Profile',
+              onTap: () {
+                // Navigate to My Profile
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
             ),
-          ),
-          child: ListView(
-            children: [
-              // Profile Section with glowing border
-              Container(
-                margin: const EdgeInsets.all(16.0),
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.7),
-                    width: 2.0,
+            _buildSettingTile(
+              title: 'My Addresses',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const AddressPage(), // Replace with your account page widget
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Profile Picture with glow effect
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.6),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundColor: colorScheme.primary.withOpacity(0.3),
-                        backgroundImage: userPhotoUrl != null
-                            ? NetworkImage(userPhotoUrl!)
-                            : const AssetImage('assets/images/default_profile.png') as ImageProvider,
-                        onBackgroundImageError: (exception, stackTrace) {
-                          return;
-                        },
-                        child: userPhotoUrl == null
-                            ? Icon(Icons.person, size: 50, color: colorScheme.secondary)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Username with cyber style
-                    Text(
-                      userName.toUpperCase(),
-                      style: TextStyle(
-                        fontFamily: 'PixelFont',
-                        fontSize: 20,
-                        color: colorScheme.primary,
-                        letterSpacing: 2.0,
-                        shadows: [
-                          Shadow(
-                            color: colorScheme.primary.withOpacity(0.7),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                    ),
-       
-                  ],
-                ),
-              ),
-
-              const Divider(height: 1),
-
-              // Appearance Settings
-              _buildSettingCategory('APPEARANCE'),
-              
-              _buildSettingTile(
-                icon: Icons.dark_mode,
-                title: 'DARK MODE',
-                trailing: Switch(
-                  value: isDarkMode,
-                  onChanged: (value) {
-                    setState(() {
-                      isDarkMode = value;
-                    });
-                  },
-                ),
-                colorScheme: colorScheme,
-                textSize: textSize,
-              ),
-
-              _buildSettingTile(
-                icon: Icons.format_size,
-                title: 'TEXT SIZE',
-                subtitle: Slider(
-                  value: textSize,
-                  min: 12.0,
-                  max: 24.0,
-                  divisions: 6,
-                  label: textSize.toStringAsFixed(1),
-                  onChanged: (value) {
-                    setState(() {
-                      textSize = value;
-                    });
-                  },
-                ),
-                colorScheme: colorScheme,
-                textSize: textSize,
-              ),
-
-              const Divider(height: 1),
-
-              // Notification Settings
-              _buildSettingCategory('NOTIFICATIONS'),
-              
-              _buildSettingTile(
-                icon: Icons.notifications,
-                title: 'PUSH NOTIFICATIONS',
-                trailing: Switch(
-                  value: notificationsEnabled,
-                  onChanged: (value) {
-                    setState(() {
-                      notificationsEnabled = value;
-                    });
-                  },
-                ),
-                colorScheme: colorScheme,
-                textSize: textSize,
-              ),
-
-              const Divider(height: 1),
-
-              // About & Help
-              _buildSettingCategory('SYSTEM'),
-              
-              _buildSettingTile(
-                icon: Icons.info,
-                title: 'ABOUT',
-                onTap: () {
-                  // Navigate to About page
-                },
-                colorScheme: colorScheme,
-                textSize: textSize,
-              ),
-
-              _buildSettingTile(
-                icon: Icons.help,
-                title: 'HELP',
-                onTap: () {
-                  // Navigate to Help page
-                },
-                colorScheme: colorScheme,
-                textSize: textSize,
-              ),
-
-              const SizedBox(height: 30),
-
-              // Logout Button with neon effect
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.5),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15.0),
-                    ),
-                    onPressed: _logout,
-                    child: const Text(
-                      'LOGOUT',
-                      style: TextStyle(
-                        fontFamily: 'PixelFont', 
-                        fontSize: 16,
-                        letterSpacing: 3.0,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-            ],
-          ),
+                );
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Bank Account/Cards',
+              onTap: () {
+                // Navigate to Bank Account/Cards
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingCategory('SYSTEM'),
+            _buildSettingTile(
+              title: 'Chat Settings',
+              onTap: () {
+                // Navigate to Chat Settings
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Notification Settings',
+              onTap: () {
+                // Navigate to Notification Settings
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Privacy Settings',
+              onTap: () {
+                // Navigate to Privacy Settings
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Blocked users',
+              onTap: () {
+                // Navigate to Blocked Users
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Language',
+              onTap: () {
+                // Navigate to Language Settings
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingCategory('Support'),
+            _buildSettingTile(
+              title: 'ABOUT',
+              onTap: () {
+                // Navigate to About
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Help Centre',
+              onTap: () {
+                // Navigate to Help Centre
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Shopee Policies',
+              onTap: () {
+                // Navigate to Shopee Policies
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Rate us',
+              onTap: () {
+                // Navigate to Rate Us
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'HELP',
+              onTap: () {
+                // Navigate to Help
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'TERMS AND CONDITIONS',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const TermsAndConditionsPage()),
+                );
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'Request Account Deletion',
+              onTap: () {
+                // Navigate to Request Account Deletion
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+          ],
         ),
       ),
     );
   }
-  
+
   Widget _buildSettingCategory(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -400,41 +310,24 @@ Future<void> _fetchUserData() async {
       ),
     );
   }
-  
+
   Widget _buildSettingTile({
-    required IconData icon,
     required String title,
     required ColorScheme colorScheme,
     required double textSize,
-    Widget? subtitle,
-    Widget? trailing,
     VoidCallback? onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(6.0),
-        border: Border.all(
-          color: colorScheme.primary.withOpacity(0.2),
-          width: 1.0,
+    return ListTile(
+      leading: Icon(_getIconForTitle(title), color: colorScheme.primary),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontFamily: 'PixelFont',
+          fontSize: textSize,
+          color: Colors.white,
         ),
       ),
-      child: ListTile(
-        leading: Icon(icon, color: colorScheme.primary),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: textSize,
-            color: Colors.white,
-            letterSpacing: 1.0,
-          ),
-        ),
-        subtitle: subtitle,
-        trailing: trailing,
-        onTap: onTap,
-      ),
+      onTap: onTap,
     );
   }
 }

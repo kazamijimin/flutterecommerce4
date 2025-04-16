@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 class ProductDetails extends StatefulWidget {
   final String imageUrl;
   final String title;
@@ -20,7 +21,7 @@ class ProductDetails extends StatefulWidget {
     this.stockCount = 41,
     required this.userId, // Mark as required
   }) : super(key: key);
-  
+
   @override
   State<ProductDetails> createState() => _ProductDetailsState();
 }
@@ -35,34 +36,34 @@ class _ProductDetailsState extends State<ProductDetails> {
   int quantity = 1;
   String addedByUserName = "Loading..."; // Placeholder for the user's name
 
-
   @override
   void initState() {
     super.initState();
     _checkIfInWishlist();
     _fetchReviews();
     _fetchAddedByUserName(); // Fetch the name of the user who added the product
-
   }
- Future<void> _fetchAddedByUserName() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        addedByUserName = user.displayName ?? "Guest User";
-      });
-    } else {
+
+  Future<void> _fetchAddedByUserName() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        setState(() {
+          addedByUserName = user.displayName ?? "Guest User";
+        });
+      } else {
+        setState(() {
+          addedByUserName = "Guest User";
+        });
+      }
+    } catch (e) {
+      print("Error fetching user name: $e");
       setState(() {
         addedByUserName = "Guest User";
       });
     }
-  } catch (e) {
-    print("Error fetching user name: $e");
-    setState(() {
-      addedByUserName = "Guest User";
-    });
   }
-}
+
   Future<void> _checkIfInWishlist() async {
     _isInWishlist = await _productService.checkIfInWishlist(widget.title);
     setState(() {});
@@ -96,21 +97,40 @@ class _ProductDetailsState extends State<ProductDetails> {
       ),
     );
   }
-Future<void> _addToCart() async {
-  await _productService.addToCart(
-    widget.title, 
-    widget.imageUrl, 
-    widget.price, 
-    quantity, 
-    widget.userId // Pass the userId here
-  );
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Added to Cart!'),
-      backgroundColor: Colors.green,
-    ),
-  );
-}
+
+  Future<void> _addToCart() async {
+    if (widget.stockCount > 0) {
+      await _productService.addToCart(
+        widget.title,
+        widget.imageUrl,
+        widget.price,
+        quantity,
+        widget.userId,
+      );
+
+      // Decrement stock count in Firestore
+      final productRef =
+          FirebaseFirestore.instance.collection('products').doc(widget.title);
+      await productRef.update({
+        'stockCount': FieldValue.increment(-quantity),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Added to Cart!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Out of Stock!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _buyNow() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -184,6 +204,10 @@ Future<void> _addToCart() async {
                 price: widget.price,
                 description: widget.description,
                 rating: widget.rating,
+                stockCount: widget.stockCount, // Pass the stockCount parameter
+                category:
+                    "Category Placeholder", // Replace with the actual category value
+
                 onAddToCart: _addToCart,
                 onBuyNow: _buyNow,
               ),
@@ -259,11 +283,14 @@ class ProductImage extends StatelessWidget {
 }
 
 // Product Info Widget
+// Product Info Widget
 class ProductInfo extends StatelessWidget {
   final String title;
   final String price;
   final String description;
   final double rating;
+  final int stockCount;
+  final String category; // Add category
   final VoidCallback onAddToCart;
   final VoidCallback onBuyNow;
 
@@ -273,6 +300,8 @@ class ProductInfo extends StatelessWidget {
     required this.price,
     required this.description,
     required this.rating,
+    required this.stockCount,
+    required this.category, // Add category
     required this.onAddToCart,
     required this.onBuyNow,
   }) : super(key: key);
@@ -306,12 +335,6 @@ class ProductInfo extends StatelessWidget {
                     color: Colors.white,
                     fontFamily: 'PixelFont',
                     letterSpacing: 1.5,
-                    shadows: [
-                      Shadow(
-                        color: Color(0xFFFF0077),
-                        blurRadius: 10,
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -338,15 +361,37 @@ class ProductInfo extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
+          // Category
+          Text(
+            'Category: $category',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.white70,
+              fontFamily: 'PixelFont',
+            ),
+          ),
+          const SizedBox(height: 8),
+
           // Price
           Text(
-            price,
+            '\$${price}',
             style: const TextStyle(
               fontSize: 22,
               color: Color(0xFF00E5FF),
               fontWeight: FontWeight.bold,
               fontFamily: 'PixelFont',
-              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Stock Count
+          Text(
+            'Stock: $stockCount',
+            style: TextStyle(
+              fontSize: 16,
+              color: stockCount > 0 ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'PixelFont',
             ),
           ),
           const SizedBox(height: 16),
@@ -358,7 +403,6 @@ class ProductInfo extends StatelessWidget {
               fontSize: 16,
               color: Colors.white70,
               fontFamily: 'PixelFont',
-              height: 1.5,
             ),
           ),
           const SizedBox(height: 16),
@@ -368,7 +412,7 @@ class ProductInfo extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: onAddToCart,
+                  onPressed: stockCount > 0 ? onAddToCart : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF0077),
                   ),
@@ -377,7 +421,7 @@ class ProductInfo extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'PixelFont',
                       fontSize: 16,
-                      color: Colors.black
+                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -385,7 +429,7 @@ class ProductInfo extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: onBuyNow,
+                  onPressed: stockCount > 0 ? onBuyNow : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00E5FF),
                   ),
@@ -394,7 +438,7 @@ class ProductInfo extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'PixelFont',
                       fontSize: 16,
-                      color: Colors.black
+                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -667,8 +711,8 @@ class Review {
 
 // Product Service
 class ProductService {
-  Future<void> addToCart(
-      String title, String imageUrl, String price, int quantity, String userId) async {
+  Future<void> addToCart(String title, String imageUrl, String price,
+      int quantity, String userId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final cartRef = FirebaseFirestore.instance
@@ -686,8 +730,8 @@ class ProductService {
     }
   }
 
-  Future<void> addToWishlist(
-      String title, String imageUrl, String price, String description, String userId) async {
+  Future<void> addToWishlist(String title, String imageUrl, String price,
+      String description, String userId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final wishlistRef = FirebaseFirestore.instance

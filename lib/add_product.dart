@@ -14,9 +14,14 @@ class AddProduct extends StatefulWidget {
 class _AddProductState extends State<AddProduct> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController(); // Controller for description
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _stockCountController = TextEditingController();
   File? _selectedImage;
   bool _isUploading = false;
+
+  // Add a list of categories
+  final List<String> _categories = ['Games', 'Consoles', 'Accessories', 'Collectibles'];
+  String _selectedCategory = 'Games'; // Default category
 
   Future<void> _pickImage() async {
     final pickedFile =
@@ -46,9 +51,10 @@ class _AddProductState extends State<AddProduct> {
   Future<void> _addProduct() async {
     final name = _nameController.text.trim();
     final price = _priceController.text.trim();
-    final description = _descriptionController.text.trim(); // Get description
+    final description = _descriptionController.text.trim();
+    final stockCount = _stockCountController.text.trim();
 
-    if (name.isEmpty || price.isEmpty || description.isEmpty || _selectedImage == null) {
+    if (name.isEmpty || price.isEmpty || description.isEmpty || stockCount.isEmpty || _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields and select an image')),
       );
@@ -68,7 +74,9 @@ class _AddProductState extends State<AddProduct> {
       await FirebaseFirestore.instance.collection('products').add({
         'name': name,
         'price': double.parse(price),
-        'description': description, // Add description to Firestore
+        'description': description,
+        'stockCount': int.parse(stockCount),
+        'category': _selectedCategory, // Save the selected category
         'imageUrl': imageUrl,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -80,9 +88,11 @@ class _AddProductState extends State<AddProduct> {
       // Clear the input fields and image
       _nameController.clear();
       _priceController.clear();
-      _descriptionController.clear(); // Clear description
+      _descriptionController.clear();
+      _stockCountController.clear();
       setState(() {
         _selectedImage = null;
+        _selectedCategory = 'Games'; // Reset category to default
       });
 
       // Navigate back to Homepage after adding
@@ -119,8 +129,29 @@ class _AddProductState extends State<AddProduct> {
             ),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'), // Add description field
+              decoration: const InputDecoration(labelText: 'Description'),
               maxLines: 3,
+            ),
+            TextField(
+              controller: _stockCountController,
+              decoration: const InputDecoration(labelText: 'Stock Count'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: _categories.map((category) {
+                return DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedCategory = value!;
+                });
+              },
             ),
             const SizedBox(height: 20),
             _selectedImage != null

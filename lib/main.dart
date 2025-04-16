@@ -2,13 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutterecommerce4/authentication_page.dart';
-import 'package:flutterecommerce4/signup.dart';
-import 'package:flutterecommerce4/login.dart';
-import 'Authentication_page.dart';
 import 'firebase_options.dart';
 import 'theme_provider.dart';
 import 'package:provider/provider.dart'; // Make sure Firebase is initialized
-import 'home.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
