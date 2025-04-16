@@ -10,7 +10,547 @@ import 'settings.dart';
 import 'login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'product_details.dart';
-import 'wishlist.dart'; // Import the ProductDetails screen
+import 'wishlist.dart';
+
+// New SearchPage class to handle search functionality
+class SearchPage extends StatefulWidget {
+  const SearchPage({super.key});
+
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+  RangeValues _priceRange = const RangeValues(0, 10000);
+  List<String> _recentSearches = [];
+  List<String> _suggestedProducts = [];
+  bool _showFilters = false;
+
+  // These would normally be fetched from Firebase
+  final List<String> _categories = ['All', 'Games', 'Consoles', 'Accessories', 'Collectibles'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+    _loadSuggestedProducts();
+  }
+
+  void _loadRecentSearches() async {
+    // In a real app, you could load this from shared preferences or Firebase
+    setState(() {
+      _recentSearches = ['Pokemon', 'Nintendo Switch', 'PS5', 'Gaming Keyboard'];
+    });
+  }
+
+  void _loadSuggestedProducts() async {
+    // Normally we'd query Firestore for popular products
+    setState(() {
+      _suggestedProducts = ['Final Fantasy XVI', 'DualSense Controller', 'Xbox Series X'];
+    });
+  }
+
+  void _saveSearch(String query) {
+    if (query.trim().isEmpty) return;
+    
+    setState(() {
+      // Remove if already exists and add to front
+      _recentSearches.remove(query);
+      _recentSearches.insert(0, query);
+      
+      // Keep only the last 5 searches
+      if (_recentSearches.length > 5) {
+        _recentSearches = _recentSearches.sublist(0, 5);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: TextField(
+          controller: _searchController,
+          style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+          decoration: InputDecoration(
+            hintText: 'Search products...',
+            hintStyle: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+            border: InputBorder.none,
+            prefixIcon: const Icon(Icons.search, color: Colors.white70),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _showFilters ? Icons.filter_list_off : Icons.filter_list,
+                    color: Colors.cyan,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showFilters = !_showFilters;
+                    });
+                  },
+                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.white70),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+          onSubmitted: (value) {
+            _saveSearch(value);
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
+      body: Column(
+        children: [
+          if (_showFilters) _buildFilters(),
+          
+          Expanded(
+            child: _searchQuery.isEmpty
+                ? _buildSuggestions()
+                : _buildSearchResults(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilters() {
+    return Container(
+      color: Colors.grey[900],
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'FILTER BY',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'PixelFont',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text(
+                'Category:',
+                style: TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[800],
+                  ),
+                  child: DropdownButton<String>(
+                    value: _selectedCategory,
+                    isExpanded: true,
+                    dropdownColor: Colors.grey[800],
+                    style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                    underline: Container(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedCategory = newValue!;
+                      });
+                    },
+                    items: _categories.map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Price Range:',
+            style: TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+          ),
+          const SizedBox(height: 8),
+          RangeSlider(
+            values: _priceRange,
+            max: 10000,
+            divisions: 20,
+            activeColor: Colors.cyan,
+            inactiveColor: Colors.grey,
+            labels: RangeLabels(
+              'PHP ${_priceRange.start.round().toString()}',
+              'PHP ${_priceRange.end.round().toString()}',
+            ),
+            onChanged: (RangeValues values) {
+              setState(() {
+                _priceRange = values;
+              });
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'PHP ${_priceRange.start.round()}',
+                style: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+              ),
+              Text(
+                'PHP ${_priceRange.end.round()}',
+                style: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyan,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              onPressed: () {
+                // Apply filters
+              },
+              child: const Text(
+                'APPLY FILTERS',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestions() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_recentSearches.isNotEmpty) ...[
+            const Text(
+              'RECENT SEARCHES',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _recentSearches.map((search) => GestureDetector(
+                onTap: () {
+                  _searchController.text = search;
+                  setState(() {
+                    _searchQuery = search;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[700]!),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.history, color: Colors.white70, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        search,
+                        style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                      ),
+                    ],
+                  ),
+                ),
+              )).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          const Text(
+            'SUGGESTED FOR YOU',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'PixelFont',
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Using StreamBuilder to get suggested products from Firestore
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('products')
+                .limit(6)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.cyan),
+                );
+              }
+
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No suggestions available',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                );
+              }
+
+              final products = snapshot.data!.docs;
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  final productData = product.data() as Map<String, dynamic>?;
+                  
+                  return _buildProductItem(
+                    productData?['imageUrl'] ?? '',
+                    productData?['name'] ?? 'Unknown Product',
+                    'PHP ${productData?['price'] ?? '0.00'}',
+                    productData?['description'] ?? 'No description available',
+                    productData?['userId'] ?? 'Unknown User',
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isGreaterThanOrEqualTo: _searchQuery)
+          .where('name', isLessThanOrEqualTo: _searchQuery + '\uf8ff')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.cyan),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.search_off, color: Colors.white54, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'No results found for "$_searchQuery"',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'PixelFont',
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final products = snapshot.data!.docs;
+        
+        // Apply price filter
+        final filteredProducts = products.where((product) {
+          final productData = product.data() as Map<String, dynamic>?;
+          final price = double.tryParse(productData?['price'].toString() ?? '0') ?? 0;
+          
+          bool matchesPrice = price >= _priceRange.start && price <= _priceRange.end;
+          
+          bool matchesCategory = _selectedCategory == 'All' || 
+                                productData?['category'] == _selectedCategory;
+          
+          return matchesPrice && matchesCategory;
+        }).toList();
+
+        if (filteredProducts.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.filter_alt_off, color: Colors.white54, size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  'No results match your filters',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'PixelFont',
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.75,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: filteredProducts.length,
+          itemBuilder: (context, index) {
+            final product = filteredProducts[index];
+            final productData = product.data() as Map<String, dynamic>?;
+            
+            return _buildProductItem(
+              productData?['imageUrl'] ?? '',
+              productData?['name'] ?? 'Unknown Product',
+              'PHP ${productData?['price'] ?? '0.00'}',
+              productData?['description'] ?? 'No description available',
+              productData?['userId'] ?? 'Unknown User',
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProductItem(String imageUrl, String title, String price, 
+      String description, String userId) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(
+              imageUrl: imageUrl,
+              title: title,
+              price: price,
+              description: description,
+              userId: userId,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[800]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade900,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: 'PixelFont',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      price,
+                      style: const TextStyle(
+                        color: Colors.cyan,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'PixelFont',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -190,19 +730,27 @@ class _HomepageState extends State<Homepage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey[700],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: 12.0),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SearchPage()),
+                  );
+                },
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[700],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      const Icon(Icons.search, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Expanded(
                         child: Text(
-                          'Search',
+                          'Search products...',
                           style: TextStyle(
                             color: Colors.white70,
                             fontFamily: 'PixelFont',
@@ -210,15 +758,20 @@ class _HomepageState extends State<Homepage> {
                           ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.search, color: Colors.white),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
+                      IconButton(
+                        icon: const Icon(Icons.filter_list, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SearchPage()),
+                          );
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -433,7 +986,7 @@ class _HomepageState extends State<Homepage> {
                   ],
                 ),
                 TextButton(
-                  onPressed: () {
+onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -712,3 +1265,4 @@ class _HomepageState extends State<Homepage> {
     );
   }
 }
+                      
