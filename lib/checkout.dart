@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'order_details.dart';
+import 'dart:math';
 class CheckoutPage extends StatefulWidget {
   final double totalPrice;
   final List<Map<String, dynamic>> selectedItems;
@@ -508,62 +509,65 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
   }
+Future<void> _confirmOrder() async {
+  setState(() {
+    _isLoading = true;
+  });
 
-  Future<void> _confirmOrder() async {
-    setState(() {
-      _isLoading = true;
-    });
+  try {
+    final user = FirebaseAuth.instance.currentUser;
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // Generate a 12-digit order ID
+      final random = Random();
+      final orderId = List.generate(12, (_) => random.nextInt(10)).join();
 
-      if (user != null) {
-        final ordersRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders');
+      // Add order to the user's orders collection
+      final userOrdersRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders');
 
-        await ordersRef.add({
-          'totalPrice': _totalPayment,
-          'paymentMethod': _selectedPaymentMethod,
-          'shippingOption': _selectedShippingOption,
-          'shippingAddress': _selectedAddress,
-          'orderDate': DateTime.now().toIso8601String(),
-          'items': widget.selectedItems,
-          'status': 'pending',
-        });
+      final orderData = {
+        'orderId': orderId, // Save the generated order ID
+        'totalPrice': _totalPayment,
+        'paymentMethod': _selectedPaymentMethod,
+        'shippingOption': _selectedShippingOption,
+        'shippingAddress': _selectedAddress,
+        'orderDate': DateTime.now().toIso8601String(),
+        'items': widget.selectedItems,
+        'status': 'to pay', // Set the initial status to "to pay"
+        'userId': user.uid, // Add user ID for reference
+      };
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'ORDER CONFIRMED!',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-              ),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+      await userOrdersRef.add(orderData);
 
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'YOU MUST BE LOGGED IN TO PLACE AN ORDER.',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-              ),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
+      // Add order to the global orders collection
+      final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
+      await globalOrdersRef.add(orderData);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'FAILED TO PLACE ORDER: $e',
+            'ORDER CONFIRMED!',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+            ),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate to the Order Table Page
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const OrderTablePage()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'YOU MUST BE LOGGED IN TO PLACE AN ORDER.',
             style: TextStyle(
               fontFamily: 'PixelFont',
             ),
@@ -571,12 +575,25 @@ class _CheckoutPageState extends State<CheckoutPage> {
           backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'FAILED TO PLACE ORDER: $e',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+          ),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 }
 
 // Custom painter for cyberpunk grid background effect

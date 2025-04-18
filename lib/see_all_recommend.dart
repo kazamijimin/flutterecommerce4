@@ -44,46 +44,57 @@ class SeeAllProductsScreen extends StatelessWidget {
           }
 
           final products = snapshot.data!.docs;
+          return GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.7,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              final productData = product.data()
+                  as Map<String, dynamic>?; // Safely cast the data
 
-return GridView.builder(
-  padding: const EdgeInsets.all(8),
-  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-    crossAxisCount: 2,
-    crossAxisSpacing: 8,
-    mainAxisSpacing: 8,
-    childAspectRatio: 0.7,
-  ),
-  itemCount: products.length,
-  itemBuilder: (context, index) {
-    final product = products[index];
-    final productData = product.data() as Map<String, dynamic>?; // Safely cast the data
-
-    return _buildProductCard(
-      context,
-      productData?['imageUrl'] ?? '', // Default to an empty string if imageUrl is missing
-      productData?['name'] ?? 'Unknown Product', // Default to 'Unknown Product' if name is missing
-      'PHP ${productData?['price'] ?? '0.00'}', // Default to '0.00' if price is missing
-      productData?['description'] ?? 'No description available', // Default to 'No description available'
-      productData?['userId'] ?? 'Unknown User', // Default to 'Unknown User' if userId is missing
-    );
-  },
-);
+              return _buildProductCard(
+                context,
+                productData?['imageUrl'] ??
+                    '', // Default to an empty string if imageUrl is missing
+                productData?['name'] ??
+                    'Unknown Product', // Default to 'Unknown Product' if name is missing
+                'PHP ${productData?['price'] ?? '0.00'}', // Default to '0.00' if price is missing
+                productData?['description'] ??
+                    'No description available', // Default to 'No description available'
+                productData?['userId'] ??
+                    'Unknown User', // Default to 'Unknown User' if userId is missing
+                product
+                    .id, // Pass the Firestore document ID as the seventh argument
+              );
+            },
+          );
         },
       ),
     );
   }
-Widget _buildProductCard(BuildContext context, String imageUrl, String title, String price, String description, String userId) {
+Widget _buildProductCard(BuildContext context, String imageUrl, String title,
+    String price, String description, String userId, String productId) {
   return GestureDetector(
     onTap: () {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ProductDetails(
+            productId: productId,
             imageUrl: imageUrl,
             title: title,
             price: price,
-            description: description, // Pass the description to the ProductDetails screen
-            userId: userId, // Pass the userId to the ProductDetails screen
+            description: description,
+            userId: userId,
+            rating: 0.0, // Provide a default value for rating
+            stockCount: 0, // Provide a default value for stockCount
+            category: 'Unknown', // Provide a default value for category
           ),
         ),
       );

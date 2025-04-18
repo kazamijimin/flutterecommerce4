@@ -12,6 +12,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'product_details.dart';
 import 'wishlist.dart';
 import 'category.dart';
+
 // New SearchPage class to handle search functionality
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -30,7 +31,13 @@ class _SearchPageState extends State<SearchPage> {
   bool _showFilters = false;
 
   // These would normally be fetched from Firebase
-  final List<String> _categories = ['All', 'Games', 'Consoles', 'Accessories', 'Collectibles'];
+  final List<String> _categories = [
+    'All',
+    'Games',
+    'Consoles',
+    'Accessories',
+    'Collectibles'
+  ];
 
   @override
   void initState() {
@@ -42,25 +49,34 @@ class _SearchPageState extends State<SearchPage> {
   void _loadRecentSearches() async {
     // In a real app, you could load this from shared preferences or Firebase
     setState(() {
-      _recentSearches = ['Pokemon', 'Nintendo Switch', 'PS5', 'Gaming Keyboard'];
+      _recentSearches = [
+        'Pokemon',
+        'Nintendo Switch',
+        'PS5',
+        'Gaming Keyboard'
+      ];
     });
   }
 
   void _loadSuggestedProducts() async {
     // Normally we'd query Firestore for popular products
     setState(() {
-      _suggestedProducts = ['Final Fantasy XVI', 'DualSense Controller', 'Xbox Series X'];
+      _suggestedProducts = [
+        'Final Fantasy XVI',
+        'DualSense Controller',
+        'Xbox Series X'
+      ];
     });
   }
 
   void _saveSearch(String query) {
     if (query.trim().isEmpty) return;
-    
+
     setState(() {
       // Remove if already exists and add to front
       _recentSearches.remove(query);
       _recentSearches.insert(0, query);
-      
+
       // Keep only the last 5 searches
       if (_recentSearches.length > 5) {
         _recentSearches = _recentSearches.sublist(0, 5);
@@ -79,7 +95,8 @@ class _SearchPageState extends State<SearchPage> {
           style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
           decoration: InputDecoration(
             hintText: 'Search products...',
-            hintStyle: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+            hintStyle:
+                const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
             border: InputBorder.none,
             prefixIcon: const Icon(Icons.search, color: Colors.white70),
             suffixIcon: Row(
@@ -131,7 +148,6 @@ class _SearchPageState extends State<SearchPage> {
       body: Column(
         children: [
           if (_showFilters) _buildFilters(),
-          
           Expanded(
             child: _searchQuery.isEmpty
                 ? _buildSuggestions()
@@ -163,7 +179,8 @@ class _SearchPageState extends State<SearchPage> {
             children: [
               const Text(
                 'Category:',
-                style: TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+                style:
+                    TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -177,14 +194,16 @@ class _SearchPageState extends State<SearchPage> {
                     value: _selectedCategory,
                     isExpanded: true,
                     dropdownColor: Colors.grey[800],
-                    style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                    style: const TextStyle(
+                        color: Colors.white, fontFamily: 'PixelFont'),
                     underline: Container(),
                     onChanged: (String? newValue) {
                       setState(() {
                         _selectedCategory = newValue!;
                       });
                     },
-                    items: _categories.map<DropdownMenuItem<String>>((String value) {
+                    items: _categories
+                        .map<DropdownMenuItem<String>>((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
                         child: Text(value),
@@ -222,11 +241,13 @@ class _SearchPageState extends State<SearchPage> {
             children: [
               Text(
                 'PHP ${_priceRange.start.round()}',
-                style: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+                style: const TextStyle(
+                    color: Colors.white70, fontFamily: 'PixelFont'),
               ),
               Text(
                 'PHP ${_priceRange.end.round()}',
-                style: const TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+                style: const TextStyle(
+                    color: Colors.white70, fontFamily: 'PixelFont'),
               ),
             ],
           ),
@@ -236,7 +257,8 @@ class _SearchPageState extends State<SearchPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               onPressed: () {
                 // Apply filters
@@ -272,33 +294,39 @@ class _SearchPageState extends State<SearchPage> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _recentSearches.map((search) => GestureDetector(
-                onTap: () {
-                  _searchController.text = search;
-                  setState(() {
-                    _searchQuery = search;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[700]!),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.history, color: Colors.white70, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        search,
-                        style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
-                      ),
-                    ],
-                  ),
-                ),
-              )).toList(),
+              children: _recentSearches
+                  .map((search) => GestureDetector(
+                        onTap: () {
+                          _searchController.text = search;
+                          setState(() {
+                            _searchQuery = search;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[700]!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.history,
+                                  color: Colors.white70, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                search,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'PixelFont'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ))
+                  .toList(),
             ),
             const SizedBox(height: 24),
           ],
@@ -341,29 +369,29 @@ class _SearchPageState extends State<SearchPage> {
 
               final products = snapshot.data!.docs;
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  final productData = product.data() as Map<String, dynamic>?;
-                  
-                  return _buildProductItem(
-                    productData?['imageUrl'] ?? '',
-                    productData?['name'] ?? 'Unknown Product',
-                    'PHP ${productData?['price'] ?? '0.00'}',
-                    productData?['description'] ?? 'No description available',
-                    productData?['userId'] ?? 'Unknown User',
-                  );
-                },
-              );
+ return GridView.builder(
+  padding: const EdgeInsets.all(16),
+  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 2,
+    childAspectRatio: 0.75,
+    crossAxisSpacing: 12,
+    mainAxisSpacing: 12,
+  ),
+  itemCount: products.length, // Use 'products' instead of 'filteredProducts'
+  itemBuilder: (context, index) {
+    final product = products[index];
+    final productData = product.data() as Map<String, dynamic>?;
+
+    return _buildProductItem(
+      productData?['imageUrl'] ?? '',
+      productData?['name'] ?? 'Unknown Product',
+      'PHP ${productData?['price'] ?? '0.00'}',
+      productData?['description'] ?? 'No description available',
+      productData?['userId'] ?? 'Unknown User',
+      product.id, // Pass the Firestore document ID
+    );
+  },
+);
             },
           ),
         ],
@@ -406,17 +434,19 @@ class _SearchPageState extends State<SearchPage> {
         }
 
         final products = snapshot.data!.docs;
-        
+
         // Apply price filter
         final filteredProducts = products.where((product) {
           final productData = product.data() as Map<String, dynamic>?;
-          final price = double.tryParse(productData?['price'].toString() ?? '0') ?? 0;
-          
-          bool matchesPrice = price >= _priceRange.start && price <= _priceRange.end;
-          
-          bool matchesCategory = _selectedCategory == 'All' || 
-                                productData?['category'] == _selectedCategory;
-          
+          final price =
+              double.tryParse(productData?['price'].toString() ?? '0') ?? 0;
+
+          bool matchesPrice =
+              price >= _priceRange.start && price <= _priceRange.end;
+
+          bool matchesCategory = _selectedCategory == 'All' ||
+              productData?['category'] == _selectedCategory;
+
           return matchesPrice && matchesCategory;
         }).toList();
 
@@ -425,7 +455,8 @@ class _SearchPageState extends State<SearchPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.filter_alt_off, color: Colors.white54, size: 48),
+                const Icon(Icons.filter_alt_off,
+                    color: Colors.white54, size: 48),
                 const SizedBox(height: 16),
                 const Text(
                   'No results match your filters',
@@ -440,40 +471,43 @@ class _SearchPageState extends State<SearchPage> {
           );
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.75,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: filteredProducts.length,
-          itemBuilder: (context, index) {
-            final product = filteredProducts[index];
-            final productData = product.data() as Map<String, dynamic>?;
-            
-            return _buildProductItem(
-              productData?['imageUrl'] ?? '',
-              productData?['name'] ?? 'Unknown Product',
-              'PHP ${productData?['price'] ?? '0.00'}',
-              productData?['description'] ?? 'No description available',
-              productData?['userId'] ?? 'Unknown User',
-            );
-          },
-        );
+ return GridView.builder(
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 2,
+    childAspectRatio: 0.75,
+    crossAxisSpacing: 12,
+    mainAxisSpacing: 12,
+  ),
+  itemCount: products.length,
+  itemBuilder: (context, index) {
+    final product = products[index];
+    final productData = product.data() as Map<String, dynamic>?;
+
+    return _buildProductItem(
+      productData?['imageUrl'] ?? '',
+      productData?['name'] ?? 'Unknown Product',
+      'PHP ${productData?['price'] ?? '0.00'}',
+      productData?['description'] ?? 'No description available',
+      productData?['userId'] ?? 'Unknown User',
+      product.id, // Pass the Firestore document ID as the sixth argument
+    );
+  },
+);
       },
     );
   }
 
-  Widget _buildProductItem(String imageUrl, String title, String price, 
-      String description, String userId) {
+  Widget _buildProductItem(String imageUrl, String title, String price,
+      String description, String userId, String productId) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetails(
+              productId: productId,
               imageUrl: imageUrl,
               title: title,
               price: price,
@@ -494,7 +528,8 @@ class _SearchPageState extends State<SearchPage> {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(7)),
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
@@ -502,7 +537,8 @@ class _SearchPageState extends State<SearchPage> {
                     return Container(
                       color: Colors.grey.shade900,
                       child: const Center(
-                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                        child:
+                            Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                     );
                   },
@@ -527,7 +563,8 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     decoration: BoxDecoration(
                       color: Colors.grey[800],
                       borderRadius: BorderRadius.circular(4),
@@ -642,15 +679,17 @@ class _HomepageState extends State<Homepage> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildBottomNavItem(Icons.home, "HOME", Colors.red),
-GestureDetector(
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CategoryPage()),
-    );
-  },
-  child: _buildBottomNavItem(Icons.category, "CATEGORY", Colors.white),
-),            if (user != null)
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CategoryPage()),
+                );
+              },
+              child:
+                  _buildBottomNavItem(Icons.category, "CATEGORY", Colors.white),
+            ),
+            if (user != null)
               _buildBottomNavItem(Icons.message, "MESSAGE", Colors.white),
             if (user != null)
               _buildBottomNavItem(Icons.shopping_bag, "SHOP", Colors.white),
@@ -766,11 +805,13 @@ GestureDetector(
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.filter_list, color: Colors.white),
+                        icon:
+                            const Icon(Icons.filter_list, color: Colors.white),
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const SearchPage()),
+                            MaterialPageRoute(
+                                builder: (context) => const SearchPage()),
                           );
                         },
                         padding: EdgeInsets.zero,
@@ -993,7 +1034,7 @@ GestureDetector(
                   ],
                 ),
                 TextButton(
-onPressed: () {
+                  onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1070,8 +1111,9 @@ onPressed: () {
                             'PHP ${productData?['price'] ?? '0.00'}',
                             productData?['description'] ??
                                 'No description available',
-                            productData?['userId'] ??
-                                'Unknown User', // Pass the userId
+                            productData?['userId'] ?? 'Unknown User',
+                            product
+                                .id, // Pass the Firestore document ID as the sixth argument
                           );
                         },
                       );
@@ -1196,13 +1238,14 @@ onPressed: () {
   }
 
   Widget _buildProductCard(String imageUrl, String title, String price,
-      String description, String userId) {
+      String description, String userId, String productId) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetails(
+              productId: productId,
               imageUrl: imageUrl,
               title: title,
               price: price,
@@ -1272,4 +1315,3 @@ onPressed: () {
     );
   }
 }
-                      

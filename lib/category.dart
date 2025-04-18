@@ -10,7 +10,12 @@ class CategoryPage extends StatefulWidget {
 }
 
 class _CategoryPageState extends State<CategoryPage> {
-  final List<String> _categories = ['Games', 'Consoles', 'Accessories', 'Collectibles'];
+  final List<String> _categories = [
+    'Games',
+    'Consoles',
+    'Accessories',
+    'Collectibles'
+  ];
   String _selectedCategory = 'Games';
 
   @override
@@ -34,7 +39,8 @@ class _CategoryPageState extends State<CategoryPage> {
               dropdownColor: Colors.grey[900],
               decoration: InputDecoration(
                 labelText: 'Select Category',
-                labelStyle: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                labelStyle: const TextStyle(
+                    color: Colors.white, fontFamily: 'PixelFont'),
                 filled: true,
                 fillColor: Colors.grey[800],
                 border: OutlineInputBorder(
@@ -42,7 +48,8 @@ class _CategoryPageState extends State<CategoryPage> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+              style:
+                  const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
               onChanged: (value) {
                 setState(() {
                   _selectedCategory = value!;
@@ -75,7 +82,8 @@ class _CategoryPageState extends State<CategoryPage> {
                   return const Center(
                     child: Text(
                       'No products found in this category',
-                      style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                      style: TextStyle(
+                          color: Colors.white, fontFamily: 'PixelFont'),
                     ),
                   );
                 }
@@ -101,10 +109,14 @@ class _CategoryPageState extends State<CategoryPage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => ProductDetails(
+                              productId:
+                                  product.id, // Pass the Firestore document ID
                               imageUrl: productData?['imageUrl'] ?? '',
                               title: productData?['name'] ?? 'Unknown Product',
-                              price: productData?['price']?.toString() ?? '0.00',
-                              description: productData?['description'] ?? 'No description available',
+                              price:
+                                  productData?['price']?.toString() ?? '0.00',
+                              description: productData?['description'] ??
+                                  'No description available',
                               stockCount: productData?['stockCount'] ?? 0,
                               userId: productData?['userId'] ?? 'Unknown User',
                             ),
@@ -122,7 +134,8 @@ class _CategoryPageState extends State<CategoryPage> {
                           children: [
                             Expanded(
                               child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(7)),
                                 child: Image.network(
                                   productData?['imageUrl'] ?? '',
                                   fit: BoxFit.cover,
@@ -130,7 +143,8 @@ class _CategoryPageState extends State<CategoryPage> {
                                     return Container(
                                       color: Colors.grey.shade900,
                                       child: const Center(
-                                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                                        child: Icon(Icons.image_not_supported,
+                                            color: Colors.grey),
                                       ),
                                     );
                                   },

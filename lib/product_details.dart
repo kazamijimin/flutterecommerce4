@@ -3,23 +3,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class ProductDetails extends StatefulWidget {
+  final String productId; // Firestore document ID
   final String imageUrl;
   final String title;
   final String price;
   final String description;
   final double rating;
   final int stockCount;
-  final String userId; // New field to store the user who added the product
+  final String userId;
+  final String category;
 
   const ProductDetails({
     Key? key,
+    required this.productId, // Pass the Firestore document ID
     required this.imageUrl,
     required this.title,
     required this.price,
     required this.description,
     this.rating = 4.9,
     this.stockCount = 41,
-    required this.userId, // Mark as required
+    required this.userId,
+    this.category = "RPG",
   }) : super(key: key);
 
   @override
@@ -34,17 +38,71 @@ class _ProductDetailsState extends State<ProductDetails> {
   bool _isInWishlist = false;
   List<Review> _reviews = [];
   int quantity = 1;
-  String addedByUserName = "Loading..."; // Placeholder for the user's name
+  String addedByUserName = "Loading...";
+  String? addedByUserAvatar;
 
   @override
   void initState() {
     super.initState();
     _checkIfInWishlist();
     _fetchReviews();
-    _fetchAddedByUserName(); // Fetch the name of the user who added the product
+    _fetchAddedByUserInfo();
   }
 
-  Future<void> _fetchAddedByUserName() async {
+  void _submitReview() async {
+    if (_reviewController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please write a review before submitting.',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final review = Review(
+        username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
+        comment: _reviewController.text.trim(),
+        rating: _userRating,
+        avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
+        date: DateTime.now().toIso8601String(),
+      );
+
+      await _reviewService.submitReview(widget.productId, review);
+
+      setState(() {
+        _reviews.add(review);
+        _reviewController.clear();
+        _userRating = 5.0; // Reset rating
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Review submitted successfully!',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to submit review: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _fetchAddedByUserInfo() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -74,81 +132,98 @@ class _ProductDetailsState extends State<ProductDetails> {
     setState(() {});
   }
 
-  Future<void> _submitReview() async {
-    final review = Review(
-      username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
-      comment: _reviewController.text,
-      rating: _userRating,
-      avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
-      date: DateTime.now().toIso8601String(),
-    );
+  void _increaseQuantity() {
+    if (quantity < widget.stockCount) {
+      setState(() {
+        quantity++;
+      });
+    }
+  }
 
-    await _reviewService.submitReview(widget.title, review);
-    setState(() {
-      _reviews.add(review);
-      _reviewController.clear();
-      _userRating = 5.0;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Review submitted!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+  void _decreaseQuantity() {
+    if (quantity > 1) {
+      setState(() {
+        quantity--;
+      });
+    }
   }
 
   Future<void> _addToCart() async {
     if (widget.stockCount > 0) {
-      await _productService.addToCart(
-        widget.title,
-        widget.imageUrl,
-        widget.price,
-        quantity,
-        widget.userId,
-      );
+      try {
+        await _productService.addToCart(
+          widget.title,
+          widget.imageUrl,
+          widget.price,
+          quantity,
+          widget.userId,
+        );
 
-      // Decrement stock count in Firestore
-      final productRef =
-          FirebaseFirestore.instance.collection('products').doc(widget.title);
-      await productRef.update({
-        'stockCount': FieldValue.increment(-quantity),
-      });
+        final productRef = FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.productId);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Added to Cart!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+        final productSnapshot = await productRef.get();
+        if (productSnapshot.exists) {
+          await productRef.update({
+            'stockCount': FieldValue.increment(-quantity),
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Added to Cart!',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Product not found in the database.',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to add to cart: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Out of Stock!'),
+          content: Text(
+            'Out of Stock!',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  void _buyNow() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Proceeding to Checkout...'),
-        backgroundColor: Colors.blue,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
-          widget.title.toUpperCase(),
+          widget.title,
           style: const TextStyle(
             fontFamily: 'PixelFont',
             letterSpacing: 2.0,
+            color: Colors.white,
           ),
         ),
         backgroundColor: Colors.black,
@@ -171,13 +246,6 @@ class _ProductDetailsState extends State<ProductDetails> {
               });
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            color: const Color(0xFF00E5FF),
-            onPressed: () {
-              // Implement share functionality
-            },
-          ),
         ],
       ),
       body: Container(
@@ -191,398 +259,385 @@ class _ProductDetailsState extends State<ProductDetails> {
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product Image
-              ProductImage(imageUrl: widget.imageUrl),
-
-              // Product Info
-              ProductInfo(
-                title: widget.title,
-                price: widget.price,
-                description: widget.description,
-                rating: widget.rating,
-                stockCount: widget.stockCount, // Pass the stockCount parameter
-                category:
-                    "Category Placeholder", // Replace with the actual category value
-
-                onAddToCart: _addToCart,
-                onBuyNow: _buyNow,
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border.all(color: Colors.grey[800]!),
               ),
-
-              const SizedBox(height: 16),
-
-              // Display the name of the user who added the product
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  "Added by: $addedByUserName",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontFamily: 'PixelFont',
-                  ),
+              child: Text(
+                widget.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontFamily: 'PixelFont',
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // Reviews Section
-              ReviewsSection(
-                reviews: _reviews,
-                reviewController: _reviewController,
-                userRating: _userRating,
-                onRatingChanged: (rating) {
-                  setState(() {
-                    _userRating = rating;
-                  });
-                },
-                onSubmitReview: _submitReview,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Product Image Widget
-class ProductImage extends StatelessWidget {
-  final String imageUrl;
-
-  const ProductImage({Key? key, required this.imageUrl}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      height: 300,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: const Color(0xFFFF0077),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF0077).withOpacity(0.3),
-            blurRadius: 12,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-}
-
-// Product Info Widget
-// Product Info Widget
-class ProductInfo extends StatelessWidget {
-  final String title;
-  final String price;
-  final String description;
-  final double rating;
-  final int stockCount;
-  final String category; // Add category
-  final VoidCallback onAddToCart;
-  final VoidCallback onBuyNow;
-
-  const ProductInfo({
-    Key? key,
-    required this.title,
-    required this.price,
-    required this.description,
-    required this.rating,
-    required this.stockCount,
-    required this.category, // Add category
-    required this.onAddToCart,
-    required this.onBuyNow,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF232339).withOpacity(0.7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title & Rating
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFamily: 'PixelFont',
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    rating.toString(),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFFFFDD00),
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.star,
-                    color: Color(0xFFFFDD00),
-                    size: 20,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Category
-          Text(
-            'Category: $category',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-              fontFamily: 'PixelFont',
             ),
-          ),
-          const SizedBox(height: 8),
-
-          // Price
-          Text(
-            '\$${price}',
-            style: const TextStyle(
-              fontSize: 22,
-              color: Color(0xFF00E5FF),
-              fontWeight: FontWeight.bold,
-              fontFamily: 'PixelFont',
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Stock Count
-          Text(
-            'Stock: $stockCount',
-            style: TextStyle(
-              fontSize: 16,
-              color: stockCount > 0 ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'PixelFont',
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Description
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-              fontFamily: 'PixelFont',
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Add to Cart and Buy Now Buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: stockCount > 0 ? onAddToCart : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF0077),
-                  ),
-                  child: const Text(
-                    "ADD TO CART",
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: stockCount > 0 ? onBuyNow : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E5FF),
-                  ),
-                  child: const Text(
-                    "BUY NOW",
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Reviews Section Widget
-class ReviewsSection extends StatelessWidget {
-  final List<Review> reviews;
-  final TextEditingController reviewController;
-  final double userRating;
-  final ValueChanged<double> onRatingChanged;
-  final VoidCallback onSubmitReview;
-
-  const ReviewsSection({
-    Key? key,
-    required this.reviews,
-    required this.reviewController,
-    required this.userRating,
-    required this.onRatingChanged,
-    required this.onSubmitReview,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "REVIEWS",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-              fontFamily: 'PixelFont',
-              letterSpacing: 2.0,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Add Review
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A2E),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFF00E5FF).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Column(
+            const SizedBox(height: 12),
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "ADD YOUR REVIEW",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontFamily: 'PixelFont',
-                    letterSpacing: 1.0,
+                Container(
+                  width: 160,
+                  height: 240,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[700]!),
+                  ),
+                  child: Image.network(
+                    widget.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Center(
+                            child: Icon(Icons.image_not_supported,
+                                color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 8),
-
-                // Star Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    return IconButton(
-                      icon: Icon(
-                        index < userRating ? Icons.star : Icons.star_border,
-                        color: const Color(0xFFFFDD00),
-                        size: 30,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.description,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontFamily: 'PixelFont',
+                        ),
+                        maxLines: 6,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      onPressed: () {
-                        onRatingChanged(index + 1.0);
-                      },
-                    );
-                  }),
-                ),
-
-                // Review Text Field
-                TextField(
-                  controller: reviewController,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'PixelFont',
-                  ),
-                  decoration: InputDecoration(
-                    hintText: "Share your thoughts on this product...",
-                    hintStyle: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontFamily: 'PixelFont',
-                    ),
-                    filled: true,
-                    fillColor: Colors.black.withOpacity(0.3),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(
-                        color: Color(0xFFFF0077),
-                        width: 1,
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Text(
+                            "Average Rating: ",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                          Text(
+                            "${widget.rating}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: const Color(0xFFFF0077).withOpacity(0.5),
-                        width: 1,
+                      const SizedBox(height: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildGameTag("Genre: ${widget.category}"),
+                          buildGameTag("Single Player"),
+                          buildGameTag("Action RPG"),
+                          buildGameTag("Anime Style"),
+                          buildGameTag("Story Rich"),
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Submit Review Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: onSubmitReview,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFDD00),
-                    ),
-                    child: const Text("SUBMIT"),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Text(
+                            "Available Stock: ",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                          Text(
+                            "${widget.stockCount}",
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: _decreaseQuantity,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                "-",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 36,
+                            height: 28,
+                            alignment: Alignment.center,
+                            child: Text(
+                              "$quantity",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: _increaseQuantity,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                "+",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.stockCount > 0 ? _addToCart : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+                child: const Text("ADD TO CART"),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[800]!),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.cyan, width: 2),
+                    ),
+                    child: addedByUserAvatar != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.network(
+                              addedByUserAvatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, _) =>
+                                  const Icon(Icons.person,
+                                      color: Colors.cyan, size: 32),
+                            ),
+                          )
+                        : const Icon(Icons.person,
+                            color: Colors.cyan, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Added by",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                      Text(
+                        addedByUserName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              "REVIEWS",
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[800]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Add Your Review",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < _userRating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _userRating = index + 1.0;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _reviewController,
+                    maxLines: 3,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'PixelFont',
+                    ),
+                    decoration: InputDecoration(
+                      hintText: "Write your review here...",
+                      hintStyle: TextStyle(
+                        color: Colors.grey[500],
+                        fontFamily: 'PixelFont',
+                      ),
+                      filled: true,
+                      fillColor: Colors.black45,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.cyan),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _submitReview,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        "SUBMIT REVIEW",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            _reviews.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No reviews yet. Be the first to review!",
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontFamily: 'PixelFont',
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: _reviews
+                        .map((review) => ReviewItem(review: review))
+                        .toList(),
+                  ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
-          const SizedBox(height: 24),
-
-          // Review List
-          ...reviews.map((review) => ReviewItem(review: review)).toList(),
-        ],
+  Widget buildGameTag(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 14,
+          fontFamily: 'PixelFont',
+        ),
       ),
     );
   }
@@ -596,94 +651,91 @@ class ReviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Format date for display
+    final dateStr =
+        review.date.isNotEmpty ? review.date.substring(0, 10) : "Unknown Date";
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
+        color: Colors.black38,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFFF0077).withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey[800]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Username and Date
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  // User Avatar
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF00E5FF),
-                        width: 1,
+              // User Avatar
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.cyan, width: 1),
+                ),
+                child: review.avatarUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.network(
+                          review.avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, _) =>
+                              const Icon(Icons.person, color: Colors.cyan),
+                        ),
+                      )
+                    : const Icon(Icons.person, color: Colors.cyan),
+              ),
+
+              const SizedBox(width: 12),
+
+              // Username and Date
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      review.username,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    child: review.avatarUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              review.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.person,
-                                      color: Color(0xFF00E5FF)),
-                            ),
-                          )
-                        : const Icon(Icons.person, color: Color(0xFF00E5FF)),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    review.username,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
+                    Text(
+                      dateStr,
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Text(
-                review.date,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.7),
-                  fontFamily: 'PixelFont',
+                  ],
                 ),
+              ),
+
+              // Rating
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < review.rating ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 16,
+                  );
+                }),
               ),
             ],
           ),
-          const SizedBox(height: 8),
 
-          // Rating
-          Row(
-            children: List.generate(5, (index) {
-              return Icon(
-                index < review.rating ? Icons.star : Icons.star_border,
-                color: const Color(0xFFFFDD00),
-                size: 16,
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // Comment
+          // Review Comment
           Text(
             review.comment,
             style: const TextStyle(
+              color: Colors.white,
               fontSize: 14,
-              color: Colors.white70,
-              fontFamily: 'PixelFont',
             ),
           ),
         ],
@@ -692,7 +744,7 @@ class ReviewItem extends StatelessWidget {
   }
 }
 
-// Review Model
+// Rest of the classes remain the same as in your original code
 class Review {
   final String username;
   final String comment;
@@ -709,7 +761,6 @@ class Review {
   });
 }
 
-// Product Service
 class ProductService {
   Future<void> addToCart(String title, String imageUrl, String price,
       int quantity, String userId) async {
@@ -725,7 +776,7 @@ class ProductService {
         'title': title,
         'price': price,
         'quantity': quantity,
-        'addedBy': userId, // Store the user who added the product
+        'addedBy': userId,
       });
     }
   }
@@ -744,7 +795,7 @@ class ProductService {
         'title': title,
         'price': price,
         'description': description,
-        'addedBy': userId, // Store the user who added the product
+        'addedBy': userId,
       });
     }
   }
@@ -764,7 +815,6 @@ class ProductService {
   }
 }
 
-// Review Service
 class ReviewService {
   Future<List<Review>> fetchReviews(String productId) async {
     final reviewsRef = FirebaseFirestore.instance

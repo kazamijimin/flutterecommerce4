@@ -125,39 +125,37 @@ class _AddressPageState extends State<AddressPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Add New Address'),
+          backgroundColor: const Color(0xFF1A1A2E),
+          title: const Text(
+            'Add New Address',
+            style: TextStyle(
+              color: Colors.white,
+              fontFamily: 'PixelFont',
+              fontSize: 20,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: countryController,
-                  decoration: const InputDecoration(labelText: 'Country'),
-                ),
-                TextField(
-                  controller: stateController,
-                  decoration:
-                      const InputDecoration(labelText: 'State/Province'),
-                ),
-                TextField(
-                  controller: cityController,
-                  decoration: const InputDecoration(labelText: 'City'),
-                ),
-                TextField(
-                  controller: barangayController,
-                  decoration: const InputDecoration(labelText: 'Barangay'),
-                ),
-                TextField(
-                  controller: streetController,
-                  decoration:
-                      const InputDecoration(labelText: 'Street Address'),
-                ),
+                _buildTextField(countryController, 'Country'),
+                _buildTextField(stateController, 'State/Province'),
+                _buildTextField(cityController, 'City'),
+                _buildTextField(barangayController, 'Barangay'),
+                _buildTextField(streetController, 'Street Address'),
               ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey,
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -167,11 +165,24 @@ class _AddressPageState extends State<AddressPage> {
                   'city': cityController.text,
                   'barangay': barangayController.text,
                   'street': streetController.text,
+                  'timestamp': DateTime.now(),
                 };
                 _addAddress(newAddress);
                 Navigator.pop(context);
               },
-              child: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pink,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              child: const Text(
+                'Add',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         );
@@ -179,46 +190,214 @@ class _AddressPageState extends State<AddressPage> {
     );
   }
 
+  Widget _buildTextField(TextEditingController controller, String label) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: Colors.grey,
+            fontFamily: 'PixelFont',
+          ),
+          enabledBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.grey),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.pink),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Manage Addresses'),
+        backgroundColor: Colors.black,
+        title: const Text(
+          'Manage Addresses',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white,
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
+          TextButton.icon(
             onPressed: _showAddAddressDialog,
+            icon: const Icon(Icons.add, color: Colors.pink),
+            label: const Text(
+              'Add Address',
+              style: TextStyle(
+                color: Colors.pink,
+                fontFamily: 'PixelFont',
+              ),
+            ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : addresses.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No addresses found. Add a new address.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: addresses.length,
-                  itemBuilder: (context, index) {
-                    final address = addresses[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: Text(
-                          '${address['street']}, ${address['barangay']}, ${address['city']}, ${address['state']}, ${address['country']}',
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deleteAddress(address['id']),
-                        ),
-                      ),
-                    );
-                  },
+      body: Container(
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: Colors.white10),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.all(16),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.pink,
                 ),
+              )
+            : addresses.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.location_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No addresses found',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Add a new shipping address',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontFamily: 'PixelFont',
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _showAddAddressDialog,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.pink,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: const Text(
+                            'Add Address',
+                            style: TextStyle(fontFamily: 'PixelFont'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: addresses.length,
+                    itemBuilder: (context, index) {
+                      final address = addresses[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A2E),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    color: Colors.pink,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${address['street']}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${address['barangay']}, ${address['city']}',
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${address['state']}, ${address['country']}',
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(color: Colors.white10),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _deleteAddress(address['id']),
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                      size: 18,
+                                    ),
+                                    label: const Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontFamily: 'PixelFont',
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+      ),
     );
   }
 }

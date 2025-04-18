@@ -3,7 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_profile.dart';
 import 'admin_dashboard.dart';
-import 'seller_dashboard.dart'; // Import the SellerDashboard
+import 'seller_dashboard.dart';
+import 'order_history.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,19 +15,21 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   User? user;
-  Map<String, dynamic>? userData; // Store user data
+  Map<String, dynamic>? userData;
   List<Map<String, dynamic>> favorites = [];
-  String sellerStatus = "notApplied"; // Track seller application status
-  bool isAdmin = false; // Track admin status
+  List<Map<String, dynamic>> purchases = []; // Products the user has bought
+  String sellerStatus = "notApplied";
+  bool isAdmin = false;
+  int totalPurchases = 0;
 
   @override
   void initState() {
     super.initState();
     _loadUser();
-    _loadFavorites(); // Load products from Firebase
+    _loadFavorites();
+    _loadPurchases(); // Load purchase history
   }
 
-  // Reload user data
   Future<void> _loadUser() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
@@ -35,7 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         user = FirebaseAuth.instance.currentUser;
       });
 
-      // Fetch additional user data from Firestore
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUser.uid)
@@ -44,9 +46,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (userDoc.exists) {
         setState(() {
           userData = userDoc.data();
-          sellerStatus =
-              userData?['sellerStatus'] ?? "notApplied"; // Check seller status
-          isAdmin = userData?['isAdmin'] ?? false; // Check admin status
+          sellerStatus = userData?['sellerStatus'] ?? "notApplied";
+          isAdmin = userData?['isAdmin'] ?? false;
         });
       }
     }
@@ -60,15 +61,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
-          .collection('wishlist') // Fetch from wishlist collection
+          .collection('wishlist')
           .get();
 
       setState(() {
         favorites = querySnapshot.docs.map((doc) {
           final data = doc.data();
           return {
+            'id': doc.id,
             'title': data['title'] ?? 'Unknown',
-            'image': data['imageUrl'] ?? '',
+            'imageUrl': data['imageUrl'] ?? '',
           };
         }).toList();
       });
@@ -77,306 +79,345 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Function to apply to become a seller
-  Future<void> _applyToBecomeSeller() async {
-    if (user != null) {
-      try {
-        final userDoc =
-            FirebaseFirestore.instance.collection('users').doc(user!.uid);
+  Future<void> _loadPurchases() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-        // Update the Firestore document to set sellerStatus to "pending"
-        await userDoc.set({'sellerStatus': 'pending'}, SetOptions(merge: true));
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('orders')
+          .get();
 
-        setState(() {
-          sellerStatus = "pending"; // Update the local state
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Your application is under review.')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to apply: $e')),
-        );
-      }
+      setState(() {
+        totalPurchases = querySnapshot.docs.length;
+      });
+    } catch (e) {
+      print('Error loading purchases: $e');
     }
+  }
+
+  // Handle logout
+  Future<void> _handleLogout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to logout: $e')),
+      );
+    }
+  }
+
+  void _navigateToMyOrders() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OrderHistory()),
+    );
+  }
+
+  void _navigateToShippingAddress() {
+    // Navigate to shipping address page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Shipping Address coming soon')),
+    );
+  }
+
+  void _navigateToFAQs() {
+    // Navigate to FAQs page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('FAQs coming soon')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final String userName = user?.displayName ?? "Guest User";
-    final String userEmail = user?.email ?? "guest@example.com";
+    final String userName = user?.displayName ?? "Guest";
     final String? userPhotoUrl = user?.photoURL;
-    final String gender = userData?['gender'] ?? "Not specified";
-    final String phoneNumber = userData?['phone'] ?? "Not provided";
-    final String age = userData?['age']?.toString() ?? "Not specified";
-    final String memberSince = userData?['createdAt'] != null
-        ? (userData!['createdAt'] as Timestamp)
-            .toDate()
-            .toLocal()
-            .toString()
-            .split(' ')[0]
-        : "Unknown";
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings, color: Colors.cyan),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminDashboard(),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
+      backgroundColor: const Color(0xFF13131A),
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadUser();
           await _loadFavorites();
+          await _loadPurchases();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              // Top profile bar with edit button
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
+                color: Colors.black,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Seller Status: ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontFamily: 'PixelFont',
+                    // Profile picture
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: userPhotoUrl != null
+                          ? Image.network(
+                              userPhotoUrl,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.asset(
+                              'assets/images/default_profile_picture.png',
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Username and level
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontFamily: 'PixelFont',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'lvl ${userData?['level'] ?? 100}',
+                            style: const TextStyle(
+                              color: Colors.pink,
+                              fontSize: 18,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      sellerStatus == "approved"
-                          ? 'Verified Seller'
-                          : sellerStatus == "pending"
-                              ? 'Pending Approval'
-                              : 'Not a Seller',
-                      style: TextStyle(
-                        color: sellerStatus == "approved"
-                            ? Colors.green
-                            : sellerStatus == "pending"
-                                ? Colors.orange
-                                : Colors.red,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (sellerStatus == "notApplied")
-                ElevatedButton(
-                  onPressed: _applyToBecomeSeller,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Apply to Become a Seller',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                )
-              else if (sellerStatus == "approved")
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SellerDashboard(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyan,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Go to Seller Dashboard',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: userPhotoUrl != null
-                    ? NetworkImage(userPhotoUrl)
-                    : const AssetImage('assets/default_profile.png')
-                        as ImageProvider,
-                child: userPhotoUrl == null
-                    ? const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.white70,
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                userName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'PixelFont',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                userEmail,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont',
-                ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    _buildInfoRow("Gender", gender),
-                    _buildInfoRow("Age", age),
-                    _buildInfoRow("Phone", phoneNumber),
-                    _buildInfoRow("Member Since", memberSince),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Favorites',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              favorites.isNotEmpty
-                  ? GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.8,
-                      ),
-                      itemCount: favorites.length,
-                      itemBuilder: (context, index) {
-                        final item = favorites[index];
-                        return _buildFavoriteItem(item);
+                    // Edit profile button
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
                       },
-                    )
-                  : const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'No favorites added yet.',
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[400],
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const Text(
+                        'Edit Profile',
                         style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
+                          color: Colors.black,
                           fontFamily: 'PixelFont',
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+
+              // Stats bar
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                color: const Color(0xFF1A1A2E),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Total products purchased
+                    Column(
+                      children: [
+                        const Text(
+                          'Total Games',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$totalPurchases',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 20,
+                            fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Friends (placeholder)
+                    Column(
+                      children: [
+                        const Text(
+                          'Friends',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${userData?['friendCount'] ?? 1}',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 20,
+                            fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Order history button
+                    Column(
+                      children: [
+                        const Text(
+                          'Order History',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[600],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Completed',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Favorites section
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Favourites',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontFamily: 'PixelFont',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Favorites grid
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: favorites.isNotEmpty
+                    ? GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 0.7,
+                        ),
+                        itemCount: favorites.length,
+                        itemBuilder: (context, index) {
+                          return _buildFavoriteItem(favorites[index]);
+                        },
+                      )
+                    : const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'No favourites yet',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                      ),
+              ),
+
+              // Edit favorites button
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Edit favorites functionality
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[700],
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Edit Favourites',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Additional options section
+              _buildNavButton('My Orders', _navigateToMyOrders),
+              _buildNavButton('Shipping Address', _navigateToShippingAddress),
+              _buildNavButton('FAQs', _navigateToFAQs),
+              _buildNavButton('Logout', _handleLogout, isDestructive: true),
+
+              const SizedBox(height: 32),
             ],
           ),
         ),
-      ),
-      backgroundColor: Colors.black,
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontFamily: 'PixelFont',
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontFamily: 'PixelFont',
-            ),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildFavoriteItem(Map<String, dynamic> item) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: item['image'].isNotEmpty
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(color: Colors.grey[800]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Game image
+          Expanded(
+            child: item['imageUrl'] != null && item['imageUrl'].isNotEmpty
                 ? Image.network(
-                    item['image'],
+                    item['imageUrl'],
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return _placeholder(item['title']);
@@ -384,34 +425,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                 : _placeholder(item['title']),
           ),
+          // Game title
+          Container(
+            color: Colors.black,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              item['title'],
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontFamily: 'PixelFont',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavButton(String title, VoidCallback onTap,
+      {bool isDestructive = false}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              isDestructive ? Colors.red.shade900 : Colors.grey[800],
+          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
-        const SizedBox(height: 8),
-        Text(
-          item['title'],
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isDestructive ? Colors.white : Colors.cyan,
+            fontSize: 16,
             fontFamily: 'PixelFont',
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
-      ],
+      ),
     );
   }
 
   Widget _placeholder(String title) {
     return Container(
-      color: Colors.grey[800],
+      color: Colors.grey[900],
       child: Center(
         child: Text(
-          title,
+          title.substring(0, title.length > 2 ? 2 : title.length),
           style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
+            color: Colors.white,
+            fontSize: 16,
             fontFamily: 'PixelFont',
           ),
-          textAlign: TextAlign.center,
         ),
       ),
     );
