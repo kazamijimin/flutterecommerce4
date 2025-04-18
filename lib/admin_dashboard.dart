@@ -7,10 +7,18 @@ class AdminDashboard extends StatelessWidget {
   // Approve seller application
   Future<void> _approveSeller(String userId) async {
     try {
+      // Update the seller's status in the `users` collection
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .update({'sellerStatus': 'approved'});
+
+      // Remove the application from the `sellerApplications` collection
+      await FirebaseFirestore.instance
+          .collection('sellerApplications')
+          .doc(userId)
+          .delete();
+
       debugPrint('Seller approved for userId: $userId');
     } catch (e) {
       debugPrint('Error approving seller: $e');
@@ -20,10 +28,18 @@ class AdminDashboard extends StatelessWidget {
   // Reject seller application
   Future<void> _rejectSeller(String userId) async {
     try {
+      // Update the seller's status in the `users` collection
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .update({'sellerStatus': 'notApplied'});
+
+      // Remove the application from the `sellerApplications` collection
+      await FirebaseFirestore.instance
+          .collection('sellerApplications')
+          .doc(userId)
+          .delete();
+
       debugPrint('Seller rejected for userId: $userId');
     } catch (e) {
       debugPrint('Error rejecting seller: $e');
@@ -39,8 +55,7 @@ class AdminDashboard extends StatelessWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('users')
-            .where('sellerStatus', isEqualTo: 'pending')
+            .collection('sellerApplications')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -56,30 +71,31 @@ class AdminDashboard extends StatelessWidget {
             );
           }
 
-          final pendingUsers = snapshot.data!.docs;
+          final pendingApplications = snapshot.data!.docs;
 
           return ListView.builder(
-            itemCount: pendingUsers.length,
+            itemCount: pendingApplications.length,
             itemBuilder: (context, index) {
-              final user = pendingUsers[index];
-              final userId = user.id;
-              final userData = user.data() as Map<String, dynamic>;
-              final userName = userData['displayName'] ?? 'Unknown User';
-              final userEmail = userData['email'] ?? 'No Email';
+              final application = pendingApplications[index];
+              final userId = application.id;
+              final applicationData = application.data() as Map<String, dynamic>;
+              final storeName = applicationData['storeName'] ?? 'Unknown Store';
+              final storeDescription =
+                  applicationData['storeDescription'] ?? 'No Description';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: Colors.grey[900],
                 child: ListTile(
                   title: Text(
-                    userName,
+                    storeName,
                     style: const TextStyle(color: Colors.white),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        userEmail,
+                        storeDescription,
                         style: const TextStyle(color: Colors.white70),
                       ),
                       const SizedBox(height: 4),
@@ -98,7 +114,7 @@ class AdminDashboard extends StatelessWidget {
                           _approveSeller(userId);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Approved seller: $userName'),
+                              content: Text('Approved seller: $storeName'),
                               backgroundColor: Colors.green,
                             ),
                           );
@@ -110,7 +126,7 @@ class AdminDashboard extends StatelessWidget {
                           _rejectSeller(userId);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Rejected seller: $userName'),
+                              content: Text('Rejected seller: $storeName'),
                               backgroundColor: Colors.red,
                             ),
                           );

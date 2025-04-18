@@ -183,7 +183,7 @@ class AuthenticationPage extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const Homepage()),
+                            MaterialPageRoute(builder: (context) => const HomePage()),
                           );
                         },
                         child: const Text(

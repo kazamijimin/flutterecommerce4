@@ -132,6 +132,52 @@ class _ProductDetailsState extends State<ProductDetails> {
     setState(() {});
   }
 
+  Future<void> _addToFavorites() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final favoritesRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('favorites');
+
+        await favoritesRef.doc(widget.productId).set({
+          'productId': widget.productId,
+          'imageUrl': widget.imageUrl,
+          'title': widget.title,
+          'price': widget.price,
+          'description': widget.description,
+          'userId': widget.userId,
+          'category': widget.category,
+        });
+
+        setState(() {
+          _isInWishlist = true; // Update the UI to reflect the favorite status
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Added to Favorites!',
+              style: TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to add to Favorites: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _increaseQuantity() {
     if (quantity < widget.stockCount) {
       setState(() {
@@ -233,18 +279,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               _isInWishlist ? Icons.favorite : Icons.favorite_border,
             ),
             color: const Color(0xFFFF0077),
-            onPressed: () async {
-              await _productService.addToWishlist(
-                widget.title,
-                widget.imageUrl,
-                widget.price,
-                widget.description,
-                widget.userId,
-              );
-              setState(() {
-                _isInWishlist = true;
-              });
-            },
+            onPressed: _addToFavorites, // Call the method to add to favorites
           ),
         ],
       ),
@@ -292,10 +327,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                   child: Image.network(
                     widget.imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Center(
-                            child: Icon(Icons.image_not_supported,
-                                color: Colors.white)),
+                    errorBuilder: (context, error, stackTrace) => const Center(
+                        child: Icon(Icons.image_not_supported,
+                            color: Colors.white)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -473,9 +507,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                             child: Image.network(
                               addedByUserAvatar!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, _) =>
-                                  const Icon(Icons.person,
-                                      color: Colors.cyan, size: 32),
+                              errorBuilder: (context, error, _) => const Icon(
+                                  Icons.person,
+                                  color: Colors.cyan,
+                                  size: 32),
                             ),
                           )
                         : const Icon(Icons.person,
@@ -543,9 +578,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     children: List.generate(5, (index) {
                       return IconButton(
                         icon: Icon(
-                          index < _userRating
-                              ? Icons.star
-                              : Icons.star_border,
+                          index < _userRating ? Icons.star : Icons.star_border,
                           color: Colors.amber,
                           size: 32,
                         ),

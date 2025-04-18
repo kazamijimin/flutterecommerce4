@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'seller_dashboard.dart'; // Import seller dashboard for navigation
+import 'profile.dart'; // Import profile for navigation
 
 class AddProduct extends StatefulWidget {
   const AddProduct({super.key});
@@ -96,7 +99,9 @@ class _AddProductState extends State<AddProduct> {
         'category': _selectedCategory,
         'discount': discount.isNotEmpty ? double.parse(discount) : 0.0,
         'imageUrl': imageUrl,
+        'sellerId': FirebaseAuth.instance.currentUser?.uid, // Add seller ID
         'createdAt': FieldValue.serverTimestamp(),
+        'availability': true,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +266,101 @@ class _AddProductState extends State<AddProduct> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      // Add drawer for hamburger menu
+      drawer: Drawer(
+        backgroundColor: Colors.black,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                gradient: LinearGradient(
+                  colors: [Colors.black, Colors.pink.withOpacity(0.6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text(
+                    'SELLER PORTAL',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontFamily: 'PixelFont',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add your products',
+                    style: TextStyle(
+                      color: Colors.cyan,
+                      fontSize: 14,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.dashboard, color: Colors.pink),
+              title: const Text(
+                'Dashboard',
+                style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SellerDashboard()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.add_box, color: Colors.pink),
+              title: const Text(
+                'Add Product',
+                style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Just close the drawer since we're already on this page
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.person, color: Colors.pink),
+              title: const Text(
+                'Profile',
+                style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                );
+              },
+            ),
+            const Divider(color: Colors.grey),
+            ListTile(
+              leading: Icon(Icons.help, color: Colors.pink),
+              title: const Text(
+                'Help',
+                style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Help section coming soon')),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: Colors.black,
         title: const Text(
@@ -270,6 +370,21 @@ class _AddProductState extends State<AddProduct> {
             color: Colors.white,
           ),
         ),
+        iconTheme: IconThemeData(color: Colors.pink), // Hamburger menu icon color
+        actions: [
+          // Add a save action button in the app bar
+          TextButton.icon(
+            onPressed: _isUploading ? null : _addProduct,
+            icon: Icon(Icons.save, color: Colors.pink),
+            label: const Text(
+              'SAVE',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -301,6 +416,7 @@ class _AddProductState extends State<AddProduct> {
               ),
             ),
             
+            // Rest of your existing UI code...
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

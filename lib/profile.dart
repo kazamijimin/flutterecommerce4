@@ -5,6 +5,7 @@ import 'edit_profile.dart';
 import 'admin_dashboard.dart';
 import 'seller_dashboard.dart';
 import 'order_history.dart';
+import 'seller_register.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -26,8 +27,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUser();
-    _loadFavorites();
-    _loadPurchases(); // Load purchase history
+    _fetchFavorites(); // Ensure this is called
+    _loadPurchases();
+  }
+
+  Future<void> _fetchFavorites() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final favoritesRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('favorites');
+
+        final querySnapshot = await favoritesRef.get();
+
+        if (querySnapshot.docs.isEmpty) {
+          print("No favorites found for user: ${user.uid}");
+        }
+
+        setState(() {
+          favorites = querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            print("Fetched favorite: ${data['title']}");
+            return {
+              'id': doc.id,
+              'title': data['title'] ?? 'Unknown',
+              'imageUrl': data['imageUrl'] ?? '',
+            };
+          }).toList();
+        });
+      } catch (e) {
+        print("Error fetching favorites: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to load favorites: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      print("User is not authenticated.");
+    }
   }
 
   Future<void> _loadUser() async {
@@ -46,7 +90,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (userDoc.exists) {
         setState(() {
           userData = userDoc.data();
-          sellerStatus = userData?['sellerStatus'] ?? "notApplied";
+          sellerStatus =
+              userData?['sellerStatus'] ?? "notApplied"; // Check seller status
           isAdmin = userData?['isAdmin'] ?? false;
         });
       }
@@ -117,6 +162,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _navigateToAdminDashboard() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdminDashboard()),
+    );
+  }
+
+  void _navigateToSeller() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SellerRegistrationScreen()),
+    );
+  }
+
   void _navigateToShippingAddress() {
     // Navigate to shipping address page
     ScaffoldMessenger.of(context).showSnackBar(
@@ -131,14 +190,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _navigateToSellerDashboard() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SellerDashboard()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String userName = user?.displayName ?? "Guest";
     final String? userPhotoUrl = user?.photoURL;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF13131A),
+      backgroundColor: Colors.black,
       body: RefreshIndicator(
+        color: Colors.pink,
+        backgroundColor: Colors.black,
         onRefresh: () async {
           await _loadUser();
           await _loadFavorites();
@@ -159,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 60,
                       height: 60,
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: Colors.pink, width: 2),
                       ),
                       child: userPhotoUrl != null
                           ? Image.network(
@@ -194,6 +262,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fontFamily: 'PixelFont',
                             ),
                           ),
+                          if (sellerStatus == "approved")
+                            const Text(
+                              'Verified Seller',
+                              style: TextStyle(
+                                color: Colors.cyan,
+                                fontSize: 16,
+                                fontFamily: 'PixelFont',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -208,7 +286,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[400],
+                        backgroundColor: Colors.pink,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
@@ -217,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Text(
                         'Edit Profile',
                         style: TextStyle(
-                          color: Colors.black,
+                          color: Colors.white,
                           fontFamily: 'PixelFont',
                         ),
                       ),
@@ -229,7 +307,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Stats bar
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                color: const Color(0xFF1A1A2E),
+                decoration: BoxDecoration(
+                  color: Colors.black,  // Moved color inside BoxDecoration
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade800),
+                    bottom: BorderSide(color: Colors.grey.shade800),
+                  ),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -248,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text(
                           '$totalPurchases',
                           style: const TextStyle(
-                            color: Colors.red,
+                            color: Colors.pink,
                             fontSize: 20,
                             fontFamily: 'PixelFont',
                             fontWeight: FontWeight.bold,
@@ -271,7 +355,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text(
                           '${userData?['friendCount'] ?? 1}',
                           style: const TextStyle(
-                            color: Colors.red,
+                            color: Colors.pink,
                             fontSize: 20,
                             fontFamily: 'PixelFont',
                             fontWeight: FontWeight.bold,
@@ -297,15 +381,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey[600],
+                            color: Colors.pink.withOpacity(0.3),
+                            border: Border.all(color: Colors.pink),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'Completed',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontFamily: 'PixelFont',
+                          child: GestureDetector(
+                            onTap: _navigateToMyOrders,
+                            child: const Text(
+                              'View',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: 'PixelFont',
+                              ),
                             ),
                           ),
                         ),
@@ -316,19 +404,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
 
               // Favorites section
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Favourites',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontFamily: 'PixelFont',
-                      fontWeight: FontWeight.bold,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Favourites',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontFamily: 'PixelFont',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    Icon(Icons.favorite, color: Colors.pink),
+                  ],
                 ),
               ),
 
@@ -341,49 +432,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
+                          crossAxisCount: 2,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
-                          childAspectRatio: 0.7,
+                          childAspectRatio: 0.8,
                         ),
                         itemCount: favorites.length,
                         itemBuilder: (context, index) {
-                          return _buildFavoriteItem(favorites[index]);
+                          final favorite = favorites[index];
+                          return _buildFavoriteItem(favorite);
                         },
                       )
-                    : const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'No favourites yet',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontFamily: 'PixelFont',
-                          ),
+                    : Container(
+                        padding: const EdgeInsets.all(24),
+                        margin: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          border: Border.all(color: Colors.grey.shade800),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.favorite_border,
+                                color: Colors.pink, size: 48),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No favorites yet',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
               ),
 
-              // Edit favorites button
+              // Refresh favorites button
               Container(
                 width: double.infinity,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Edit favorites functionality
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[700],
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Edit Favourites',
+                child: ElevatedButton.icon(
+                  onPressed: _fetchFavorites,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text(
+                    'Refresh Favorites',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontFamily: 'PixelFont',
                     ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
@@ -391,12 +495,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
 
               // Additional options section
-              _buildNavButton('My Orders', _navigateToMyOrders),
-              _buildNavButton('Shipping Address', _navigateToShippingAddress),
-              _buildNavButton('FAQs', _navigateToFAQs),
-              _buildNavButton('Logout', _handleLogout, isDestructive: true),
-
-              const SizedBox(height: 32),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade800),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.menu, color: Colors.cyan),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'ACCOUNT SETTINGS',
+                          style: TextStyle(
+                            color: Colors.cyan,
+                            fontSize: 16,
+                            fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (isAdmin)
+                      _buildNavButton(
+                          'Admin Dashboard', _navigateToAdminDashboard,
+                          icon: Icons.admin_panel_settings),
+                    _buildNavButton('My Orders', _navigateToMyOrders,
+                        icon: Icons.history),
+                    if (sellerStatus == "approved")
+                      _buildNavButton(
+                          'Seller Dashboard', _navigateToSellerDashboard,
+                          icon: Icons.store),
+                    _buildNavButton(
+                        'Shipping Address', _navigateToShippingAddress,
+                        icon: Icons.local_shipping),
+                    _buildNavButton('FAQs', _navigateToFAQs,
+                        icon: Icons.help_outline),
+                    _buildNavButton('Logout', _handleLogout,
+                        isDestructive: true, icon: Icons.logout),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -409,32 +555,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.black,
         border: Border.all(color: Colors.grey[800]!, width: 1),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Game image
+          // Favorite item image
           Expanded(
             child: item['imageUrl'] != null && item['imageUrl'].isNotEmpty
-                ? Image.network(
-                    item['imageUrl'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return _placeholder(item['title']);
-                    },
+                ? ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(8)),
+                    child: Image.network(
+                      item['imageUrl'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _placeholder(item['title']);
+                      },
+                    ),
                   )
                 : _placeholder(item['title']),
           ),
-          // Game title
+          // Favorite item title
           Container(
-            color: Colors.black,
             padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              border: Border(
+                top: BorderSide(color: Colors.grey.shade800),
+              ),
+            ),
             child: Text(
               item['title'],
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 14,
                 fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -447,24 +604,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildNavButton(String title, VoidCallback onTap,
-      {bool isDestructive = false}) {
+      {bool isDestructive = false, IconData? icon}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ElevatedButton(
+      child: ElevatedButton.icon(
         onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isDestructive ? Colors.red.shade900 : Colors.grey[800],
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        child: Text(
+        icon: Icon(icon, color: isDestructive ? Colors.white : Colors.cyan),
+        label: Text(
           title,
           style: TextStyle(
             color: isDestructive ? Colors.white : Colors.cyan,
             fontSize: 16,
             fontFamily: 'PixelFont',
           ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+              isDestructive ? Colors.red.shade900 : Colors.grey[800],
+          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
       ),
     );
@@ -478,8 +636,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title.substring(0, title.length > 2 ? 2 : title.length),
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 16,
+            fontSize: 24,
             fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),

@@ -64,7 +64,7 @@ class _LoginState extends State<Login> {
       
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Homepage()),
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred';
@@ -113,7 +113,7 @@ Future<void> signInWithGoogle() async {
     if (userCredential.user != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Homepage()),
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
   } catch (e) {
