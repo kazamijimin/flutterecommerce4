@@ -950,145 +950,120 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 // Update the _confirmOrder method to include cart cleanup
+Future<void> _confirmOrder() async {
+  // Validate that an address is selected
+  if (_selectedAddress.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please select a shipping address to continue',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
 
-  Future<void> _confirmOrder() async {
-    // Validate that an address is selected
-    if (_selectedAddress.isEmpty) {
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      // Generate a 12-digit order ID
+      final random = Random();
+      final orderId = List.generate(12, (_) => random.nextInt(10)).join();
+
+      // Create the order data
+      final orderData = {
+        'orderId': orderId, // Save the generated order ID
+        'totalPrice': _totalPayment,
+        'paymentMethod': _selectedPaymentMethod,
+        'shippingOption': _selectedShippingOption,
+        'shippingAddress': _selectedAddress,
+        'orderDate': DateTime.now().toIso8601String(),
+        'items': [widget.selectedItems.first], // Include only the first product
+        'status': 'to pay', // Set the initial status to "to pay"
+        'userId': user.uid, // Add user ID for reference
+      };
+
+      // Add the order to the user's orders collection
+      final userOrdersRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders');
+      await userOrdersRef.add(orderData);
+
+      // Add the order to the global orders collection
+      final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
+      await globalOrdersRef.add(orderData);
+
+      // Delete purchased items from the cart
+      final cartRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('cart');
+      final cartSnapshot = await cartRef.get();
+
+      for (var cartDoc in cartSnapshot.docs) {
+        final cartData = cartDoc.data();
+        final purchasedTitle = widget.selectedItems.first['title'] ?? '';
+
+        if (cartData['title'] == purchasedTitle) {
+          await cartRef.doc(cartDoc.id).delete();
+          break;
+        }
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Please select a shipping address to continue',
+        const SnackBar(
+          content: Text(
+            'Order placed successfully!',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate to the OrderDetailsPage
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrderDetailsPage(order: orderData),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You must be logged in to place an order.',
             style: TextStyle(fontFamily: 'PixelFont'),
           ),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user != null) {
-        // Generate a 12-digit order ID
-        final random = Random();
-        final orderId = List.generate(12, (_) => random.nextInt(10)).join();
-
-        // Add order to the user's orders collection
-        final userOrdersRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders');
-
-        final orderData = {
-          'orderId': orderId, // Save the generated order ID
-          'totalPrice': _totalPayment,
-          'paymentMethod': _selectedPaymentMethod,
-          'shippingOption': _selectedShippingOption,
-          'shippingAddress': _selectedAddress,
-          'orderDate': DateTime.now().toIso8601String(),
-          'items': widget.selectedItems,
-          'status': 'to pay', // Set the initial status to "to pay"
-          'userId': user.uid, // Add user ID for reference
-        };
-
-        await userOrdersRef.add(orderData);
-
-        // Add order to the global orders collection
-        final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
-        await globalOrdersRef.add(orderData);
-
-        // NEW CODE: Delete purchased items from cart
-        final cartRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('cart');
-
-        // Find and delete matching items from cart
-        // First, get all cart items
-        final cartSnapshot = await cartRef.get();
-
-        // Track deleted items for notification
-        int itemsDeleted = 0;
-
-        // For each item in the cart, check if it matches any purchased item
-        for (var cartDoc in cartSnapshot.docs) {
-          final cartData = cartDoc.data();
-
-          // Check if this cart item matches any of our purchased items
-          bool itemWasPurchased = false;
-
-          for (var purchasedItem in widget.selectedItems) {
-            // Compare title/name to see if it's the same item
-            final cartTitle = cartData['title'] ?? cartData['name'] ?? '';
-            final purchasedTitle = purchasedItem['title'] ?? '';
-
-            if (cartTitle == purchasedTitle) {
-              // This item was purchased, delete it from cart
-              await cartRef.doc(cartDoc.id).delete();
-              itemsDeleted++;
-              itemWasPurchased = true;
-              break;
-            }
-          }
-
-          if (itemWasPurchased) {
-            continue; // Skip to next cart item
-          }
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'ORDER CONFIRMED! Removed $itemsDeleted items from cart',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-              ),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Navigate to the Order Table Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const OrderTablePage()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'YOU MUST BE LOGGED IN TO PLACE AN ORDER.',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-              ),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'FAILED TO PLACE ORDER: $e',
-            style: const TextStyle(
-              fontFamily: 'PixelFont',
-            ),
-          ),
-          backgroundColor: Colors.red,
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Failed to place order: $e',
+          style: const TextStyle(fontFamily: 'PixelFont'),
         ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 }
 
 // Custom painter for cyberpunk grid background effect

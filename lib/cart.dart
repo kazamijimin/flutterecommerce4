@@ -142,6 +142,99 @@ class _CartPageState extends State<CartPage> {
                                       fontFamily: 'PixelFont', // Apply PixelFont
                                     ),
                                   ),
+                                  
+                                  // Add stock availability message
+                                  FutureBuilder<DocumentSnapshot>(
+                                    future: itemData['productId'] != null 
+                                        ? FirebaseFirestore.instance
+                                            .collection('products')
+                                            .doc(itemData['productId'])
+                                            .get()
+                                        : null, // Use null instead of _findProductByName for now
+                                    builder: (context, snapshot) {
+                                      // Debug: Print productId to verify it exists
+                                      print('Product ID for ${itemTitle}: ${itemData['productId']}');
+                                      
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return const Text(
+                                          "Checking availability...",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      }
+                                      
+                                      // If we don't have a product ID, try looking up the product by name
+                                      if (itemData['productId'] == null) {
+                                        // Trigger product lookup but don't wait for result in builder
+                                        _findAndUpdateProductId(itemTitle);
+                                        
+                                        return const Text(
+                                          "Product information unavailable",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      }
+                                      
+                                      if (snapshot.hasError) {
+                                        print('Error loading product: ${snapshot.error}');
+                                        return const Text(
+                                          "Error checking stock",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      }
+                                      
+                                      if (snapshot.hasData && snapshot.data!.exists) {
+                                        final productData = snapshot.data!.data() as Map<String, dynamic>;
+                                        final stockCount = productData['stockCount'] ?? 0;
+                                        final availability = productData['availability'] ?? true;
+                                        final archived = productData['archived'] ?? false;
+                                        
+                                        if (!availability || archived) {
+                                          return const Text(
+                                            "Not available/Out of Stock",
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontFamily: 'PixelFont',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        } else if (stockCount <= 3 && stockCount > 0) {
+                                          return const Text(
+                                            "Hurry, about to stock out!",
+                                            style: TextStyle(
+                                              color: Colors.amber,
+                                              fontFamily: 'PixelFont',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        } else if (stockCount <= 0) {
+                                          return const Text(
+                                            "Not available/Out of Stock",
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontFamily: 'PixelFont',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                      
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
                                 ],
                               ),
                             ),
@@ -288,21 +381,81 @@ class _CartPageState extends State<CartPage> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: _selectedItems.values.contains(true)
-                          ? () {
-                              // Get only the selected items to pass to checkout
-                              final selectedItems = items
-                                  .where((item) => _selectedItems[item.id] ?? false)
-                                  .map((item) {
-                                    final data = item.data() as Map<String, dynamic>;
-                                    return {
-                                      'title': data['title'] ?? data['name'] ?? 'Unknown Item',
-                                      'price': data['price'],
-                                      'quantity': data['quantity'] ?? 1,
-                                      'imageUrl': data['imageUrl'] ?? '',
-                                    };
-                                  })
-                                  .toList();
-
+                          ? () async {
+                              // Check stock availability before proceeding to checkout
+                              bool hasOutOfStockItems = false;
+                              List<String> outOfStockItemNames = [];
+                              
+                              // Create a list to store selected items that are in stock
+                              final selectedItems = <Map<String, dynamic>>[];
+                              
+                              for (var item in items) {
+                                if (_selectedItems[item.id] ?? false) {
+                                  final data = item.data() as Map<String, dynamic>;
+                                  final itemName = data['title'] ?? data['name'] ?? 'Unknown Item';
+                                  final productId = data['productId'];
+                                  
+                                  if (productId != null) {
+                                    // Check product availability in Firestore
+                                    final productDoc = await FirebaseFirestore.instance
+                                        .collection('products')
+                                        .doc(productId)
+                                        .get();
+                                    
+                                    if (productDoc.exists) {
+                                      final productData = productDoc.data() as Map<String, dynamic>;
+                                      final stockCount = productData['stockCount'] ?? 0;
+                                      final availability = productData['availability'] ?? true;
+                                      final archived = productData['archived'] ?? false;
+                                      
+                                      if (!availability || archived || stockCount <= 0) {
+                                        hasOutOfStockItems = true;
+                                        outOfStockItemNames.add(itemName);
+                                        continue; // Skip this item
+                                      }
+                                    }
+                                  }
+                                  
+                                  // Only add in-stock items to the selectedItems list
+                                  selectedItems.add({
+                                    'title': itemName,
+                                    'price': data['price'],
+                                    'quantity': data['quantity'] ?? 1,
+                                    'imageUrl': data['imageUrl'] ?? '',
+                                    'productId': productId,
+                                  });
+                                }
+                              }
+                              
+                              if (hasOutOfStockItems) {
+                                // Show error message for out of stock items
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Cannot proceed with checkout. The following items are out of stock: ${outOfStockItemNames.join(", ")}',
+                                      style: const TextStyle(fontFamily: 'PixelFont'),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                    duration: const Duration(seconds: 5),
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              if (selectedItems.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'No valid items selected for checkout',
+                                      style: TextStyle(fontFamily: 'PixelFont'),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              // If we reach here, all selected items are in stock
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -369,5 +522,93 @@ class _CartPageState extends State<CartPage> {
     }
 
     return total;
+  }
+
+  // Add this helper method to the _CartPageState class:
+  Future<DocumentSnapshot?> _findProductByName(String name) async {
+    try {
+      // Query products collection by name
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isEqualTo: name)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        // If we found a matching product, update the cart item with the product ID
+        // This will help for future queries
+        final String productId = querySnapshot.docs.first.id;
+        final user = FirebaseAuth.instance.currentUser;
+        
+        if (user != null) {
+          // Find this cart item by title and update it with the product ID
+          final cartItems = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('cart')
+              .where('title', isEqualTo: name)
+              .get();
+              
+          if (cartItems.docs.isNotEmpty) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('cart')
+                .doc(cartItems.docs.first.id)
+                .update({'productId': productId});
+          }
+        }
+        
+        return querySnapshot.docs.first.reference.get();
+      }
+      return null;
+    } catch (e) {
+      print('Error finding product by name: $e');
+      return null;
+    }
+  }
+
+  // Then modify your helper method to avoid type issues:
+  void _findAndUpdateProductId(String name) async {
+    try {
+      // Query products collection by name
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isEqualTo: name)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        // If we found a matching product, update the cart item with the product ID
+        final String productId = querySnapshot.docs.first.id;
+        final user = FirebaseAuth.instance.currentUser;
+        
+        if (user != null) {
+          // Find this cart item by title and update it with the product ID
+          final cartItems = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('cart')
+              .where('title', isEqualTo: name)
+              .get();
+              
+          if (cartItems.docs.isNotEmpty) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('cart')
+                .doc(cartItems.docs.first.id)
+                .update({'productId': productId});
+                
+            // Optionally trigger a rebuild after updating
+            if (mounted) {
+              setState(() {});
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error finding product by name: $e');
+    }
   }
 }

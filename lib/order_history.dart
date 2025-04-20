@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'order_details.dart';
 
 class OrderHistory extends StatefulWidget {
   const OrderHistory({Key? key}) : super(key: key);
@@ -9,16 +10,29 @@ class OrderHistory extends StatefulWidget {
   State<OrderHistory> createState() => _OrderHistoryState();
 }
 
-class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderStateMixin {
+class _OrderHistoryState extends State<OrderHistory>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<String> _tabs = [
     'To Pay',
     'To Ship',
     'To Receive',
     'To Review',
+    'Completed',  // Added Completed tab
     'Return/Refund',
     'Cancellation'
   ];
+  
+  // Map for converting tab names to Firestore status values
+  final Map<String, String> _tabToStatusMap = {
+    'To Pay': 'to pay',
+    'To Ship': 'to ship',
+    'To Receive': 'to receive',
+    'To Review': 'to review',
+    'Completed': 'completed',  // Added mapping for Completed
+    'Return/Refund': 'return/refund',
+    'Cancellation': 'cancellation'
+  };
 
   @override
   void initState() {
@@ -44,7 +58,6 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
             fontFamily: 'PixelFont',
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
-            color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF0F0F1B),
@@ -78,32 +91,28 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.account_circle, size: 64, color: Colors.pink.withOpacity(0.5)),
-            const SizedBox(height: 16),
-            const Text(
-              'Please log in to view your orders',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                color: Colors.white70,
-                fontSize: 16,
-              ),
-            ),
-          ],
+      return const Center(
+        child: Text(
+          'Please log in to view your orders.',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white70,
+            fontSize: 16,
+          ),
         ),
       );
     }
 
-    // Fetch orders from Firestore based on the tab name (status)
+    // Convert tab name to status format using the map
+    String statusFilter = _tabToStatusMap[tabName] ?? tabName.toLowerCase();
+
+    // Fetch orders from Firestore based on the status
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('orders')
-          .where('status', isEqualTo: tabName.toLowerCase()) // Match status with tab name
+          .where('status', isEqualTo: statusFilter)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -119,7 +128,11 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.receipt_long, size: 64, color: Colors.pink.withOpacity(0.5)),
+                Icon(
+                  _getStatusIcon(statusFilter),
+                  size: 48,
+                  color: _getStatusColor(statusFilter).withOpacity(0.5),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'No $tabName orders',
@@ -129,6 +142,16 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
                     fontSize: 16,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  _getEmptyStateMessage(statusFilter),
+                  style: const TextStyle(
+                    fontFamily: 'PixelFont',
+                    color: Colors.white38,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           );
@@ -137,12 +160,12 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
         final orders = snapshot.data!.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           return {
-            'id': doc.id,
             'orderId': data['orderId'] ?? 'N/A',
             'orderDate': data['orderDate'] ?? 'N/A',
             'totalPrice': data['totalPrice'] ?? 0.0,
             'items': data['items'] ?? [],
-            'status': data['status'] ?? tabName.toLowerCase(),
+            'status': data['status'] ?? statusFilter,
+            'documentId': doc.id, // Store document ID for reference
           };
         }).toList();
 
@@ -151,457 +174,436 @@ class _OrderHistoryState extends State<OrderHistory> with SingleTickerProviderSt
           itemCount: orders.length,
           itemBuilder: (context, index) {
             final order = orders[index];
-            return _buildOrderCard(order, tabName);
+            return _buildOrderCard(order, statusFilter);
           },
         );
       },
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order, String tabName) {
-    final items = order['items'] as List<dynamic>;
-    
-    // Determine status color based on tab
-    Color statusColor;
-    switch (tabName) {
-      case 'To Pay':
-        statusColor = Colors.amber;
-        break;
-      case 'To Ship':
-        statusColor = Colors.cyan;
-        break;
-      case 'To Receive':
-        statusColor = Colors.blue;
-        break;
-      case 'To Review':
-        statusColor = Colors.purple;
-        break;
-      case 'Return/Refund':
-        statusColor = Colors.orange;
-        break;
-      case 'Cancellation':
-        statusColor = Colors.red;
-        break;
+  // Helper function to get status-specific icon
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'to pay':
+        return Icons.payment;
+      case 'to ship':
+        return Icons.inventory;
+      case 'to receive':
+        return Icons.local_shipping;
+      case 'to review':
+        return Icons.rate_review;
+      case 'return/refund':
+        return Icons.assignment_return;
+      case 'cancellation':
+        return Icons.cancel;
+      case 'completed':
+        return Icons.check_circle;
       default:
-        statusColor = const Color(0xFFFF0077);
+        return Icons.shopping_bag;
     }
+  }
+
+// Helper function to get status-specific color
+  Color _getStatusColor(String status) {
+    // Convert status to tab format for consistency
+    String tabStatus = status;
+    _tabToStatusMap.forEach((key, value) {
+      if (value == status) {
+        tabStatus = key;
+      }
+    });
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      decoration: BoxDecoration(
+    switch (tabStatus) {
+      case 'To Pay':
+        return Colors.orange;
+      case 'To Ship':
+        return const Color(0xFFFF0077); // Pink
+      case 'To Receive':
+        return const Color(0xFF00E5FF); // Cyan
+      case 'To Review':
+        return const Color(0xFFFFCC00); // Yellow
+      case 'Completed':
+        return const Color(0xFF00FF66); // Green
+      case 'Return/Refund':
+        return Colors.redAccent;
+      case 'Cancellation':
+        return Colors.red;
+      default:
+        return const Color(0xFFFF0077);
+    }
+  }
+
+  // Helper function to get empty state messages
+  String _getEmptyStateMessage(String status) {
+    switch (status) {
+      case 'to pay':
+        return 'You have no orders waiting for payment';
+      case 'to ship':
+        return 'You have no orders waiting to be shipped';
+      case 'to receive':
+        return 'You have no orders in transit';
+      case 'to review':
+        return 'You have no orders waiting for review';
+      case 'completed':
+        return 'You have no completed orders';
+      case 'return/refund':
+        return 'You have no return or refund requests';
+      case 'cancellation':
+        return 'You have no cancelled orders';
+      default:
+        return 'No orders found in this category';
+    }
+  }
+
+  // Updated order card with status indicators
+  Widget _buildOrderCard(Map<String, dynamic> order, String currentTab) {
+    final items = order['items'] as List<dynamic>;
+    final status = order['status'] as String;
+    final Color statusColor = _getStatusColor(status);
+
+    return GestureDetector(
+      onTap: () {
+        // Navigate to the OrderDetailsPage when card is tapped
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrderDetailsPage(
+              order: {
+                ...order,
+                'status': status,
+              },
+            ),
+          ),
+        );
+      },
+      child: Card(
         color: const Color(0xFF1A1A2E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[800]!),
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Order header
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Order #${order['orderId']}',
+        margin: const EdgeInsets.only(bottom: 16.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: statusColor.withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getStatusIcon(status),
+                          color: statusColor,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Order ID: ${order['orderId']}',
+                          style: TextStyle(
+                            fontFamily: 'PixelFont',
+                            fontSize: 14,
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Status chip
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: statusColor.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Text(
+                      _getStatusLabel(status),
+                      style: TextStyle(
+                        fontFamily: 'PixelFont',
+                        fontSize: 11,
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Order details
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Order Date: ${order['orderDate']}',
                     style: const TextStyle(
                       fontFamily: 'PixelFont',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      fontSize: 14,
+                      color: Colors.white70,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    tabName,
-                    style: TextStyle(
-                      color: statusColor,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Total Payment: \$${order['totalPrice'].toStringAsFixed(2)}',
+                    style: const TextStyle(
                       fontFamily: 'PixelFont',
                       fontSize: 14,
+                      color: Colors.white,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Order info
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Date: ${order['orderDate']}',
-                  style: const TextStyle(
-                    fontFamily: 'PixelFont',
-                    fontSize: 14,
-                    color: Colors.white70,
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Items:',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyan,
+                    ),
                   ),
-                ),
-                Text(
-                  'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontFamily: 'PixelFont',
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.cyan,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const Divider(color: Colors.grey, height: 24),
-          
-          // Items list with images on left
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left-side image in a box
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFF0077).withOpacity(0.5)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(7),
-                    child: item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty
-                      ? Image.network(
-                          item['imageUrl'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: Colors.grey[800],
-                            child: Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey[600],
-                              size: 30,
-                            ),
-                          ),
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: Colors.grey[800],
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: const Color(0xFFFF0077),
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : Container(
-                          color: Colors.grey[800],
-                          child: Icon(
-                            Icons.image,
-                            color: Colors.grey[600],
-                            size: 30,
-                          ),
-                        ),
-                  ),
-                ),
-                
-                const SizedBox(width: 12),
-                
-                // Item details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['title'] ?? 'Unknown Item',
-                        style: const TextStyle(
-                          fontFamily: 'PixelFont',
-                          fontSize: 14,
-                          color: Colors.white,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const SizedBox(height: 8),
+                  for (final item in items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Row(
                         children: [
-                          Text(
-                            '\$${item['price'] ?? '0'}',
-                            style: const TextStyle(
-                              fontFamily: 'PixelFont',
-                              fontSize: 14,
-                              color: Colors.cyan,
-                            ),
-                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            width: 50,
+                            height: 50,
                             decoration: BoxDecoration(
-                              color: Colors.black45,
+                              border: Border.all(color: statusColor),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              'Qty: ${item['quantity'] ?? 1}',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontFamily: 'PixelFont',
-                                fontSize: 12,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Image.network(
+                                item['imageUrl'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  );
+                                },
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['title'],
+                                  style: const TextStyle(
+                                    fontFamily: 'PixelFont',
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Price: \$${item['price']} x ${item['quantity']}',
+                                  style: const TextStyle(
+                                    fontFamily: 'PixelFont',
+                                    fontSize: 12,
+                                    color: Colors.cyan,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+
+                  // Action button based on status
+                  const SizedBox(height: 12),
+                  _buildActionButton(order, status),
+                ],
+              ),
             ),
-          )).toList(),
-          
-          // Actions
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildActionButtons(order, tabName),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-  
-  Widget _buildActionButtons(Map<String, dynamic> order, String tabName) {
-    // Create different action buttons based on the tab/status
-    switch (tabName) {
-      case 'To Pay':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            OutlinedButton(
-              onPressed: () => _cancelOrder(order['id']),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-              ),
-              child: const Text('Cancel', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: () => _payOrder(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF0077),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Pay Now', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
-      case 'To Ship':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              onPressed: () => _contactSeller(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyan,
-                foregroundColor: Colors.black,
-              ),
-              child: const Text('Contact Seller', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
-      case 'To Receive':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            OutlinedButton(
-              onPressed: () => _trackOrder(order['id']),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.cyan,
-                side: const BorderSide(color: Colors.cyan),
-              ),
-              child: const Text('Track', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: () => _confirmReceipt(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF0077),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Received', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
-      case 'To Review':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              onPressed: () => _writeReview(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purple,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Write Review', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
-      case 'Return/Refund':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              onPressed: () => _trackRefundStatus(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Track Status', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
-      case 'Cancellation':
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              onPressed: () => _deleteOrder(order['id']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.3),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Delete', style: TextStyle(fontFamily: 'PixelFont')),
-            ),
-          ],
-        );
-        
+
+// Helper to get a user-friendly status label
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'to pay':
+        return 'PAYMENT PENDING';
+      case 'to ship':
+        return 'PROCESSING';
+      case 'to receive':
+        return 'SHIPPING';
+      case 'to review':
+        return 'DELIVERED';
+      case 'completed':
+        return 'COMPLETED';
+      case 'return/refund':
+        return 'RETURN/REFUND';
+      case 'cancellation':
+        return 'CANCELLED';
       default:
-        return const SizedBox.shrink();
+        return status.toUpperCase();
     }
   }
-  
-  // Action methods (these would be implemented with actual functionality)
-  void _payOrder(String orderId) {
-    // Navigate to payment page
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Navigating to payment...'), backgroundColor: Colors.green),
-    );
-  }
-  
-  void _cancelOrder(String orderId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders')
-            .doc(orderId)
-            .update({'status': 'cancellation'});
-            
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order cancelled'), backgroundColor: Colors.red),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+
+  // Add a context-appropriate action button
+  Widget _buildActionButton(Map<String, dynamic> order, String status) {
+    late String buttonText;
+    late Color buttonColor;
+    late IconData buttonIcon;
+    late VoidCallback onPressed;
+
+    switch (status) {
+      case 'to pay':
+        buttonText = 'PAY NOW';
+        buttonColor = Colors.orange;
+        buttonIcon = Icons.payment;
+        onPressed = () => _handlePayment(order);
+        break;
+      case 'to ship':
+        buttonText = 'VIEW DETAILS';
+        buttonColor = const Color(0xFFFF0077);
+        buttonIcon = Icons.visibility;
+        onPressed = () => _viewOrderDetails(order);
+        break;
+      case 'to receive':
+        buttonText = 'TRACK ORDER';
+        buttonColor = const Color(0xFF00E5FF);
+        buttonIcon = Icons.local_shipping;
+        onPressed = () => _trackShipment(order);
+        break;
+      case 'to review':
+        buttonText = 'WRITE REVIEW';
+        buttonColor = const Color(0xFF00FF66);
+        buttonIcon = Icons.rate_review;
+        onPressed = () => _writeReview(order);
+        break;
+      case 'completed':  // ADD THIS CASE
+        buttonText = 'ORDER DETAILS';
+        buttonColor = const Color(0xFF00FF66);  // Green
+        buttonIcon = Icons.check_circle;
+        onPressed = () => _viewOrderDetails(order);
+        break;
+      case 'return/refund':
+        buttonText = 'VIEW REQUEST';
+        buttonColor = Colors.redAccent;
+        buttonIcon = Icons.assignment_return;
+        onPressed = () => _viewReturnRequest(order);
+        break;
+      case 'cancellation':
+        buttonText = 'VIEW DETAILS';
+        buttonColor = Colors.red;
+        buttonIcon = Icons.info_outline;
+        onPressed = () => _viewOrderDetails(order);
+        break;
+      default:
+        buttonText = 'VIEW DETAILS';
+        buttonColor = const Color(0xFFFF0077);
+        buttonIcon = Icons.visibility;
+        onPressed = () => _viewOrderDetails(order);
     }
-  }
-  
-  void _contactSeller(String orderId) {
-    // Navigate to message screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening chat with seller...'), backgroundColor: Colors.cyan),
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(buttonIcon, size: 16),
+        label: Text(
+          buttonText,
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            letterSpacing: 1,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonColor,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+      ),
     );
   }
-  
-  void _trackOrder(String orderId) {
-    // Navigate to tracking page
+
+  // Action handlers
+  void _handlePayment(Map<String, dynamic> order) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Loading tracking information...'), backgroundColor: Colors.blue),
+      const SnackBar(
+        content: Text('Processing payment...'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    _viewOrderDetails(order);
+  }
+
+  void _viewOrderDetails(Map<String, dynamic> order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderDetailsPage(
+          order: order,
+        ),
+      ),
     );
   }
-  
-  void _confirmReceipt(String orderId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders')
-            .doc(orderId)
-            .update({'status': 'to review'});
-            
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Receipt confirmed'), backgroundColor: Colors.green),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-  
-  void _writeReview(String orderId) {
-    // Navigate to review page
+
+  void _trackShipment(Map<String, dynamic> order) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening review form...'), backgroundColor: Colors.purple),
+      const SnackBar(
+        content: Text('Tracking your order...'),
+        backgroundColor: Color(0xFF00E5FF),
+      ),
     );
+    _viewOrderDetails(order);
   }
-  
-  void _trackRefundStatus(String orderId) {
-    // Show refund details
+
+  void _writeReview(Map<String, dynamic> order) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Loading refund details...'), backgroundColor: Colors.orange),
+      const SnackBar(
+        content: Text('Opening review form...'),
+        backgroundColor: Color(0xFF00FF66),
+      ),
     );
+    _viewOrderDetails(order);
   }
-  
-  void _deleteOrder(String orderId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders')
-            .doc(orderId)
-            .delete();
-            
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order deleted'), backgroundColor: Colors.grey),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
+
+  void _viewReturnRequest(Map<String, dynamic> order) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Viewing return/refund request...'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    _viewOrderDetails(order);
   }
 }

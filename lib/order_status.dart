@@ -94,23 +94,25 @@ class OrderStatus extends StatelessWidget {
                     final orders = snapshot.data!.docs;
                     int totalOrders = orders.length;
                     double totalRevenue = 0;
-                    
+
                     // Count status types
                     int toShip = 0;
                     int toDeliver = 0;
                     int completed = 0;
                     int canceled = 0;
-                    
+
                     for (var order in orders) {
                       final data = order.data() as Map<String, dynamic>;
-                      
+
                       // Add to total revenue
                       if (data.containsKey('totalPrice')) {
-                        totalRevenue += double.parse(data['totalPrice'].toString());
+                        totalRevenue +=
+                            double.parse(data['totalPrice'].toString());
                       }
-                      
+
                       // Count by status
-                      final status = data['status']?.toString().toLowerCase() ?? '';
+                      final status =
+                          data['status']?.toString().toLowerCase() ?? '';
                       switch (status) {
                         case 'to ship':
                           toShip++;
@@ -126,24 +128,34 @@ class OrderStatus extends StatelessWidget {
                           break;
                       }
                     }
-                    
+
                     return Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildStatTile('Total Orders', totalOrders.toString(), const Color(0xFFFF0077)),
-                            _buildStatTile('Total Revenue', '₱${totalRevenue.toStringAsFixed(2)}', const Color(0xFF00FF66)),
-                            _buildStatTile('Completed', completed.toString(), const Color(0xFF00FF66)),
+                            _buildStatTile(
+                                'Total Orders',
+                                totalOrders.toString(),
+                                const Color(0xFFFF0077)),
+                            _buildStatTile(
+                                'Total Revenue',
+                                '₱${totalRevenue.toStringAsFixed(2)}',
+                                const Color(0xFF00FF66)),
+                            _buildStatTile('Completed', completed.toString(),
+                                const Color(0xFF00FF66)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildStatTile('To Ship', toShip.toString(), const Color(0xFF00F0FF)),
-                            _buildStatTile('To Deliver', toDeliver.toString(), const Color(0xFFFFCC00)),
-                            _buildStatTile('Canceled', canceled.toString(), const Color(0xFFFF3366)),
+                            _buildStatTile('To Ship', toShip.toString(),
+                                const Color(0xFF00F0FF)),
+                            _buildStatTile('To Deliver', toDeliver.toString(),
+                                const Color(0xFFFFCC00)),
+                            _buildStatTile('Canceled', canceled.toString(),
+                                const Color(0xFFFF3366)),
                           ],
                         ),
                       ],
@@ -153,7 +165,7 @@ class OrderStatus extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Scrollable orders list in an Expanded widget
           Expanded(
             child: Container(
@@ -244,22 +256,33 @@ class OrderStatus extends StatelessWidget {
 
                       // Safely handle the items field
                       final items = orderData['items'] as List<dynamic>? ?? [];
-                      
+
+                      // Determine status color
                       // Determine status color
                       Color statusColor;
                       final status = orderData['status'] ?? 'Unknown';
-                      
-                      switch (status.toString().toLowerCase()) {
+
+                      // Convert to consistent format for comparison
+                      String statusLower = status.toString().toLowerCase();
+
+                      switch (statusLower) {
+                        case 'to pay':
+                          statusColor = Colors.orange; // Orange
+                          break;
                         case 'to ship':
+                          statusColor = const Color(0xFFFF0077); // Pink
+                          break;
+                        case 'to receive':
                           statusColor = const Color(0xFF00F0FF); // Cyan
                           break;
-                        case 'to deliver':
+                        case 'to review':
                           statusColor = const Color(0xFFFFCC00); // Yellow
                           break;
                         case 'completed':
                           statusColor = const Color(0xFF00FF66); // Green
                           break;
-                        case 'canceled':
+                        case 'cancellation':
+                        case 'cancelled':
                           statusColor = const Color(0xFFFF3366); // Red
                           break;
                         default:
@@ -289,7 +312,8 @@ class OrderStatus extends StatelessWidget {
                           children: [
                             // Header with glowing effect
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF0F0F23),
                                 borderRadius: const BorderRadius.only(
@@ -305,7 +329,8 @@ class OrderStatus extends StatelessWidget {
                                 ],
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -328,7 +353,8 @@ class OrderStatus extends StatelessWidget {
                                     ],
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: statusColor.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(12),
@@ -351,16 +377,18 @@ class OrderStatus extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            
+
                             // Order details
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         if (orderData['orderDate'] != null) ...[
                                           Row(
@@ -372,7 +400,8 @@ class OrderStatus extends StatelessWidget {
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                _formatDate(orderData['orderDate']),
+                                                _formatDate(
+                                                    orderData['orderDate']),
                                                 style: const TextStyle(
                                                   fontFamily: 'PixelFont',
                                                   fontSize: 12,
@@ -384,14 +413,22 @@ class OrderStatus extends StatelessWidget {
                                           const SizedBox(height: 6),
                                         ],
                                         FutureBuilder<DocumentSnapshot>(
-                                          future: _firestore.collection('users').doc(orderData['userId']).get(),
+                                          future: _firestore
+                                              .collection('users')
+                                              .doc(orderData['userId'])
+                                              .get(),
                                           builder: (context, snapshot) {
                                             String customerName = 'Anonymous';
-                                            if (snapshot.hasData && snapshot.data!.exists) {
-                                              final userData = snapshot.data!.data() as Map<String, dynamic>;
-                                              customerName = userData['displayName'] ?? 'Anonymous';
+                                            if (snapshot.hasData &&
+                                                snapshot.data!.exists) {
+                                              final userData =
+                                                  snapshot.data!.data()
+                                                      as Map<String, dynamic>;
+                                              customerName =
+                                                  userData['displayName'] ??
+                                                      'Anonymous';
                                             }
-                                            
+
                                             return Row(
                                               children: [
                                                 const Icon(
@@ -416,12 +453,15 @@ class OrderStatus extends StatelessWidget {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF00F0FF).withOpacity(0.1),
+                                      color: const Color(0xFF00F0FF)
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: const Color(0xFF00F0FF).withOpacity(0.3),
+                                        color: const Color(0xFF00F0FF)
+                                            .withOpacity(0.3),
                                       ),
                                     ),
                                     child: Text(
@@ -437,22 +477,24 @@ class OrderStatus extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            
+
                             const Divider(
                               color: Color(0xFF333355),
                               height: 1,
                               thickness: 1,
                             ),
-                            
+
                             // Products heading
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                               child: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFF0077).withOpacity(0.1),
+                                      color: const Color(0xFFFF0077)
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text(
@@ -469,12 +511,13 @@ class OrderStatus extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            
+
                             // Products list
                             ...items.map((item) {
                               // Rest of your product rendering code
                               return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                                 padding: const EdgeInsets.all(10),
                                 // Remaining code for rendering products
                                 // ... (rest of product item code)
@@ -498,7 +541,8 @@ class OrderStatus extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(6),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFFFF0077).withOpacity(0.3),
+                                            color: const Color(0xFFFF0077)
+                                                .withOpacity(0.3),
                                             blurRadius: 6,
                                             spreadRadius: 0,
                                           ),
@@ -506,28 +550,43 @@ class OrderStatus extends StatelessWidget {
                                       ),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(6),
-                                        child: item['imageUrl'] != null && item['imageUrl'].toString().isNotEmpty
+                                        child: item['imageUrl'] != null &&
+                                                item['imageUrl']
+                                                    .toString()
+                                                    .isNotEmpty
                                             ? Image.network(
                                                 item['imageUrl'],
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(
-                                                  color: const Color(0xFF333355),
+                                                errorBuilder: (context, error,
+                                                        stackTrace) =>
+                                                    Container(
+                                                  color:
+                                                      const Color(0xFF333355),
                                                   child: const Icon(
                                                     Icons.broken_image,
                                                     color: Colors.white30,
                                                     size: 30,
                                                   ),
                                                 ),
-                                                loadingBuilder: (context, child, loadingProgress) {
-                                                  if (loadingProgress == null) return child;
+                                                loadingBuilder: (context, child,
+                                                    loadingProgress) {
+                                                  if (loadingProgress == null)
+                                                    return child;
                                                   return Container(
-                                                    color: const Color(0xFF333355),
+                                                    color:
+                                                        const Color(0xFF333355),
                                                     child: Center(
-                                                      child: CircularProgressIndicator(
-                                                        color: const Color(0xFFFF0077),
-                                                        value: loadingProgress.expectedTotalBytes != null
-                                                            ? loadingProgress.cumulativeBytesLoaded /
-                                                                loadingProgress.expectedTotalBytes!
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        color: const Color(
+                                                            0xFFFF0077),
+                                                        value: loadingProgress
+                                                                    .expectedTotalBytes !=
+                                                                null
+                                                            ? loadingProgress
+                                                                    .cumulativeBytesLoaded /
+                                                                loadingProgress
+                                                                    .expectedTotalBytes!
                                                             : null,
                                                         strokeWidth: 2,
                                                       ),
@@ -545,13 +604,14 @@ class OrderStatus extends StatelessWidget {
                                               ),
                                       ),
                                     ),
-                                    
+
                                     const SizedBox(width: 12),
-                                    
+
                                     // Product details with pixel style
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             item['title'] ?? 'Unknown Product',
@@ -568,11 +628,17 @@ class OrderStatus extends StatelessWidget {
                                           Row(
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: Colors.black38,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: Colors.grey.shade700),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                      color:
+                                                          Colors.grey.shade700),
                                                 ),
                                                 child: Text(
                                                   'QTY: ${item['quantity'] ?? 1}',
@@ -623,16 +689,49 @@ class OrderStatus extends StatelessWidget {
                                 ),
                               );
                             }).toList(),
-                            
+
                             // Action buttons
+                            // Action buttons
+                            // Action buttons - Fix overflow by using a Wrap widget
                             Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              padding: const EdgeInsets.all(12),
+                              child: Wrap(
+                                spacing:
+                                    8, // horizontal spacing between buttons
+                                runSpacing: 8, // vertical spacing between rows
+                                alignment: WrapAlignment.center,
                                 children: [
-                                  _buildNeonButton(context, 'To Ship', orderData['status'] == 'To Ship', order.id, _firestore),
-                                  _buildNeonButton(context, 'To Deliver', orderData['status'] == 'To Deliver', order.id, _firestore),
-                                  _buildNeonButton(context, 'Completed', orderData['status'] == 'Completed', order.id, _firestore),
+                                  _buildNeonButton(
+                                      context,
+                                      'To Pay',
+                                      orderData['status'] == 'To Pay',
+                                      order.id,
+                                      _firestore),
+                                  _buildNeonButton(
+                                      context,
+                                      'To Ship',
+                                      orderData['status'] == 'To Ship',
+                                      order.id,
+                                      _firestore),
+                                  _buildNeonButton(
+                                      context,
+                                      'To Receive',
+                                      orderData['status'] == 'To Receive',
+                                      order.id,
+                                      _firestore),
+                                  _buildNeonButton(
+                                      context,
+                                      'To Review',
+                                      orderData['status'] == 'To Review',
+                                      order.id,
+                                      _firestore),
+                                  _buildNeonButton(
+                                      context,
+                                      'Completed',
+                                      orderData['status'] ==
+                                          'Completed', // This is case-sensitive
+                                      order.id,
+                                      _firestore),
                                 ],
                               ),
                             ),
@@ -649,7 +748,7 @@ class OrderStatus extends StatelessWidget {
       ),
     );
   }
-  
+
   // Build the drawer/hamburger menu
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
@@ -661,7 +760,10 @@ class OrderStatus extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.black,
               gradient: LinearGradient(
-                colors: [Colors.black, const Color(0xFFFF0077).withOpacity(0.6)],
+                colors: [
+                  Colors.black,
+                  const Color(0xFFFF0077).withOpacity(0.6)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -700,8 +802,9 @@ class OrderStatus extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (context) => const SellerDashboard()),
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const SellerDashboard()),
               );
             },
           ),
@@ -738,7 +841,7 @@ class OrderStatus extends StatelessWidget {
             title: const Text(
               'Order Status',
               style: TextStyle(
-                color: Colors.white, 
+                color: Colors.white,
                 fontFamily: 'PixelFont',
                 fontWeight: FontWeight.bold,
               ),
@@ -789,139 +892,137 @@ class OrderStatus extends StatelessWidget {
     );
   }
 
-  Widget _buildNeonButton(BuildContext context, String status, bool isSelected, String orderId, FirebaseFirestore firestore) {
+  Widget _buildNeonButton(BuildContext context, String status, bool isSelected,
+      String orderId, FirebaseFirestore firestore) {
     // Map status to colors
     Color color;
+
+    // Status values to store in Firestore - lowercase with spaces
+    String firestoreStatus = status.toLowerCase();
+
     switch (status) {
+      case 'To Pay':
+        color = Colors.orange; // Orange
+        break;
       case 'To Ship':
         color = const Color(0xFF00F0FF); // Cyan
         break;
-      case 'To Deliver':
+      case 'To Receive':
         color = const Color(0xFFFFCC00); // Yellow
+        break;
+      case 'To Review':
+        color = const Color(0xFFFF0077); // Pink
         break;
       case 'Completed':
         color = const Color(0xFF00FF66); // Green
+        firestoreStatus = 'completed'; // special case
         break;
       default:
         color = const Color(0xFFFF0077); // Pink
     }
-    
-    return InkWell(
-      onTap: () async {
-        try {
-          // Update order status
-          await firestore.collection('orders').doc(orderId).update({
-            'status': status,
-          });
-          
-          // If completed, update sales information and show special notification
-          if (status == 'Completed') {
-            // Get the order details first
-            DocumentSnapshot orderDoc = await firestore.collection('orders').doc(orderId).get();
-            Map<String, dynamic> orderData = orderDoc.data() as Map<String, dynamic>;
-            
-            // Get the user ID from the order
-            String userId = orderData['userId'] ?? '';
-            
-            // Get user details from users collection
-            String customerName = 'Customer';
-            String customerEmail = '';
-            if (userId.isNotEmpty) {
-              try {
-                DocumentSnapshot userDoc = await firestore.collection('users').doc(userId).get();
-                if (userDoc.exists) {
-                  final userData = userDoc.data() as Map<String, dynamic>;
-                  customerName = userData['displayName'] ?? 'Customer';
-                  customerEmail = userData['email'] ?? '';
-                  
-                  print("Found customer: $customerName with email: $customerEmail");
-                } else {
-                  print("User document does not exist for userId: $userId");
-                }
-              } catch (e) {
-                print('Error fetching user data: $e');
-              }
-            } else {
-              print("No userId found in order data");
-            }
-            
-            double orderAmount = 0.0;
-            if (orderData.containsKey('totalPrice')) {
-              orderAmount = double.parse(orderData['totalPrice'].toString());
-            }
-            
-            // Get seller ID from the order or from current user
-            String sellerId = orderData['sellerId'] ?? FirebaseAuth.instance.currentUser!.uid;
-            
-            // Add a sales record with the correct customer name
-            await firestore.collection('sales').add({
-              'orderId': orderId,
-              'sellerId': sellerId,
-              'amount': orderAmount,
-              'customerName': customerName,
-              'customerEmail': customerEmail,
-              'userId': userId,
-              'timestamp': Timestamp.now(),
-              'items': orderData['items'] ?? [],
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: () async {
+          try {
+            // Update order status - use lowercase format to match order_history.dart
+            await firestore.collection('orders').doc(orderId).update({
+              'status': firestoreStatus,
             });
-            
-            // Update the orderData with the correct customer information before showing dialog
-            orderData['customerName'] = customerName;
-            
-            // Show a more detailed success message
-            // ignore: use_build_context_synchronously
-            _showSalesCompletedDialog(context, orderData);
-          } else {
-            // Regular status update notification
+
+            // If updating to completed, also update the user's orders collection
+            if (firestoreStatus == 'completed') {
+              // Get the order document to find the user
+              DocumentSnapshot orderDoc =
+                  await firestore.collection('orders').doc(orderId).get();
+              Map<String, dynamic> orderData =
+                  orderDoc.data() as Map<String, dynamic>;
+
+              if (orderData.containsKey('userId')) {
+                String userId = orderData['userId'];
+
+                // Find the matching order in the user's orders collection and update it
+                QuerySnapshot userOrdersQuery = await firestore
+                    .collection('users')
+                    .doc(userId)
+                    .collection('orders')
+                    .where('orderId', isEqualTo: orderData['orderId'])
+                    .get();
+
+                for (var doc in userOrdersQuery.docs) {
+                  await firestore
+                      .collection('users')
+                      .doc(userId)
+                      .collection('orders')
+                      .doc(doc.id)
+                      .update({'status': firestoreStatus});
+                }
+              }
+            }
+
+            // Show success snackbar
             // ignore: use_build_context_synchronously
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Order status updated to $status',
+                  'Order status updated to ${status}',
                   style: const TextStyle(fontFamily: 'PixelFont'),
                 ),
-                backgroundColor: color,
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // Show completed dialog if status is completed
+            if (firestoreStatus == 'completed') {
+              // ignore: use_build_context_synchronously
+              _showSalesCompletedDialog(
+                  context,
+                  await firestore
+                      .collection('orders')
+                      .doc(orderId)
+                      .get()
+                      .then((doc) => doc.data() as Map<String, dynamic>));
+            }
+          } catch (e) {
+            print("Error updating order status: $e");
+            // ignore: use_build_context_synchronously
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Error updating order: $e',
+                  style: const TextStyle(fontFamily: 'PixelFont'),
+                ),
+                backgroundColor: Colors.red,
               ),
             );
           }
-        } catch (e) {
-          print("Error updating order status: $e");
-          // ignore: use_build_context_synchronously
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Error updating order: $e',
-                style: const TextStyle(fontFamily: 'PixelFont'),
-              ),
-              backgroundColor: Colors.red,
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
+            border: Border.all(color: color, width: 1.5),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.4),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    )
+                  ]
+                : null,
+          ),
+          child: Text(
+            status,
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: 11, // Reduced font size
+              fontWeight: FontWeight.bold,
+              color: isSelected ? color : color.withOpacity(0.8),
+              letterSpacing: 0.5,
             ),
-          );
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
-          border: Border.all(color: color, width: 1.5),
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  )
-                ]
-              : null,
-        ),
-        child: Text(
-          status,
-          style: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? color : color.withOpacity(0.8),
-            letterSpacing: 0.5,
           ),
         ),
       ),
@@ -929,17 +1030,18 @@ class OrderStatus extends StatelessWidget {
   }
 
   // Add this new method to show sales completion dialog
-  void _showSalesCompletedDialog(BuildContext context, Map<String, dynamic> orderData) {
+  void _showSalesCompletedDialog(
+      BuildContext context, Map<String, dynamic> orderData) {
     double totalAmount = 0.0;
     if (orderData.containsKey('totalPrice')) {
       totalAmount = double.parse(orderData['totalPrice'].toString());
     }
-    
+
     // Use the customerName field we added in the _buildNeonButton method
     String customerName = orderData['customerName'] ?? 'Customer';
     List<dynamic> items = orderData['items'] ?? [];
     int itemCount = items.length;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1007,7 +1109,7 @@ class OrderStatus extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Sale details
                 Container(
                   padding: const EdgeInsets.all(15),
@@ -1099,7 +1201,7 @@ class OrderStatus extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
                 InkWell(
                   onTap: () => Navigator.of(context).pop(),
@@ -1137,7 +1239,7 @@ class OrderStatus extends StatelessWidget {
 
   String _formatDate(dynamic dateValue) {
     if (dateValue == null) return 'N/A';
-    
+
     try {
       // Handle different date formats
       DateTime date;
@@ -1148,7 +1250,7 @@ class OrderStatus extends StatelessWidget {
       } else {
         return 'Invalid Date';
       }
-      
+
       // Format to YYYY-MM-DD
       return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     } catch (e) {

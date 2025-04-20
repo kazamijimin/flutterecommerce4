@@ -2,211 +2,856 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class OrderTablePage extends StatefulWidget {
-  const OrderTablePage({Key? key}) : super(key: key);
+class OrderDetailsPage extends StatelessWidget {
+  final Map<String, dynamic> order;
 
-  @override
-  State<OrderTablePage> createState() => _OrderTablePageState();
-}
-
-class _OrderTablePageState extends State<OrderTablePage> {
-  List<Map<String, dynamic>> _orders = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchOrders();
-  }
-Future<void> _fetchOrders() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('orders')
-          .orderBy('orderDate', descending: true)
-          .get();
-
-      setState(() {
-        _orders = snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['orderId'] = data['orderId'] ?? doc.id; // Use saved orderId or fallback to doc.id
-          return data;
-        }).toList();
-        _isLoading = false;
-      });
-    }
-  } catch (e) {
-    setState(() {
-      _isLoading = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Failed to fetch orders: $e',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
+  const OrderDetailsPage({Key? key, required this.order}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final item = order['items'][0]; // Get the single product being checked out
+    final neonPink = const Color(0xFFFF0077);
+    final neonBlue = const Color(0xFF00E5FF);
+    final neonGreen = const Color(0xFF00FF66);
+    final darkBackground = const Color(0xFF0F0F1B);
+    final surfaceColor = const Color(0xFF1A1A2E);
+    
+    // Get the order status
+    final String orderStatus = order['status']?.toString() ?? 'To Pay';
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Order Details',
+        title: Text(
+          _getAppBarTitle(orderStatus),
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2.0,
+          ),
+        ),
+        backgroundColor: darkBackground,
+        elevation: 0,
+      ),
+      backgroundColor: darkBackground,
+      body: Stack(
+        children: [
+          // Background grid effect
+          CustomPaint(
+            size: Size.infinite,
+            painter: GridPainter(
+              lineColor: neonBlue.withOpacity(0.15),
+              lineWidth: 1,
+              gridSpacing: 30,
+            ),
+          ),
+          
+          // Main content
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status tracker card
+                _buildStatusTracker(orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
+                
+                const SizedBox(height: 24),
+                
+                // Order information card
+                _buildSectionCard(
+                  title: 'ORDER INFORMATION',
+                  icon: Icons.info_outline,
+                  neonPink: neonPink,
+                  neonBlue: neonBlue,
+                  surfaceColor: surfaceColor,
+                  child: Column(
+                    children: [
+                      _buildInfoRow(
+                        icon: Icons.confirmation_number,
+                        title: 'Order ID',
+                        value: '#${order['orderId'] ?? 'N/A'}',
+                        iconColor: neonBlue,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today,
+                        title: 'Date',
+                        value: _formatDate(order['orderDate'] ?? 'N/A'),
+                        iconColor: neonBlue,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        icon: Icons.payment,
+                        title: 'Payment Method',
+                        value: order['paymentMethod'] ?? 'N/A',
+                        iconColor: neonBlue,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        icon: Icons.local_shipping,
+                        title: 'Shipping Option',
+                        value: order['shippingOption'] ?? 'Standard Shipping',
+                        iconColor: neonBlue,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        icon: Icons.location_on,
+                        title: 'Shipping Address',
+                        value: order['shippingAddress'] ?? 'N/A',
+                        iconColor: neonBlue,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Product card
+                _buildSectionCard(
+                  title: 'YOUR PURCHASE',
+                  icon: Icons.shopping_bag,
+                  neonPink: neonPink,
+                  neonBlue: neonBlue,
+                  surfaceColor: surfaceColor,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Product image with animated border
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          border: Border.all(
+                            color: neonPink,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: neonPink.withOpacity(0.5),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          child: Image.network(
+                            item['imageUrl'] ?? '',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 40,
+                            ),
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  color: neonPink,
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      
+                      // Product details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['title'] ?? 'Unknown Item',
+                              style: const TextStyle(
+                                fontFamily: 'PixelFont',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black38,
+                                border: Border.all(
+                                  color: Colors.grey.shade700,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Quantity: ${item['quantity']}',
+                                style: TextStyle(
+                                  fontFamily: 'PixelFont',
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: neonBlue.withOpacity(0.2),
+                                border: Border.all(
+                                  color: neonBlue.withOpacity(0.5),
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '\$${item['price']}',
+                                style: TextStyle(
+                                  fontFamily: 'PixelFont',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: neonBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Payment summary card
+                _buildSectionCard(
+                  title: 'PAYMENT SUMMARY',
+                  icon: Icons.account_balance_wallet,
+                  neonPink: neonPink,
+                  neonBlue: neonBlue,
+                  surfaceColor: surfaceColor,
+                  child: Column(
+                    children: [
+                      _buildPaymentRow(
+                        title: 'Subtotal',
+                        value: '\$${(order['totalPrice'] != null ? (order['totalPrice'] - 4.99) : 0).toStringAsFixed(2)}',
+                      ),
+                      _buildPaymentRow(
+                        title: 'Shipping Fee',
+                        value: '\$4.99',
+                      ),
+                      const SizedBox(height: 4),
+                      const Divider(color: Colors.white30),
+                      const SizedBox(height: 4),
+                      _buildPaymentRow(
+                        title: 'Total',
+                        value: '\$${order['totalPrice']?.toStringAsFixed(2) ?? '0.00'}',
+                        isTotal: true,
+                        neonPink: neonPink,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Action button based on order status
+                _buildActionButton(context, orderStatus, order, neonPink, neonBlue, neonGreen),
+                
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Get the appropriate app bar title based on order status
+  String _getAppBarTitle(String status) {
+    switch (status) {
+      case 'to pay':
+        return 'PAYMENT PENDING';
+      case 'to ship':
+        return 'ORDER CONFIRMED';
+      case 'to receive':
+        return 'ORDER SHIPPED';
+      case 'to review':
+        return 'ORDER DELIVERED';
+      case 'completed':
+        return 'ORDER COMPLETE';
+      case 'cancelled':
+        return 'ORDER CANCELLED';
+      default:
+        return 'ORDER DETAILS';
+    }
+  }
+
+  // Build the status tracker widget
+  Widget _buildStatusTracker(
+    String status, 
+    Color neonPink, 
+    Color neonBlue, 
+    Color neonGreen, 
+    Color surfaceColor
+  ) {
+    // Determine which stages are completed
+    final isPaid = status != 'To Pay';
+    final isShipped = ['To Receive', 'To Review', 'Completed'].contains(status);
+    final isDelivered = ['To Review', 'Completed'].contains(status);
+    final isCompleted = status == 'Completed';
+    
+    // Determine current active step and its color
+    Color activeStepColor;
+    String activeStepText;
+    
+    switch (status) {
+      case 'to pay':
+        activeStepColor = Colors.orange;
+        activeStepText = 'PAYMENT PENDING';
+        break;
+      case 'to ship':
+        activeStepColor = neonPink;
+        activeStepText = 'PREPARING YOUR ORDER';
+        break;
+      case 'to receive':
+        activeStepColor = neonBlue;
+        activeStepText = 'YOUR ORDER IS ON THE WAY';
+        break;
+      case 'to review':
+        activeStepColor = neonGreen;
+        activeStepText = 'ORDER DELIVERED';
+        break;
+      case 'completed':
+        activeStepColor = neonGreen.withGreen(255);
+        activeStepText = 'ORDER COMPLETED';
+        break;
+      case 'cancelled':
+        activeStepColor = Colors.red;
+        activeStepText = 'ORDER CANCELLED';
+        break;
+      default:
+        activeStepColor = neonPink;
+        activeStepText = 'PROCESSING';
+    }
+    
+    // Select appropriate icon for current status
+    IconData statusIcon;
+    switch (status) {
+      case 'to pay':
+        statusIcon = Icons.hourglass_empty;
+        break;
+      case 'to ship':
+        statusIcon = Icons.inventory;
+        break;
+      case 'to receive':
+        statusIcon = Icons.local_shipping;
+        break;
+      case 'to review':
+        statusIcon = Icons.check_circle;
+        break;
+      case 'completed':
+        statusIcon = Icons.verified;
+        break;
+      case 'cancelled':
+        statusIcon = Icons.cancel;
+        break;
+      default:
+        statusIcon = Icons.help;
+    }
+    
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border.all(
+          color: activeStepColor.withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: activeStepColor.withOpacity(0.2),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Status header with gradient matching current status
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  activeStepColor.withOpacity(0.7),
+                  activeStepColor.withOpacity(0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    statusIcon,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    activeStepText,
+                    style: const TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Dynamic status tracker steps with individual colors
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Payment step - active only when on "to pay" or completed
+                _buildStatusStep(
+                  'Payment', 
+                  isPaid || status == 'to pay', 
+                  status == 'to pay' ? Colors.orange : (isPaid ? neonPink : Colors.grey.shade800),
+                  isCurrentStep: status == 'to pay'
+                ),
+                
+                _buildStatusLine(
+                  isPaid, 
+                  isPaid ? neonPink : Colors.grey.shade800
+                ),
+                
+                // Shipping step - active only when on "to ship" or later
+                _buildStatusStep(
+                  'Processing', 
+                  isShipped || status == 'to ship', 
+                  status == 'to ship' ? neonPink : (isShipped ? neonBlue : Colors.grey.shade800),
+                  isCurrentStep: status == 'to ship'
+                ),
+                
+                _buildStatusLine(
+                  isShipped, 
+                  isShipped ? neonBlue : Colors.grey.shade800
+                ),
+                
+                // Delivery step - active only when on "to receive" or later
+                _buildStatusStep(
+                  'Shipping', 
+                  isDelivered || status == 'to receive', 
+                  status == 'to receive' ? neonBlue : (isDelivered ? neonGreen : Colors.grey.shade800),
+                  isCurrentStep: status == 'to receive'
+                ),
+                
+                _buildStatusLine(
+                  isDelivered, 
+                  isDelivered ? neonGreen : Colors.grey.shade800
+                ),
+                
+                // Completed step - active only when "completed"
+                _buildStatusStep(
+                  'Delivered', 
+                  isCompleted || status == 'to review', 
+                  status == 'to review' ? neonGreen : (isCompleted ? Colors.green : Colors.grey.shade800),
+                  isCurrentStep: status == 'to review' || status == 'completed'
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build a single status step circle with pulsing effect for current step
+  Widget _buildStatusStep(String label, bool isActive, Color color, {bool isCurrentStep = false}) {
+    return Column(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: isActive ? color : Colors.grey.shade800,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isActive ? color : Colors.grey.shade600,
+              width: 2,
+            ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(isCurrentStep ? 0.7 : 0.4),
+                      blurRadius: isCurrentStep ? 12 : 8,
+                      spreadRadius: isCurrentStep ? 2 : 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Icon(
+              isActive ? (isCurrentStep ? Icons.circle : Icons.check) : Icons.circle,
+              color: Colors.white,
+              size: isActive ? (isCurrentStep ? 10 : 16) : 8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
           style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontSize: 10,
+            color: isActive ? color : Colors.grey,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build the connecting line between status steps
+  Widget _buildStatusLine(bool isActive, Color activeColor) {
+    return Container(
+      width: 40,
+      height: 2,
+      margin: const EdgeInsets.only(bottom: 24),
+      color: isActive ? activeColor : Colors.grey.shade800,
+    );
+  }
+
+  // Build action button based on order status
+  Widget _buildActionButton(
+    BuildContext context, 
+    String status, 
+    Map<String, dynamic> order,
+    Color neonPink,
+    Color neonBlue,
+    Color neonGreen,
+  ) {
+    // Configure button based on status
+    String buttonText;
+    Color buttonColor;
+    IconData buttonIcon;
+    VoidCallback onPressed;
+
+    switch (status) {
+      case 'to pay':
+        buttonText = 'PROCEED TO PAYMENT';
+        buttonColor = neonPink;
+        buttonIcon = Icons.payment;
+        onPressed = () => _proceedToPayment(context, order);
+        break;
+      case 'to ship':
+        buttonText = 'TRACK ORDER';
+        buttonColor = neonBlue;
+        buttonIcon = Icons.inventory;
+        onPressed = () => _trackOrder(context, order);
+        break;
+      case 'to receive':
+        buttonText = 'TRACK SHIPMENT';
+        buttonColor = neonBlue;
+        buttonIcon = Icons.local_shipping;
+        onPressed = () => _trackShipment(context, order);
+        break;
+      case 'to review':
+        buttonText = 'WRITE A REVIEW';
+        buttonColor = neonGreen;
+        buttonIcon = Icons.rate_review;
+        onPressed = () => _writeReview(context, order);
+        break;
+      case 'completed':
+        buttonText = 'CONTINUE SHOPPING';
+        buttonColor = neonGreen;
+        buttonIcon = Icons.shopping_cart;
+        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+        break;
+      case 'cancelled':
+        buttonText = 'CONTINUE SHOPPING';
+        buttonColor = Colors.grey;
+        buttonIcon = Icons.shopping_cart;
+        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+        break;
+      default:
+        buttonText = 'CONTINUE SHOPPING';
+        buttonColor = neonBlue;
+        buttonIcon = Icons.shopping_cart;
+        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(buttonIcon),
+        label: Text(
+          buttonText,
+          style: const TextStyle(
             fontFamily: 'PixelFont',
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
           ),
         ),
-        backgroundColor: const Color(0xFF0F0F1B),
-      ),
-      backgroundColor: const Color(0xFF0F0F1B),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
-              ),
-            )
-          : _orders.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No orders found.',
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      color: Colors.white70,
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: _orders.length,
-                  itemBuilder: (context, index) {
-                    final order = _orders[index];
-                    return _buildOrderCard(order);
-                  },
-                ),
-    );
-  }
-
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final items = order['items'] as List<dynamic>;
-    return Card(
-      color: const Color(0xFF1A1A2E),
-      margin: const EdgeInsets.only(bottom: 16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Order ID: ${order['orderId'] ?? 'N/A'}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.cyan,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Order Date: ${order['orderDate'] ?? 'N/A'}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Total Payment: \$${order['totalPrice'].toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Payment Method: ${order['paymentMethod'] ?? 'N/A'}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Shipping Address: ${order['shippingAddress'] ?? 'N/A'}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Items:',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.cyan,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final item in items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFFF0077)),
-                      ),
-                      child: Image.network(
-                        item['imageUrl'],
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['title'],
-                            style: const TextStyle(
-                              fontFamily: 'PixelFont',
-                              fontSize: 14,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            'Price: \$${item['price']} x ${item['quantity']}',
-                            style: const TextStyle(
-                              fontFamily: 'PixelFont',
-                              fontSize: 12,
-                              color: Colors.cyan,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonColor,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
       ),
     );
   }
+
+  // Action methods
+  void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
+    // Show payment options dialog or navigate to payment page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Navigating to payment page...',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _trackOrder(BuildContext context, Map<String, dynamic> order) {
+    // Navigate to order tracking page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Tracking your order...',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _trackShipment(BuildContext context, Map<String, dynamic> order) {
+    // Navigate to shipment tracking page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Tracking your shipment...',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _writeReview(BuildContext context, Map<String, dynamic> order) {
+    // Navigate to review writing page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Opening review form...',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    required Color neonPink,
+    required Color neonBlue,
+    required Color surfaceColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border.all(
+          color: neonBlue.withOpacity(0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: neonBlue.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: neonBlue.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: neonPink,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: neonBlue,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color iconColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          color: iconColor,
+          size: 18,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentRow({
+    required String title,
+    required String value,
+    bool isTotal = false,
+    Color? neonPink,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: isTotal ? 16 : 14,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? Colors.white : Colors.white70,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: isTotal ? 18 : 14,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? (neonPink ?? Colors.white) : Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Custom painter for grid background
+class GridPainter extends CustomPainter {
+  final Color lineColor;
+  final double lineWidth;
+  final double gridSpacing;
+
+  GridPainter({
+    required this.lineColor,
+    required this.lineWidth,
+    required this.gridSpacing,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = lineColor
+      ..strokeWidth = lineWidth;
+
+    for (double y = 0; y < size.height; y += gridSpacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+
+    for (double x = 0; x < size.width; x += gridSpacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
