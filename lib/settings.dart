@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 import 'terms_condition.dart'; // Import the Terms and Conditions page
 import 'address.dart';
+import 'faqs.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -96,7 +97,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'Blocked users': Icons.block,
       'Language': Icons.language,
       'ABOUT': Icons.info,
-      'Help Centre': Icons.help_center,
+      'FAQS': Icons.help_center,
       'Shopee Policies': Icons.policy,
       'Rate us': Icons.star_rate,
       'HELP': Icons.help_outline,
@@ -238,9 +239,29 @@ class _SettingsPageState extends State<SettingsPage> {
               textSize: textSize,
             ),
             _buildSettingTile(
-              title: 'Help Centre',
+              title: 'FAQS and Help',
               onTap: () {
-                // Navigate to Help Centre
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const FAQPage(), // Navigate to FAQS page
+                  ),
+                );
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'FAQS and Help',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const FAQPage(), // Navigate to FAQS page
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,

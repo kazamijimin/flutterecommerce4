@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'cart.dart';
 import 'wishlist.dart';
 import 'category.dart';
@@ -24,6 +25,15 @@ class _HomePageState extends State<HomePage> {
   final ScrollController _productScrollController = ScrollController();
   int cartCount = 0;
   int wishlistCount = 0;
+  
+  // Search-related variables
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearchFocused = false;
+  List<String> _recentSearches = [];
+  List<Map<String, dynamic>> _suggestedProducts = [];
+  bool _isLoadingSuggestions = false;
+  Timer? _debounceTimer;
   
   // Preload product data
   List<Map<String, dynamic>> products = [];
@@ -49,32 +59,153 @@ class _HomePageState extends State<HomePage> {
     _fetchProducts();
     _startAutoScroll();
     _loadCounts();
+    _loadRecentSearches();
+    
+    // Listen for search focus changes
+    _searchFocusNode.addListener(() {
+      setState(() {
+        _isSearchFocused = _searchFocusNode.hasFocus;
+      });
+    });
+    
+    // Listen for search text changes
+    _searchController.addListener(_onSearchChanged);
   }
 
-  // Fetch products in advance to avoid loading during scrolling
-  Future<void> _fetchProducts() async {
+  void _onSearchChanged() {
+    // Debounce search to avoid too many Firebase queries
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _getSuggestedProducts(_searchController.text);
+    });
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _recentSearches = prefs.getStringList('recentSearches') ?? [];
+    });
+  }
+
+  Future<void> _saveRecentSearch(String search) async {
+    if (search.trim().isEmpty) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final searches = prefs.getStringList('recentSearches') ?? [];
+    
+    // Remove duplicates and add to the beginning
+    searches.remove(search);
+    searches.insert(0, search);
+    
+    // Limit to 5 recent searches
+    final limitedSearches = searches.take(5).toList();
+    
+    await prefs.setStringList('recentSearches', limitedSearches);
+    
+    setState(() {
+      _recentSearches = limitedSearches;
+    });
+  }
+
+  Future<void> _clearRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('recentSearches');
+    setState(() {
+      _recentSearches = [];
+    });
+  }
+
+  Future<void> _getSuggestedProducts(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _suggestedProducts = [];
+      });
+      return;
+    }
+    
+    setState(() {
+      _isLoadingSuggestions = true;
+    });
+    
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('products').limit(10).get();
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isGreaterThanOrEqualTo: query)
+          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+          .limit(5)
+          .get();
       
       if (mounted) {
         setState(() {
-          products = snapshot.docs.map((doc) {
+          _suggestedProducts = querySnapshot.docs.map((doc) {
             final data = doc.data();
             data['id'] = doc.id;
             return data;
           }).toList();
-          isProductsLoading = false;
+          _isLoadingSuggestions = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          isProductsLoading = false;
+          _isLoadingSuggestions = false;
         });
       }
     }
   }
 
+  void _executeSearch(String query) {
+    // Save the search query to recent searches
+    _saveRecentSearch(query);
+    
+    // Clear focus to hide suggestions
+    _searchFocusNode.unfocus();
+    
+    // Here you would normally navigate to search results page
+    // For now, show a dialog with the search query
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: Text('Search Results', style: pixelFontStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: Text('Searching for: $query', style: pixelFontStyle()),
+        actions: [
+          TextButton(
+            child: Text('Close', style: pixelFontStyle(color: Colors.cyan)),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Fetch products in advance to avoid loading during scrolling
+ Future<void> _fetchProducts() async {
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('products')
+        .where('archived', isNotEqualTo: true)  // Only fetch non-archived products
+        .limit(10)
+        .get();
+    
+    if (mounted) {
+      setState(() {
+        products = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        isProductsLoading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        isProductsLoading = false;
+      });
+    }
+  }
+}
   void _startAutoScroll() {
     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (_pageController.hasClients) {
@@ -134,8 +265,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _debounceTimer?.cancel();
     _pageController.dispose();
     _productScrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -198,14 +332,30 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
                     style: pixelFontStyle(),
                     decoration: InputDecoration(
                       hintText: 'Search',
                       hintStyle: pixelFontStyle(color: Colors.grey.shade400),
                       prefixIcon: const Icon(Icons.search, color: Colors.white),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.white, size: 20),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _suggestedProducts = [];
+                                });
+                              },
+                            )
+                          : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
+                    onSubmitted: (value) {
+                      _executeSearch(value);
+                    },
                   ),
                 ),
               ),
@@ -242,107 +392,127 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.black,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _topNavButton('MENU', Icons.menu),
-                  _topNavButton('WISHLIST', Icons.favorite_border),
-                  _topNavButton('WALLET', Icons.account_balance_wallet),
-                ],
+            // Search suggestions overlay
+            if (_isSearchFocused)
+              Container(
+                color: Colors.black,
+                width: double.infinity,
+                child: _buildSearchSuggestions(),
               ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            if (!_isSearchFocused)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Colors.black,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // Banner Carousel - Using PageView with preloaded images
-                    SizedBox(
-                      height: 200,
-                      child: PageView(
-                        controller: _pageController,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentPage = index;
-                          });
-                        },
-                        children: [
-                          Image.asset('assets/images/banner1.jpg', fit: BoxFit.cover),
-                          Image.asset('assets/images/banner2.jpg', fit: BoxFit.cover),
-                          Image.asset('assets/images/banner3.jpg', fit: BoxFit.cover),
-                        ],
-                      ),
-                    ),
-                    // Carousel Indicator
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (index) => _buildDot(index)),
-                      ),
-                    ),
-                    // Recommended Products with Navigation Arrows
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'RECOMMENDED',
-                            style: pixelFontStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              // Left arrow
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios, color: Colors.cyan, size: 20),
-                                onPressed: () => _scrollProducts(true),
-                              ),
-                              // Right arrow
-                              IconButton(
-                                icon: const Icon(Icons.arrow_forward_ios, color: Colors.cyan, size: 20),
-                                onPressed: () => _scrollProducts(false),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    _buildProductGrid(),
-                    
-                    // GameBox Summer Sale Banner
-                    Container(
-                      margin: const EdgeInsets.symmetric(vertical: 16),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      width: double.infinity,
-                      color: Colors.blue.shade900,
-                      child: Center(
-                        child: Text(
-                          'GAMEBOX SUMMER SALE',
-                          style: pixelFontStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.cyan,
-                          ),
-                        ),
-                      ),
-                    ),
+                    _topNavButton('MENU', Icons.menu),
+                    _topNavButton('WISHLIST', Icons.favorite_border),
+                    _topNavButton('WALLET', Icons.account_balance_wallet),
                   ],
                 ),
               ),
-            ),
+            if (!_isSearchFocused)
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    // Refresh product data
+                    await _fetchProducts();
+                    // Optionally refresh other data like cart/wishlist counts
+                    await _loadCounts();
+                  },
+                  color: Colors.cyan,
+                  backgroundColor: Colors.grey.shade900,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(), // This is important for RefreshIndicator to work
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Banner Carousel - Using PageView with preloaded images
+                        SizedBox(
+                          height: 200,
+                          child: PageView(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentPage = index;
+                              });
+                            },
+                            children: [
+                              Image.asset('assets/images/banner1.jpg', fit: BoxFit.cover),
+                              Image.asset('assets/images/banner2.jpg', fit: BoxFit.cover),
+                              Image.asset('assets/images/banner3.jpg', fit: BoxFit.cover),
+                            ],
+                          ),
+                        ),
+                        // Carousel Indicator
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(3, (index) => _buildDot(index)),
+                          ),
+                        ),
+                        // Recommended Products with Navigation Arrows
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'RECOMMENDED',
+                                style: pixelFontStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  // Left arrow
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back_ios, color: Colors.cyan, size: 20),
+                                    onPressed: () => _scrollProducts(true),
+                                  ),
+                                  // Right arrow
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_forward_ios, color: Colors.cyan, size: 20),
+                                    onPressed: () => _scrollProducts(false),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        _buildProductGrid(),
+                        
+                        // GameBox Summer Sale Banner
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          width: double.infinity,
+                          color: Colors.blue.shade900,
+                          child: Center(
+                            child: Text(
+                              'GAMEBOX SUMMER SALE',
+                              style: pixelFontStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.cyan,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.black,
-          selectedItemColor: Colors.cyan,
+          selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
           unselectedItemColor: Colors.white,
           selectedLabelStyle: pixelFontStyle(fontSize: 12),
           unselectedLabelStyle: pixelFontStyle(fontSize: 12),
@@ -380,6 +550,153 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildSearchSuggestions() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Suggested products based on search query
+          if (_suggestedProducts.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'SUGGESTED PRODUCTS',
+                style: pixelFontStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.cyan,
+                ),
+              ),
+            ),
+            const Divider(color: Colors.grey, height: 1),
+            for (var product in _suggestedProducts)
+              ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.network(
+                    product['imageUrl'] ?? '',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 40,
+                      height: 40,
+                      color: Colors.grey.shade800,
+                      child: const Icon(Icons.error, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
+                title: Text(
+                  product['name'] ?? 'Unknown',
+                  style: pixelFontStyle(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  'PHP ${product['price'] ?? '0.00'}',
+                  style: pixelFontStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
+                onTap: () {
+                  // Navigate to product details and save search
+                  _searchFocusNode.unfocus();
+                  _saveRecentSearch(product['name']);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProductDetails(
+                        imageUrl: product['imageUrl'] ?? '',
+                        title: product['name'] ?? 'Unknown Product',
+                        price: 'PHP ${product['price'] ?? '0.00'}',
+                        description: product['description'] ?? 'No description available',
+                        userId: product['userId'] ?? 'Unknown User',
+                        productId: product['id'],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+          
+          // Recent searches section
+          if (_recentSearches.isNotEmpty && _suggestedProducts.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'RECENT SEARCHES',
+                    style: pixelFontStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyan,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _clearRecentSearches,
+                    child: Text(
+                      'Clear',
+                      style: pixelFontStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.grey, height: 1),
+            for (var search in _recentSearches)
+              ListTile(
+                leading: const Icon(Icons.history, color: Colors.grey),
+                title: Text(
+                  search,
+                  style: pixelFontStyle(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () {
+                  _searchController.text = search;
+                  _executeSearch(search);
+                },
+              ),
+          ],
+          
+          // Loading indicator for suggestions
+          if (_isLoadingSuggestions)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          
+          // No results message
+          if (_searchController.text.isNotEmpty && 
+              _suggestedProducts.isEmpty && 
+              !_isLoadingSuggestions)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Text(
+                  'No products found',
+                  style: pixelFontStyle(color: Colors.grey),
+                ),
+              ),
+            ),
+            
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
   Widget _topNavButton(String title, IconData icon) {
     return TextButton.icon(
       icon: Icon(icon, color: Colors.white, size: 18),
@@ -411,76 +728,78 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-void _showMenuDialog() {
-  showDialog(
-    context: context,
-    barrierColor: Colors.black.withOpacity(0.7),
-    builder: (context) => Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: Container(
-        width: 200,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          border: Border.all(color: Colors.pink.shade800, width: 2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
-              child: Text(
-                'MENU',
-                style: pixelFontStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const Divider(color: Colors.grey, height: 1),
-            InkWell(
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  
+  void _showMenuDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          width: 200,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: Border.all(color: Colors.pink.shade800, width: 2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
                 child: Text(
-                  'Library',
+                  'MENU',
                   style: pixelFontStyle(
-                    fontSize: 16,
-                    color: Colors.pink.shade300,
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),
-            ),
-            InkWell(
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.pop(context);
-                // Navigate to login screen
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Text(
-                  'Your store',
-                  style: pixelFontStyle(
-                    fontSize: 16,
-                    color: Colors.pink.shade300,
+              const Divider(color: Colors.grey, height: 1),
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(
+                    'Library',
+                    style: pixelFontStyle(
+                      fontSize: 16,
+                      color: Colors.pink.shade300,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              InkWell(
+                onTap: () async {
+                  await FirebaseAuth.instance.signOut();
+                  Navigator.pop(context);
+                  // Navigate to login screen
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(
+                    'Your store',
+                    style: pixelFontStyle(
+                      fontSize: 16,
+                      color: Colors.pink.shade300,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+  
   void _showMessageDialog() {
     showDialog(
       context: context,
@@ -569,7 +888,7 @@ void _showMenuDialog() {
                   ),
                   Text(
                     'PHP ${productData['price'] ?? '0.00'}',
-                    style: pixelFontStyle(color: Colors.cyan),
+                    style: pixelFontStyle(color: const Color.fromARGB(255, 212, 0, 0)),
                   ),
                 ],
               ),

@@ -17,58 +17,69 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
       TextEditingController();
   bool _isSubmitting = false;
 
-  Future<void> _submitSellerApplication() async {
-    if (!_formKey.currentState!.validate()) return;
+ Future<void> _submitSellerApplication() async {
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isSubmitting = true;
-    });
+  setState(() {
+    _isSubmitting = true;
+  });
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final sellerData = {
-          'storeName': _storeNameController.text.trim(),
-          'storeDescription': _storeDescriptionController.text.trim(),
-          'userId': user.uid,
-          'status': 'pending', // Default status for new applications
-          'createdAt': FieldValue.serverTimestamp(),
-        };
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // Get the current date in "YYYY-MM-DD" format
+      final DateTime now = DateTime.now();
+      final String joinDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-        await FirebaseFirestore.instance
-            .collection('sellerApplications')
-            .doc(user.uid)
-            .set(sellerData);
+      final sellerData = {
+        'storeName': _storeNameController.text.trim(),
+        'storeDescription': _storeDescriptionController.text.trim(),
+        'userId': user.uid,
+        'sellerStatus': 'pending', // Default status for new applications
+        'createdAt': FieldValue.serverTimestamp(), // Add timestamp
+        'joinDate': joinDate, // Add join date
+      };
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Application submitted successfully!',
-              style: TextStyle(fontFamily: 'PixelFont'),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+      // Save the application in the sellerApplications collection
+      await FirebaseFirestore.instance
+          .collection('sellerApplications')
+          .doc(user.uid)
+          .set(sellerData);
 
-        Navigator.pop(context); // Navigate back to the previous screen
-      }
-    } catch (e) {
+      // Also update the users collection with the same data
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update(sellerData);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            'Failed to submit application: $e',
-            style: const TextStyle(fontFamily: 'PixelFont'),
+            'Application submitted successfully!',
+            style: TextStyle(fontFamily: 'PixelFont'),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.green,
         ),
       );
-    } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
-    }
-  }
 
+      Navigator.pop(context); // Navigate back to the previous screen
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Failed to submit application: $e',
+          style: const TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() {
+      _isSubmitting = false;
+    });
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

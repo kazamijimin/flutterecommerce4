@@ -18,17 +18,24 @@ class _AddProductState extends State<AddProduct> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _stockCountController = TextEditingController(text: '1');
+  final TextEditingController _stockCountController =
+      TextEditingController(text: '1');
   final TextEditingController _discountController = TextEditingController();
   File? _selectedImage;
   bool _isUploading = false;
 
   // Categories as in original code
-  final List<String> _categories = ['Games', 'Consoles', 'Accessories', 'Collectibles'];
+  final List<String> _categories = [
+    'Games',
+    'Consoles',
+    'Accessories',
+    'Collectibles'
+  ];
   String _selectedCategory = 'Games'; // Default category
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -66,72 +73,103 @@ class _AddProductState extends State<AddProduct> {
       _stockCountController.text = (currentValue + 1).toString();
     });
   }
+Future<void> _addProduct() async {
+  final name = _nameController.text.trim();
+  final price = _priceController.text.trim();
+  final description = _descriptionController.text.trim();
+  final stockCount = _stockCountController.text.trim();
+  final discount = _discountController.text.trim();
 
-  Future<void> _addProduct() async {
-    final name = _nameController.text.trim();
-    final price = _priceController.text.trim();
-    final description = _descriptionController.text.trim();
-    final stockCount = _stockCountController.text.trim();
-    final discount = _discountController.text.trim();
-
-    if (name.isEmpty || price.isEmpty || description.isEmpty || stockCount.isEmpty || _selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields and select an image')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isUploading = true;
-    });
-
-    try {
-      // Upload the image and get its URL
-      final imageUrl = await _uploadImage(_selectedImage!);
-      if (imageUrl == null) return;
-
-      // Add the product to Firestore
-      await FirebaseFirestore.instance.collection('products').add({
-        'name': name,
-        'price': double.parse(price),
-        'description': description,
-        'stockCount': int.parse(stockCount),
-        'category': _selectedCategory,
-        'discount': discount.isNotEmpty ? double.parse(discount) : 0.0,
-        'imageUrl': imageUrl,
-        'sellerId': FirebaseAuth.instance.currentUser?.uid, // Add seller ID
-        'createdAt': FieldValue.serverTimestamp(),
-        'availability': true,
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Product added successfully!')),
-      );
-
-      // Clear the input fields and image
-      _nameController.clear();
-      _priceController.clear();
-      _descriptionController.clear();
-      _stockCountController.text = '1';
-      _discountController.clear();
-      setState(() {
-        _selectedImage = null;
-        _selectedCategory = 'Games'; // Reset category to default
-      });
-
-      // Navigate back to Homepage after adding
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add product: $e')),
-      );
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
+  if (name.isEmpty || price.isEmpty || description.isEmpty || stockCount.isEmpty || _selectedImage == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please fill in all fields and select an image')),
+    );
+    return;
   }
 
+  setState(() {
+    _isUploading = true;
+  });
+
+  try {
+    // Get the current user
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    // Fetch the store information from the users collection
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) {
+      throw Exception('User information not found for user ID: ${user.uid}');
+    }
+
+    final userData = userDoc.data();
+    final storeName = userData?['storeName'];
+    final storeDescription = userData?['storeDescription'];
+    final joinDate = userData?['joinDate'];
+    final sellerStatus = userData?['sellerStatus'];
+
+    if (storeName == null || storeName.isEmpty) {
+      throw Exception('Store name is missing in the user document.');
+    }
+
+    if (sellerStatus != 'approved') {
+      throw Exception('Your seller application is not approved yet.');
+    }
+
+    // Upload the image and get its URL
+    final imageUrl = await _uploadImage(_selectedImage!);
+    if (imageUrl == null) return;
+
+    // Add the product to Firestore
+    await FirebaseFirestore.instance.collection('products').add({
+      'name': name,
+      'price': double.parse(price),
+      'description': description,
+      'stockCount': int.parse(stockCount),
+      'category': _selectedCategory,
+      'discount': discount.isNotEmpty ? double.parse(discount) : 0.0,
+      'imageUrl': imageUrl,
+      'sellerId': user.uid, // Add seller ID
+      'storeName': storeName, // Add store name
+      'storeDescription': storeDescription, // Add store description
+      'joinDate': joinDate, // Add join date
+      'createdAt': FieldValue.serverTimestamp(),
+      'availability': true,
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Product added successfully!')),
+    );
+
+    // Clear the input fields and image
+    _nameController.clear();
+    _priceController.clear();
+    _descriptionController.clear();
+    _stockCountController.text = '1';
+    _discountController.clear();
+    setState(() {
+      _selectedImage = null;
+      _selectedCategory = 'Games'; // Reset category to default
+    });
+
+    // Navigate back to the previous screen
+    Navigator.pop(context);
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to add product: $e')),
+    );
+  } finally {
+    setState(() {
+      _isUploading = false;
+    });
+  }
+}
   Widget _buildStockCounter() {
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -316,7 +354,8 @@ class _AddProductState extends State<AddProduct> {
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const SellerDashboard()),
+                  MaterialPageRoute(
+                      builder: (context) => const SellerDashboard()),
                 );
               },
             ),
@@ -327,7 +366,8 @@ class _AddProductState extends State<AddProduct> {
                 style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
               ),
               onTap: () {
-                Navigator.pop(context); // Just close the drawer since we're already on this page
+                Navigator.pop(
+                    context); // Just close the drawer since we're already on this page
               },
             ),
             ListTile(
@@ -340,7 +380,8 @@ class _AddProductState extends State<AddProduct> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileScreen()),
                 );
               },
             ),
@@ -370,7 +411,8 @@ class _AddProductState extends State<AddProduct> {
             color: Colors.white,
           ),
         ),
-        iconTheme: IconThemeData(color: Colors.pink), // Hamburger menu icon color
+        iconTheme:
+            IconThemeData(color: Colors.pink), // Hamburger menu icon color
         actions: [
           // Add a save action button in the app bar
           TextButton.icon(
@@ -415,7 +457,7 @@ class _AddProductState extends State<AddProduct> {
                 ),
               ),
             ),
-            
+
             // Rest of your existing UI code...
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,7 +506,7 @@ class _AddProductState extends State<AddProduct> {
                     ),
                   ),
                 ),
-                
+
                 // Right column with details
                 Expanded(
                   flex: 5,
@@ -504,7 +546,7 @@ class _AddProductState extends State<AddProduct> {
                           ],
                         ),
                       ),
-                      
+
                       // Category Selection
                       Container(
                         margin: const EdgeInsets.all(8),
@@ -552,7 +594,7 @@ class _AddProductState extends State<AddProduct> {
                           ],
                         ),
                       ),
-                      
+
                       // Price & Discount
                       Container(
                         margin: const EdgeInsets.all(8),
@@ -584,7 +626,8 @@ class _AddProductState extends State<AddProduct> {
                                       hintText: '0.00',
                                       hintStyle: TextStyle(color: Colors.grey),
                                       prefixText: '\$ ',
-                                      prefixStyle: TextStyle(color: Colors.green),
+                                      prefixStyle:
+                                          TextStyle(color: Colors.green),
                                       border: InputBorder.none,
                                     ),
                                   ),
@@ -621,7 +664,7 @@ class _AddProductState extends State<AddProduct> {
                           ],
                         ),
                       ),
-                      
+
                       // Available Stock
                       _buildStockCounter(),
                     ],
@@ -629,7 +672,7 @@ class _AddProductState extends State<AddProduct> {
                 ),
               ],
             ),
-            
+
             // Add Product Button
             Container(
               margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),

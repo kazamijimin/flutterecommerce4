@@ -6,6 +6,7 @@ import 'admin_dashboard.dart';
 import 'seller_dashboard.dart';
 import 'order_history.dart';
 import 'seller_register.dart';
+import 'login.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUser();
     _fetchFavorites(); // Ensure this is called
     _loadPurchases();
+    _checkSellerApplicationStatus(); // Check seller application status
   }
 
   Future<void> _fetchFavorites() async {
@@ -59,15 +61,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       } catch (e) {
         print("Error fetching favorites: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to load favorites: $e',
-              style: const TextStyle(fontFamily: 'PixelFont'),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to load favorites: $e',
+                style: const TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
       }
     } else {
       print("User is not authenticated.");
@@ -95,6 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           isAdmin = userData?['isAdmin'] ?? false;
         });
       }
+    } else {
+      setState(() {
+        user = null;
+      });
     }
   }
 
@@ -124,6 +132,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _checkSellerApplicationStatus() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        // Check if the user has a seller application
+        final sellerDoc = await FirebaseFirestore.instance
+            .collection('sellerApplications')
+            .doc(currentUser.uid)
+            .get();
+
+        setState(() {
+          if (sellerDoc.exists) {
+            final data = sellerDoc.data();
+            if (data != null &&
+                data['storeName'] != null &&
+                data['storeName'].isNotEmpty) {
+              sellerStatus = "approved"; // User is an approved seller
+            } else {
+              sellerStatus = "pending"; // Application is pending
+            }
+          } else {
+            sellerStatus = "notApplied"; // No application found
+          }
+        });
+
+        if (sellerDoc.exists) {
+          debugPrint(
+              "Seller application found: ${sellerDoc.data()?['storeName']}");
+        } else {
+          debugPrint(
+              "No seller application found for user: ${currentUser.uid}");
+        }
+      } catch (e) {
+        debugPrint("Error checking seller application status: $e");
+      }
+    }
+  }
+
   Future<void> _loadPurchases() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -146,13 +192,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Handle logout
   Future<void> _handleLogout() async {
     try {
-      await FirebaseAuth.instance.signOut();
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to logout: $e')),
+      await FirebaseAuth.instance.signOut(); // Logs out from Firebase
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+            builder: (context) => const Login()), // Navigate to LoginScreen
+        (route) => false, // Remove all previous routes
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to logout: $e')),
+        );
+      }
     }
+  }
+
+  void _navigateToLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const Login()),
+    );
   }
 
   void _navigateToMyOrders() {
@@ -183,13 +243,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _navigateToFAQs() {
-    // Navigate to FAQs page
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('FAQs coming soon')),
-    );
-  }
-
   void _navigateToSellerDashboard() {
     Navigator.push(
       context,
@@ -197,8 +250,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Sign in prompt widget for users who aren't logged in
+  Widget _buildSignInPrompt(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon or image
+            const Icon(
+              Icons.account_circle,
+              size: 100,
+              color: Colors.pink,
+            ),
+            const SizedBox(height: 24),
+            // Title
+            const Text(
+              'Sign in to view your profile',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Description
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Access your games, orders, and seller features',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                  fontFamily: 'PixelFont',
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            // Sign in button
+            SizedBox(
+              width: 200,
+              child: ElevatedButton(
+                onPressed: _navigateToLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Sign up text button
+            TextButton(
+              onPressed: () {
+                // Navigate to sign up screen (login screen with signup tab)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const Login(),
+                  ),
+                );
+              },
+              child: const Text(
+                'New user? Sign up here',
+                style: TextStyle(
+                  color: Colors.cyan,
+                  fontSize: 16,
+                  fontFamily: 'PixelFont',
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check if user is logged in
+    if (user == null) {
+      return _buildSignInPrompt(context);
+    }
+
+    // If user is logged in, show profile screen
     final String userName = user?.displayName ?? "Guest";
     final String? userPhotoUrl = user?.photoURL;
 
@@ -308,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black,  // Moved color inside BoxDecoration
+                  color: Colors.black, // Moved color inside BoxDecoration
                   border: Border(
                     top: BorderSide(color: Colors.grey.shade800),
                     bottom: BorderSide(color: Colors.grey.shade800),
@@ -530,13 +676,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.history),
                     if (sellerStatus == "approved")
                       _buildNavButton(
-                          'Seller Dashboard', _navigateToSellerDashboard,
-                          icon: Icons.store),
+                        'Manage Store', // Updated name
+                        _navigateToSellerDashboard,
+                        icon: Icons.store,
+                      ),
+                    if (sellerStatus == "notApplied")
+                      _buildNavButton(
+                        'Become a Seller', // Updated name
+                        _navigateToSeller,
+                        icon: Icons.store,
+                      ),
                     _buildNavButton(
                         'Shipping Address', _navigateToShippingAddress,
                         icon: Icons.local_shipping),
-                    _buildNavButton('FAQs', _navigateToFAQs,
-                        icon: Icons.help_outline),
                     _buildNavButton('Logout', _handleLogout,
                         isDestructive: true, icon: Icons.logout),
                     const SizedBox(height: 32),
