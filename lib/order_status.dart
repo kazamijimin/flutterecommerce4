@@ -98,7 +98,7 @@ class OrderStatus extends StatelessWidget {
                     // Count status types
                     int toShip = 0;
                     int toDeliver = 0;
-                    int completed = 0;
+                    int delivered = 0;
                     int canceled = 0;
 
                     for (var order in orders) {
@@ -120,8 +120,8 @@ class OrderStatus extends StatelessWidget {
                         case 'to deliver':
                           toDeliver++;
                           break;
-                        case 'completed':
-                          completed++;
+                        case 'delivered':
+                          delivered++;
                           break;
                         case 'canceled':
                           canceled++;
@@ -142,7 +142,7 @@ class OrderStatus extends StatelessWidget {
                                 'Total Revenue',
                                 '₱${totalRevenue.toStringAsFixed(2)}',
                                 const Color(0xFF00FF66)),
-                            _buildStatTile('Completed', completed.toString(),
+                            _buildStatTile('Delivered', delivered.toString(),
                                 const Color(0xFF00FF66)),
                           ],
                         ),
@@ -278,7 +278,7 @@ class OrderStatus extends StatelessWidget {
                         case 'to review':
                           statusColor = const Color(0xFFFFCC00); // Yellow
                           break;
-                        case 'completed':
+                        case 'delivered':
                           statusColor = const Color(0xFF00FF66); // Green
                           break;
                         case 'cancellation':
@@ -727,9 +727,8 @@ class OrderStatus extends StatelessWidget {
                                       _firestore),
                                   _buildNeonButton(
                                       context,
-                                      'Completed',
-                                      orderData['status'] ==
-                                          'Completed', // This is case-sensitive
+                                      'Delivered',
+                                      orderData['status'] == 'Delivered',
                                       order.id,
                                       _firestore),
                                 ],
@@ -913,9 +912,9 @@ class OrderStatus extends StatelessWidget {
       case 'To Review':
         color = const Color(0xFFFF0077); // Pink
         break;
-      case 'Completed':
+      case 'Delivered':  // Changed from 'Completed'
         color = const Color(0xFF00FF66); // Green
-        firestoreStatus = 'completed'; // special case
+        firestoreStatus = 'delivered'; // Changed from 'completed'
         break;
       default:
         color = const Color(0xFFFF0077); // Pink
@@ -926,42 +925,51 @@ class OrderStatus extends StatelessWidget {
       child: InkWell(
         onTap: () async {
           try {
-            // Update order status - use lowercase format to match order_history.dart
-            await firestore.collection('orders').doc(orderId).update({
-              'status': firestoreStatus,
-            });
-
-            // If updating to completed, also update the user's orders collection
-            if (firestoreStatus == 'completed') {
-              // Get the order document to find the user
-              DocumentSnapshot orderDoc =
-                  await firestore.collection('orders').doc(orderId).get();
-              Map<String, dynamic> orderData =
-                  orderDoc.data() as Map<String, dynamic>;
-
-              if (orderData.containsKey('userId')) {
-                String userId = orderData['userId'];
-
-                // Find the matching order in the user's orders collection and update it
-                QuerySnapshot userOrdersQuery = await firestore
-                    .collection('users')
-                    .doc(userId)
-                    .collection('orders')
-                    .where('orderId', isEqualTo: orderData['orderId'])
-                    .get();
-
-                for (var doc in userOrdersQuery.docs) {
-                  await firestore
-                      .collection('users')
-                      .doc(userId)
-                      .collection('orders')
-                      .doc(doc.id)
-                      .update({'status': firestoreStatus});
-                }
-              }
+            // 1. First get the complete order document to access essential data
+            DocumentSnapshot orderDoc = await firestore.collection('orders').doc(orderId).get();
+            
+            if (!orderDoc.exists) {
+              throw Exception("Order not found");
             }
-
-            // Show success snackbar
+            
+            // 2. Extract necessary information
+            Map<String, dynamic> orderData = orderDoc.data() as Map<String, dynamic>;
+            String userId = orderData['userId'] ?? '';
+            String systemOrderId = orderData['orderId'] ?? '';
+            
+            if (userId.isEmpty || systemOrderId.isEmpty) {
+              throw Exception("Invalid order data: missing userId or orderId");
+            }
+            
+            // 3. Begin a batch operation for atomicity
+            WriteBatch batch = firestore.batch();
+            
+            // 4. Update the main order document
+            batch.update(firestore.collection('orders').doc(orderId), {
+              'status': firestoreStatus,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+            
+            // 5. Find the corresponding order in user's subcollection
+            QuerySnapshot userOrdersQuery = await firestore
+                .collection('users')
+                .doc(userId)
+                .collection('orders')
+                .where('orderId', isEqualTo: systemOrderId)
+                .get();
+            
+            // 6. Update each matching user's order document
+            for (var doc in userOrdersQuery.docs) {
+              batch.update(doc.reference, {
+                'status': firestoreStatus,
+                'lastUpdated': FieldValue.serverTimestamp(),
+              });
+            }
+            
+            // 7. Commit the batch to ensure all updates happen or none do
+            await batch.commit();
+            
+            // 8. Show confirmation to the user
             // ignore: use_build_context_synchronously
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -972,18 +980,14 @@ class OrderStatus extends StatelessWidget {
                 backgroundColor: Colors.green,
               ),
             );
-
-            // Show completed dialog if status is completed
-            if (firestoreStatus == 'completed') {
+            
+            // 9. Show delivered dialog if applicable
+            if (firestoreStatus == 'delivered') {
+              // Using the complete order data that we already retrieved
               // ignore: use_build_context_synchronously
-              _showSalesCompletedDialog(
-                  context,
-                  await firestore
-                      .collection('orders')
-                      .doc(orderId)
-                      .get()
-                      .then((doc) => doc.data() as Map<String, dynamic>));
+              _showSalesDeliveredDialog(context, orderData);
             }
+            
           } catch (e) {
             print("Error updating order status: $e");
             // ignore: use_build_context_synchronously
@@ -1030,7 +1034,7 @@ class OrderStatus extends StatelessWidget {
   }
 
   // Add this new method to show sales completion dialog
-  void _showSalesCompletedDialog(
+  void _showSalesDeliveredDialog(
       BuildContext context, Map<String, dynamic> orderData) {
     double totalAmount = 0.0;
     if (orderData.containsKey('totalPrice')) {
@@ -1090,7 +1094,7 @@ class OrderStatus extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'SALE COMPLETED!',
+                  'ORDER DELIVERED!',
                   style: TextStyle(
                     fontFamily: 'PixelFont',
                     fontSize: 24,
@@ -1101,7 +1105,7 @@ class OrderStatus extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Order has been marked as completed',
+                  'Order has been marked as delivered',
                   style: TextStyle(
                     fontFamily: 'PixelFont',
                     fontSize: 14,
@@ -1294,6 +1298,92 @@ class OrderStatus extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+// Near the bottom of the file, modify the updateOrderStatus function:
+
+Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext context) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  try {
+    // 1. Convert the status to the proper format for Firestore
+    String firestoreStatus = newStatus.toLowerCase();
+    
+    // Map specific status values if needed
+    if (newStatus == 'Delivered') {
+      firestoreStatus = 'delivered';
+    }
+    
+    // 2. Start a batch operation
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+    
+    // 3. First find the order in the main orders collection
+    // This is preferable to looking up in the user collection first
+    QuerySnapshot orderQuery = await FirebaseFirestore.instance
+        .collection('orders')
+        .where('orderId', isEqualTo: orderId)
+        .limit(1)
+        .get();
+        
+    if (orderQuery.docs.isEmpty) {
+      throw Exception("Order not found in main collection");
+    }
+    
+    // Get the main order document and its data
+    DocumentReference mainOrderRef = orderQuery.docs.first.reference;
+    Map<String, dynamic> orderData = orderQuery.docs.first.data() as Map<String, dynamic>;
+    String userId = orderData['userId'];
+    
+    // 4. Update in the main orders collection
+    batch.update(mainOrderRef, {
+      'status': firestoreStatus,
+      'lastUpdated': FieldValue.serverTimestamp()
+    });
+    
+    // 5. Find and update in user's orders collection
+    if (userId != null && userId.isNotEmpty) {
+      QuerySnapshot userOrderQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('orders')
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+          
+      if (userOrderQuery.docs.isNotEmpty) {
+        batch.update(userOrderQuery.docs.first.reference, {
+          'status': firestoreStatus,
+          'lastUpdated': FieldValue.serverTimestamp()
+        });
+      }
+    }
+    
+    // 6. Commit the batch
+    await batch.commit();
+    
+    // 7. Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Order status updated to $newStatus',
+          style: const TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+    
+  } catch (e) {
+    print('Error updating order status: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Failed to update order status: $e',
+          style: const TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
       ),
     );
   }

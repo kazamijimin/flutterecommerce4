@@ -1,10 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'dart:async';
 
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
@@ -40,40 +36,104 @@ class _ProductDetailsState extends State<ProductDetails> {
   final TextEditingController _reviewController = TextEditingController();
   double _userRating = 5.0;
   bool _isInWishlist = false;
+  bool _isInFavorites = false; // Add this flag to track if user can add review
   List<Review> _reviews = [];
   int quantity = 1;
   String addedByUserName = "Loading...";
   String? addedByUserAvatar;
-  bool _hasPurchasedProduct = false;
-  String _storeName = "";
-  String _storeDescription = "";
-  double? _discountedPrice;
-  String _sellerPhotoURL = "";
-  String _sellerStatus = "";
-  File? _reviewImage;
-  int _currentStockCount = 0;
-  StreamSubscription<DocumentSnapshot>? _stockSubscription;
+  bool _canAddReview = false; // Add this flag to track if user can add review
+  double _averageRating = 0.0;
+  int _reviewCount = 0;
+  int _actualStockCount = 0;
 
   @override
   void initState() {
     super.initState();
     _checkIfInWishlist();
+    _checkIfInFavorites(); // Add this new method call
     _fetchReviews();
     _fetchAddedByUserInfo();
-    _checkIfPurchased();
-    _fetchProductDetails(); // New method to get discount, store info
-    _setupStockListener(); // Add real-time listener for stock changes
+    _checkIfCanAddReview();
+    _loadProductDetails(); // Add this new method call
   }
 
+  // Updated method to check if user has completed order for this product
+  Future<void> _checkIfCanAddReview() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _canAddReview = false;
+      });
+      return;
+    }
+
+    try {
+      // Check user's orders collection (in users/{uid}/orders)
+      final userOrdersQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders')
+          .where('status', isEqualTo: 'delivered') // Changed from 'completed'
+          .get();
+
+      if (userOrdersQuery.docs.isNotEmpty) {
+        // Look through user's orders first
+        for (var orderDoc in userOrdersQuery.docs) {
+          final orderData = orderDoc.data();
+          final items = orderData['items'] as List<dynamic>? ?? [];
+
+          for (var item in items) {
+            if (item['title'] == widget.title) {
+              setState(() {
+                _canAddReview = true;
+              });
+              return; // Found a match in user's orders
+            }
+          }
+        }
+      }
+
+      // If not found in user's orders, check main orders collection
+      final mainOrdersQuery = await FirebaseFirestore.instance
+          .collection('orders')
+          .where('userId', isEqualTo: user.uid)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      for (var orderDoc in mainOrdersQuery.docs) {
+        final orderData = orderDoc.data();
+        final items = orderData['items'] as List<dynamic>? ?? [];
+
+        for (var item in items) {
+          if (item['title'] == widget.title) {
+            setState(() {
+              _canAddReview = true;
+            });
+            return; // Found a match in main orders
+          }
+        }
+      }
+
+      // If we get here, no matching completed order was found
+      setState(() {
+        _canAddReview = false;
+      });
+    } catch (e) {
+      print("Error checking if user can add review: $e");
+      setState(() {
+        _canAddReview = false;
+      });
+    }
+  }
+
+  // Update your _submitReview method
   void _submitReview() async {
-    // Force re-check purchase status before submitting
-    await _checkIfPurchased();
-    
-    if (!_hasPurchasedProduct) {
+    // First check if user can add review
+    if (!_canAddReview) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Only customers who have purchased this product can submit reviews.',
+            'You can only review products from completed orders.',
             style: TextStyle(fontFamily: 'PixelFont'),
           ),
           backgroundColor: Colors.red,
@@ -96,41 +156,52 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      // Add image upload functionality
-      String? reviewImageUrl;
-      if (_reviewImage != null) {
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('review_images')
-            .child(
-                '${widget.productId}_${user?.uid ?? 'anonymous'}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-
-        await storageRef.putFile(_reviewImage!);
-        reviewImageUrl = await storageRef.getDownloadURL();
-      }
-
       final review = Review(
-        username: user?.displayName ?? 'Anonymous',
+        username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
         comment: _reviewController.text.trim(),
         rating: _userRating,
-        avatarUrl: user?.photoURL,
-        reviewImageUrl: reviewImageUrl, // Add review image
+        avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
         date: DateTime.now().toIso8601String(),
       );
 
+      // Submit the review
       await _reviewService.submitReview(widget.productId, review);
 
-      // Update product rating average
-      await _updateProductRating();
+      // Update the product document with new rating average
+      final productRef = FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId);
 
-      setState(() {
-        _reviews.add(review);
-        _reviewController.clear();
-        _userRating = 5.0; // Reset rating
-        _reviewImage = null; // Clear the image
-      });
+      // Get the current product data
+      final productDoc = await productRef.get();
+      if (productDoc.exists) {
+        final productData = productDoc.data() as Map<String, dynamic>;
+        final int currentReviewCount = productData['reviewCount'] ?? 0;
+        final double currentRating = productData['rating'] ?? 0.0;
+
+        // Calculate new average rating
+        final double totalRatingPoints = currentRating * currentReviewCount;
+        final int newReviewCount = currentReviewCount + 1;
+        final double newAverageRating =
+            (totalRatingPoints + _userRating) / newReviewCount;
+
+        // Update the product with new rating data
+        await productRef.update({
+          'rating': newAverageRating,
+          'reviewCount': newReviewCount,
+          'lastReviewed': FieldValue.serverTimestamp(),
+        });
+
+        // Update local state
+// In your _submitReview method, make sure to update these lines
+        setState(() {
+          _reviews.add(review);
+          _reviewController.clear();
+          _userRating = 5.0; // Reset rating
+          _averageRating = newAverageRating;
+          _reviewCount = newReviewCount;
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -175,114 +246,20 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   Future<void> _checkIfInWishlist() async {
-    // Change this to use productId instead of title
-    _isInWishlist = await _productService.checkIfInWishlist(widget.productId);
+    _isInWishlist = await _productService.checkIfInWishlist(widget.title);
     setState(() {});
   }
 
   Future<void> _fetchReviews() async {
-    // Change this to use productId instead of title
-    _reviews = await _reviewService.fetchReviews(widget.productId);
+    _reviews = await _reviewService.fetchReviews(widget.title);
     setState(() {});
   }
 
-  Future<void> _addToFavorites() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final favoritesRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('favorites');
-        
-        if (_isInWishlist) {
-          // Remove from wishlist
-          await favoritesRef.doc(widget.productId).delete();
-          
-          setState(() {
-            _isInWishlist = false;
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Removed from Favorites!',
-                style: TextStyle(fontFamily: 'PixelFont'),
-              ),
-              backgroundColor: Colors.amber,
-            ),
-          );
-        } else {
-          // Add to wishlist
-          await favoritesRef.doc(widget.productId).set({
-            'productId': widget.productId,
-            'imageUrl': widget.imageUrl,
-            'title': widget.title,
-            'price': widget.price,
-            'description': widget.description,
-            'userId': widget.userId,
-            'category': widget.category,
-            'addedAt': FieldValue.serverTimestamp(),
-          });
-
-          setState(() {
-            _isInWishlist = true;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Added to Favorites!',
-                style: TextStyle(fontFamily: 'PixelFont'),
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        // Prompt user to sign in
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Please sign in to add items to your favorites',
-              style: TextStyle(fontFamily: 'PixelFont'),
-            ),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to update favorites: $e',
-            style: const TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-// Update the increase and decrease quantity methods
-
   void _increaseQuantity() {
-    if (quantity < _currentStockCount) {
-      // Use real-time stock count
+    if (quantity < widget.stockCount) {
       setState(() {
         quantity++;
       });
-    } else {
-      // Optional: Show a message that max stock has been reached
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Maximum available stock selected',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.amber,
-          duration: Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -293,249 +270,74 @@ class _ProductDetailsState extends State<ProductDetails> {
       });
     }
   }
-// Update the _addToCart method
 
-Future<void> _addToCart() async {
-  if (_currentStockCount <= 0) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Out of Stock!',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-  
-  if (quantity > _currentStockCount) {
-    // If somehow the quantity is greater than available stock
-    setState(() {
-      quantity = _currentStockCount;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Quantity adjusted to available stock: $_currentStockCount',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.amber,
-      ),
-    );
-    return;
-  }
+  Future<void> _addToCart() async {
+    if (widget.stockCount > 0) {
+      try {
+        await _productService.addToCart(
+          widget.title,
+          widget.imageUrl,
+          widget.price,
+          quantity,
+          widget.userId,
+        );
 
-  try {
-    // Update the productId in the cart item to ensure future stock checks work
-    await _productService.addToCart(
-      widget.title,
-      widget.imageUrl,
-      _discountedPrice != null ? _discountedPrice.toString() : widget.price,
-      quantity,
-      widget.userId,
-      widget.productId, // Pass the productId to store in cart
-    );
+        final productRef = FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.productId);
 
-    final productRef = FirebaseFirestore.instance
-        .collection('products')
-        .doc(widget.productId);
+        final productSnapshot = await productRef.get();
+        if (productSnapshot.exists) {
+          await productRef.update({
+            'stockCount': FieldValue.increment(-quantity),
+          });
 
-    // Use a transaction to ensure accuracy when updating stock
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final snapshot = await transaction.get(productRef);
-      
-      if (!snapshot.exists) {
-        throw Exception("Product not found in the database.");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Added to Cart!',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Product not found in the database.',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to add to cart: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-      
-      final currentStock = snapshot.data()?['stockCount'] ?? 0;
-      
-      if (currentStock < quantity) {
-        throw Exception("Not enough stock available.");
-      }
-      
-      transaction.update(productRef, {
-        'stockCount': currentStock - quantity,
-      });
-    });
-
-    // Update local stock count immediately after successful addition
-    setState(() {
-      _currentStockCount -= quantity;
-      quantity = 1; // Reset quantity to 1 for next potential add
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Added to Cart!',
-          style: TextStyle(fontFamily: 'PixelFont'),
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Out of Stock!',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Failed to add to cart: $e',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
-// Add this method to the _ProductDetailsState class
-
-Future<void> _buyNow() async {
-  // First, add the product to cart
-  if (_currentStockCount <= 0) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Out of Stock!',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  try {
-    // Add to cart first
-    await _productService.addToCart(
-      widget.title,
-      widget.imageUrl,
-      _discountedPrice != null ? _discountedPrice.toString() : widget.price,
-      quantity,
-      widget.userId,
-      widget.productId,
-    );
-    
-    // Update the stock
-    final productRef = FirebaseFirestore.instance
-        .collection('products')
-        .doc(widget.productId);
-
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final snapshot = await transaction.get(productRef);
-      
-      if (!snapshot.exists) {
-        throw Exception("Product not found in the database.");
-      }
-      
-      final currentStock = snapshot.data()?['stockCount'] ?? 0;
-      
-      if (currentStock < quantity) {
-        throw Exception("Not enough stock available.");
-      }
-      
-      transaction.update(productRef, {
-        'stockCount': currentStock - quantity,
-      });
-    });
-    
-    // Update local stock
-    setState(() {
-      _currentStockCount -= quantity;
-    });
-    
-    // Navigate to checkout page
-    Navigator.pushNamed(
-      context, 
-      '/checkout', 
-      arguments: {
-        'fromBuyNow': true,
-        'items': [
-          {
-            'productId': widget.productId,
-            'title': widget.title,
-            'imageUrl': widget.imageUrl,
-            'price': _discountedPrice != null ? _discountedPrice.toString() : widget.price,
-            'quantity': quantity,
-            'sellerId': widget.userId,
-          }
-        ]
-      }
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Failed to process purchase: $e',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
-  Future<void> _checkIfPurchased() async {
-  try {
-    if (!mounted) return; // Check if widget is still in the tree
-    
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (mounted) { // Check before setting state
-        setState(() {
-          _hasPurchasedProduct = false;
-        });
-      }
-      return;
-    }
-
-    print('Checking purchase for product: ${widget.productId}, title: ${widget.title}');
-
-    // TEMPORARY SOLUTION - ALWAYS ALLOW REVIEWS FOR TESTING
-    if (mounted) { // Check before setting state
-      setState(() {
-        _hasPurchasedProduct = true;
-        print('User has purchased product: true (FORCED FOR TESTING)');
-      });
-    }
-    
-    // Comment out the rest of the logic for now
-    /*
-    // First, get all orders without filtering by status
-    final ordersSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('orders')
-        .get();
-
-    if (!mounted) return;
-
-    print('Found ${ordersSnapshot.docs.length} total orders');
-    bool hasPurchased = false;
-
-    for (var orderDoc in ordersSnapshot.docs) {
-      // Order checking logic
-      // ...
-    }
-
-    if (mounted) {
-      setState(() {
-        _hasPurchasedProduct = hasPurchased;
-        print('User has purchased product: $hasPurchased');
-      });
-    }
-    */
-  } catch (e) {
-    print('Error checking purchase history: $e');
-    if (mounted) { // Check before setting state
-      setState(() {
-        _hasPurchasedProduct = false;
-      });
+      );
     }
   }
-}
-  Future<void> _fetchProductDetails() async {
+
+  Future<void> _loadProductDetails() async {
     try {
-      // Fetch product details to get discount
       final productDoc = await FirebaseFirestore.instance
           .collection('products')
           .doc(widget.productId)
@@ -543,106 +345,29 @@ Future<void> _buyNow() async {
 
       if (productDoc.exists) {
         final data = productDoc.data() as Map<String, dynamic>;
-        final discount = data['discount'] as num?;
-        final originalPrice =
-            double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
-                0.0;
-
-        // Get the accurate stock count from Firestore
-        final stockCount = data['stockCount'] ?? 0;
-
         setState(() {
-          _currentStockCount = stockCount;
+          _actualStockCount = data['stockCount'] ?? 0;
+          _reviewCount = data['reviewCount'] ?? 0;
 
-          if (discount != null && discount > 0) {
-            final discountAmount = originalPrice * (discount / 100);
-            _discountedPrice = originalPrice - discountAmount;
+          // Only use the rating if there are reviews
+          if (_reviewCount > 0) {
+            _averageRating = (data['rating'] ?? 0.0).toDouble();
+          } else {
+            _averageRating = 0.0; // No reviews yet
           }
         });
-
-        // Get seller info
-        if (data['sellerId'] != null) {
-          final sellerDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(data['sellerId'])
-              .get();
-
-          if (sellerDoc.exists) {
-            final sellerData = sellerDoc.data() as Map<String, dynamic>;
-            setState(() {
-              _storeName = sellerData['storeName'] ?? 'Unknown Store';
-              _storeDescription = sellerData['storeDescription'] ?? '';
-              _sellerPhotoURL = sellerData['photoURL'] ?? '';
-              _sellerStatus = sellerData['sellerStatus'] ?? '';
-            });
-          }
-        }
       }
     } catch (e) {
-      print('Error fetching product details: $e');
+      print("Error loading product details: $e");
     }
   }
 
-  Future<void> _updateProductRating() async {
-    try {
-      final productRef = FirebaseFirestore.instance
-          .collection('products')
-          .doc(widget.productId);
-
-      // Get all reviews to calculate average
-      final reviewsSnapshot = await productRef.collection('reviews').get();
-
-      double totalRating = 0;
-      int totalReviews = reviewsSnapshot.docs.length;
-
-      for (var doc in reviewsSnapshot.docs) {
-        totalRating += (doc.data()['rating'] as num).toDouble();
-      }
-
-      // Calculate average rating
-      double averageRating = totalReviews > 0 ? totalRating / totalReviews : 0;
-
-      // Update product document with the new rating and review count
-      await productRef
-          .update({'rating': averageRating, 'reviewCount': totalReviews});
-    } catch (e) {
-      print('Error updating product rating: $e');
-    }
-  }
-
-  Future<void> _pickReviewImage() async {
-    final ImagePicker _picker = ImagePicker();
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
-      setState(() {
-        _reviewImage = File(image.path);
-      });
-    }
-  }
-
-  void _setupStockListener() {
-    _stockSubscription = FirebaseFirestore.instance
-        .collection('products')
-        .doc(widget.productId)
-        .snapshots()
-        .listen((snapshot) {
-      if (mounted && snapshot.exists) {  // Check if widget is still mounted
-        final data = snapshot.data() as Map<String, dynamic>;
-        setState(() {
-          _currentStockCount = data['stockCount'] ?? 0;
-        });
-      }
+  Future<void> _checkIfInFavorites() async {
+    final isFavorite =
+        await _productService.checkIfInFavorites(widget.productId);
+    setState(() {
+      _isInFavorites = isFavorite;
     });
-  }
-
-  @override
-  void dispose() {
-    // Cancel the Firestore listener
-    _stockSubscription?.cancel();
-    // Dispose of the text controller
-    _reviewController.dispose();
-    super.dispose();
   }
 
   @override
@@ -660,41 +385,68 @@ Future<void> _buyNow() async {
         ),
         backgroundColor: Colors.black,
         actions: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: Icon(
-                  _isInWishlist ? Icons.favorite : Icons.favorite_border,
-                  color: const Color(0xFFFF0077),
-                ),
-                onPressed: _addToFavorites,
-              ),
-              if (_isInWishlist)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: const Text(
-                      '',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+          // Star icon for favorites
+          IconButton(
+            icon: Icon(
+              _isInFavorites ? Icons.star : Icons.star_border,
+              color: Colors.amber,
+            ),
+            onPressed: () async {
+              await _productService.toggleFavorite(
+                widget.productId,
+                widget.title,
+                widget.imageUrl,
+                widget.price,
+                widget.description,
+                widget.userId,
+              );
+              setState(() {
+                _isInFavorites = !_isInFavorites;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _isInFavorites
+                        ? 'Added to Favorites!'
+                        : 'Removed from Favorites',
+                    style: const TextStyle(fontFamily: 'PixelFont'),
                   ),
+                  backgroundColor: _isInFavorites ? Colors.amber : Colors.grey,
                 ),
-            ],
+              );
+            },
+          ),
+          // Heart icon for wishlist (keep your existing code)
+          IconButton(
+            icon: Icon(
+              _isInWishlist ? Icons.favorite : Icons.favorite_border,
+            ),
+            color: const Color(0xFFFF0077),
+            onPressed: () async {
+              await _productService.toggleWishlist(
+                widget.productId,
+                widget.title,
+                widget.imageUrl,
+                widget.price,
+                widget.description,
+                widget.userId,
+              );
+              setState(() {
+                _isInWishlist = !_isInWishlist;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _isInWishlist
+                        ? 'Added to Wishlist!'
+                        : 'Removed from Wishlist',
+                    style: const TextStyle(fontFamily: 'PixelFont'),
+                  ),
+                  backgroundColor:
+                      _isInWishlist ? const Color(0xFFFF0077) : Colors.grey,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -763,30 +515,83 @@ Future<void> _buyNow() async {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 16),
-                      // In your build method, replace the stock count display:
-
-                      Row(
-                        children: [
-                          const Text(
-                            "Available Stock: ",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontFamily: 'PixelFont',
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(4),
+                          border:
+                              Border.all(color: Colors.amber.withOpacity(0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  "${_averageRating.toStringAsFixed(1)}",
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'PixelFont',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: List.generate(5, (index) {
+                                        if (index < _averageRating.floor()) {
+                                          return const Icon(Icons.star,
+                                              color: Colors.amber, size: 16);
+                                        } else if (index ==
+                                                _averageRating.floor() &&
+                                            _averageRating -
+                                                    _averageRating.floor() >
+                                                0) {
+                                          return const Icon(Icons.star_half,
+                                              color: Colors.amber, size: 16);
+                                        } else {
+                                          return const Icon(Icons.star_border,
+                                              color: Colors.amber, size: 16);
+                                        }
+                                      }),
+                                    ),
+                                    Text(
+                                      "$_reviewCount ${_reviewCount == 1 ? 'review' : 'reviews'}",
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 12,
+                                        fontFamily: 'PixelFont',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ),
-                          Text(
-                            "$_currentStockCount", // Use real-time stock count instead of widget.stockCount
-                            style: TextStyle(
-                              color: _currentStockCount > 0
-                                  ? Colors.green
-                                  : Colors.red,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'PixelFont',
-                            ),
-                          ),
-                        ],
+                            if (_reviewCount > 0) ...[
+                              const SizedBox(height: 8),
+                              LinearProgressIndicator(
+                                value: 1.0,
+                                backgroundColor: Colors.grey[800],
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Colors.amber),
+                                minHeight: 4,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Computed from $_reviewCount ${_reviewCount == 1 ? 'rating' : 'ratings'}",
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Column(
@@ -811,14 +616,29 @@ Future<void> _buyNow() async {
                             ),
                           ),
                           Text(
-                            "$_currentStockCount",
-                            style: const TextStyle(
-                              color: Colors.red,
+                            "$_actualStockCount", // Use the loaded stock count
+                            style: TextStyle(
+                              color: _actualStockCount > 10
+                                  ? Colors.green
+                                  : Colors.red,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'PixelFont',
                             ),
                           ),
+                          if (_actualStockCount < 5 && _actualStockCount > 0)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8.0),
+                              child: Text(
+                                "Low Stock!",
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -887,180 +707,77 @@ Future<void> _buyNow() async {
               ],
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.grey.shade700),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_discountedPrice != null) ...[
-                    Text(
-                      "PHP ${widget.price}",
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 16,
-                        fontFamily: 'PixelFont',
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "PHP ${_discountedPrice!.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                  ] else
-                    Text(
-                      "PHP ${widget.price}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _currentStockCount > 0 ? _addToCart : null, // Use _currentStockCount instead of widget.stockCount
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pink,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'PixelFont',
-                        ),
-                      ),
-                      child: const Text("ADD TO CART"),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.stockCount > 0 ? _addToCart : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _currentStockCount > 0 ? _buyNow : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                    child: const Text("BUY NOW"),
-                  ),
-                ),
-              ],
+                child: const Text("ADD TO CART"),
+              ),
             ),
             const SizedBox(height: 24),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.black38,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey[800]!),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.cyan, width: 2),
+                    ),
+                    child: addedByUserAvatar != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.network(
+                              addedByUserAvatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, _) => const Icon(
+                                  Icons.person,
+                                  color: Colors.cyan,
+                                  size: 32),
+                            ),
+                          )
+                        : const Icon(Icons.person,
+                            color: Colors.cyan, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.cyan, width: 2),
+                      const Text(
+                        "Added by",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          fontFamily: 'PixelFont',
                         ),
-                        child: _sellerPhotoURL.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: Image.network(
-                                  _sellerPhotoURL,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, _) =>
-                                      const Icon(Icons.store,
-                                          color: Colors.cyan, size: 32),
-                                ),
-                              )
-                            : const Icon(Icons.store,
-                                color: Colors.cyan, size: 32),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Sold By",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                            Text(
-                              _storeName.isNotEmpty
-                                  ? _storeName
-                                  : "Unknown Store",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                            if (_sellerStatus == "approved")
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                margin: const EdgeInsets.only(top: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  "Verified Seller",
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 10,
-                                    fontFamily: 'PixelFont',
-                                  ),
-                                ),
-                              ),
-                          ],
+                      Text(
+                        addedByUserName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'PixelFont',
                         ),
                       ),
                     ],
                   ),
-                  if (_storeDescription.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _storeDescription,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -1075,143 +792,161 @@ Future<void> _buyNow() async {
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black38,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[800]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Add Your Review",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            _canAddReview
+                ? Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _hasPurchasedProduct ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _hasPurchasedProduct ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5),
-                      ),
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[800]!),
                     ),
-                    child: Text(
-                      _hasPurchasedProduct 
-                        ? "You can submit a review for this product" 
-                        : "Only verified purchasers can submit reviews",
-                      style: TextStyle(
-                        color: _hasPurchasedProduct ? Colors.green : Colors.red,
-                        fontSize: 12,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < _userRating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _userRating = index + 1.0;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _reviewController,
-                    maxLines: 3,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'PixelFont',
-                    ),
-                    decoration: InputDecoration(
-                      hintText: "Write your review here...",
-                      hintStyle: TextStyle(
-                        color: Colors.grey[500],
-                        fontFamily: 'PixelFont',
-                      ),
-                      filled: true,
-                      fillColor: Colors.black45,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.cyan),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _pickReviewImage,
-                        icon:
-                            const Icon(Icons.photo_camera, color: Colors.black),
-                        label: const Text(
-                          "Add Photo",
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Add Your Review",
                           style: TextStyle(
-                            color: Colors.black,
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             fontFamily: 'PixelFont',
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber.shade300,
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            return IconButton(
+                              icon: Icon(
+                                index < _userRating
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: Colors.amber,
+                                size: 32,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _userRating = index + 1.0;
+                                });
+                              },
+                            );
+                          }),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (_reviewImage != null)
-                        Expanded(
-                          child: Text(
-                            "Image selected",
-                            style: TextStyle(
-                              color: Colors.green.shade300,
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _reviewController,
+                          maxLines: 3,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                          ),
+                          decoration: InputDecoration(
+                            hintText: "Write your review here...",
+                            hintStyle: TextStyle(
+                              color: Colors.grey[500],
                               fontFamily: 'PixelFont',
+                            ),
+                            filled: true,
+                            fillColor: Colors.black45,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[700]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.cyan),
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _submitReview,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text(
-                        "SUBMIT REVIEW",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'PixelFont',
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _submitReview,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              "SUBMIT REVIEW",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[800]!),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFFF0077),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "ONLY VERIFIED BUYERS CAN REVIEW",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'PixelFont',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "You can only review products after your order has been completed.",
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                            fontFamily: 'PixelFont',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'You can only review products from completed orders.',
+                                    style: TextStyle(fontFamily: 'PixelFont'),
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[800],
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              "COMPLETE AN ORDER FIRST",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
             _reviews.isEmpty
                 ? const Center(
@@ -1309,15 +1044,13 @@ class ReviewItem extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'PixelFont',
                       ),
                     ),
                     Text(
-                      "Verified Purchase • $dateStr",
+                      dateStr,
                       style: TextStyle(
-                        color: Colors.green[400],
+                        color: Colors.grey[500],
                         fontSize: 12,
-                        fontFamily: 'PixelFont',
                       ),
                     ),
                   ],
@@ -1345,31 +1078,8 @@ class ReviewItem extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
-              fontFamily: 'PixelFont',
             ),
           ),
-
-          // Review Image (if any)
-          if (review.reviewImageUrl != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[700]!),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  review.reviewImageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, _) => const Center(
-                    child: Icon(Icons.broken_image, color: Colors.grey),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1382,7 +1092,6 @@ class Review {
   final String comment;
   final double rating;
   final String? avatarUrl;
-  final String? reviewImageUrl; // Add this field
   final String date;
 
   Review({
@@ -1390,16 +1099,14 @@ class Review {
     required this.comment,
     required this.rating,
     this.avatarUrl,
-    this.reviewImageUrl, // Add this parameter
     required this.date,
   });
 }
 
-// Update the addToCart method in ProductService class
-
+// Update your ProductService class with these methods
 class ProductService {
   Future<void> addToCart(String title, String imageUrl, String price,
-      int quantity, String userId, String productId) async {
+      int quantity, String userId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final cartRef = FirebaseFirestore.instance
@@ -1413,34 +1120,105 @@ class ProductService {
         'price': price,
         'quantity': quantity,
         'addedBy': userId,
-        'productId': productId, // Store the productId to check stock later
-        'addedAt': FieldValue.serverTimestamp(),
       });
     }
   }
 
-  Future<bool> checkIfInWishlist(String productId) async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return false;
-      
-      final favoriteDoc = await FirebaseFirestore.instance
+// Update to toggle wishlist instead of just adding
+  Future<bool> toggleWishlist(String productId, String title, String imageUrl,
+      String price, String description, String userId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final wishlistRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .collection('favorites')
-          .doc(productId)
-          .get();
-          
-      return favoriteDoc.exists;
-    } catch (e) {
-      print('Error checking wishlist: $e');
-      return false;
+          .collection('wishlist');
+
+      final doc = await wishlistRef.doc(title).get();
+
+      if (doc.exists) {
+        // Remove from wishlist
+        await wishlistRef.doc(title).delete();
+        return false;
+      } else {
+        // Add to wishlist
+        await wishlistRef.doc(title).set({
+          'productId': productId,
+          'imageUrl': imageUrl,
+          'title': title,
+          'price': price,
+          'description': description,
+          'addedBy': userId,
+          'addedOn': FieldValue.serverTimestamp(),
+        });
+        return true;
+      }
     }
+    return false; // Return false if user is null
   }
-  
+
+  // Add favorites functionality
+  Future<bool> toggleFavorite(String productId, String title, String imageUrl,
+      String price, String description, String userId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final favsRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('favorites');
+
+      final doc = await favsRef.doc(productId).get();
+
+      if (doc.exists) {
+        // Remove from favorites
+        await favsRef.doc(productId).delete();
+        return false;
+      } else {
+        // Add to favorites
+        await favsRef.doc(productId).set({
+          'productId': productId,
+          'imageUrl': imageUrl,
+          'title': title,
+          'price': price,
+          'description': description,
+          'addedBy': userId,
+          'addedOn': FieldValue.serverTimestamp(),
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> checkIfInWishlist(String title) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final wishlistRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('wishlist');
+
+      final doc = await wishlistRef.doc(title).get();
+      return doc.exists;
+    }
+    return false;
+  }
+
+  Future<bool> checkIfInFavorites(String productId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final favsRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('favorites');
+
+      final doc = await favsRef.doc(productId).get();
+      return doc.exists;
+    }
+    return false;
+  }
 }
 
-// Fix the incomplete ReviewService class
 class ReviewService {
   Future<List<Review>> fetchReviews(String productId) async {
     final reviewsRef = FirebaseFirestore.instance
@@ -1456,7 +1234,6 @@ class ReviewService {
         comment: data['comment'] ?? '',
         rating: (data['rating'] ?? 0).toDouble(),
         avatarUrl: data['avatarUrl'],
-        reviewImageUrl: data['reviewImageUrl'], // Add image support
         date: data['date'] ?? '',
       );
     }).toList();
@@ -1473,41 +1250,7 @@ class ReviewService {
       'comment': review.comment,
       'rating': review.rating,
       'avatarUrl': review.avatarUrl,
-      'reviewImageUrl': review.reviewImageUrl, // Add image support
       'date': review.date,
-      'verifiedPurchase': true, // Since we already check this
     });
-
-    // Update the product's overall rating
-    final productRef =
-        FirebaseFirestore.instance.collection('products').doc(productId);
-
-    try {
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        DocumentSnapshot productSnapshot = await transaction.get(productRef);
-    
-        if (!productSnapshot.exists) {
-          throw Exception("Product does not exist!");
-        }
-    
-        final data = productSnapshot.data() as Map<String, dynamic>;
-        int reviewCount = (data['reviewCount'] ?? 0) + 1;
-        double currentRating = (data['rating'] ?? 0).toDouble();
-    
-        // Calculate new rating
-        double newRating =
-            ((currentRating * (reviewCount - 1)) + review.rating) / reviewCount;
-    
-        transaction.update(productRef, {
-          'rating': newRating,
-          'reviewCount': reviewCount,
-        });
-        
-        return null; // Ensure the transaction completes
-      });
-    } catch (e) {
-      print('Error updating product rating: $e');
-      // Still allow the review to be added even if rating update fails
-    }
   }
 }

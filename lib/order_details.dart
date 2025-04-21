@@ -15,10 +15,10 @@ class OrderDetailsPage extends StatelessWidget {
     final neonGreen = const Color(0xFF00FF66);
     final darkBackground = const Color(0xFF0F0F1B);
     final surfaceColor = const Color(0xFF1A1A2E);
-    
+
     // Get the order status
     final String orderStatus = order['status']?.toString() ?? 'To Pay';
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -44,7 +44,7 @@ class OrderDetailsPage extends StatelessWidget {
               gridSpacing: 30,
             ),
           ),
-          
+
           // Main content
           SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -52,10 +52,11 @@ class OrderDetailsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Status tracker card
-                _buildStatusTracker(orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
-                
+                _buildStatusTracker(
+                    orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
+
                 const SizedBox(height: 24),
-                
+
                 // Order information card
                 _buildSectionCard(
                   title: 'ORDER INFORMATION',
@@ -102,9 +103,9 @@ class OrderDetailsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Product card
                 _buildSectionCard(
                   title: 'YOUR PURCHASE',
@@ -137,7 +138,8 @@ class OrderDetailsPage extends StatelessWidget {
                           child: Image.network(
                             item['imageUrl'] ?? '',
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
                               Icons.image_not_supported,
                               color: Colors.grey,
                               size: 40,
@@ -147,7 +149,8 @@ class OrderDetailsPage extends StatelessWidget {
                               return Center(
                                 child: CircularProgressIndicator(
                                   color: neonPink,
-                                  value: loadingProgress.expectedTotalBytes != null
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
                                       ? loadingProgress.cumulativeBytesLoaded /
                                           loadingProgress.expectedTotalBytes!
                                       : null,
@@ -158,7 +161,7 @@ class OrderDetailsPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      
+
                       // Product details
                       Expanded(
                         child: Column(
@@ -224,9 +227,9 @@ class OrderDetailsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Payment summary card
                 _buildSectionCard(
                   title: 'PAYMENT SUMMARY',
@@ -238,7 +241,8 @@ class OrderDetailsPage extends StatelessWidget {
                     children: [
                       _buildPaymentRow(
                         title: 'Subtotal',
-                        value: '\$${(order['totalPrice'] != null ? (order['totalPrice'] - 4.99) : 0).toStringAsFixed(2)}',
+                        value:
+                            '\$${(order['totalPrice'] != null ? (order['totalPrice'] - 4.99) : 0).toStringAsFixed(2)}',
                       ),
                       _buildPaymentRow(
                         title: 'Shipping Fee',
@@ -249,20 +253,33 @@ class OrderDetailsPage extends StatelessWidget {
                       const SizedBox(height: 4),
                       _buildPaymentRow(
                         title: 'Total',
-                        value: '\$${order['totalPrice']?.toStringAsFixed(2) ?? '0.00'}',
+                        value:
+                            '\$${order['totalPrice']?.toStringAsFixed(2) ?? '0.00'}',
                         isTotal: true,
                         neonPink: neonPink,
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Action button based on order status
-                _buildActionButton(context, orderStatus, order, neonPink, neonBlue, neonGreen),
-                
+                _buildActionButton(
+                    context, orderStatus, order, neonPink, neonBlue, neonGreen),
+
+                // Add this to show admin controls (with divider for visual separation)
+                if (_isSellerOrAdmin()) ...[
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 16),
+                  _buildAdminStatusControls(context, orderStatus),
+                ],
+
                 const SizedBox(height: 24),
+
+                // Add this to show order history button
+                _buildOrderHistoryButton(context, neonBlue),
               ],
             ),
           ),
@@ -271,9 +288,12 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  // Get the appropriate app bar title based on order status
+// Replace your existing _getAppBarTitle method
   String _getAppBarTitle(String status) {
-    switch (status) {
+    // Normalize status for consistent comparison
+    final String normalizedStatus = status.toString().toLowerCase();
+
+    switch (normalizedStatus) {
       case 'to pay':
         return 'PAYMENT PENDING';
       case 'to ship':
@@ -281,6 +301,8 @@ class OrderDetailsPage extends StatelessWidget {
       case 'to receive':
         return 'ORDER SHIPPED';
       case 'to review':
+        return 'ORDER DELIVERED';
+      case 'delivered':
         return 'ORDER DELIVERED';
       case 'completed':
         return 'ORDER COMPLETE';
@@ -291,25 +313,25 @@ class OrderDetailsPage extends StatelessWidget {
     }
   }
 
-  // Build the status tracker widget
-  Widget _buildStatusTracker(
-    String status, 
-    Color neonPink, 
-    Color neonBlue, 
-    Color neonGreen, 
-    Color surfaceColor
-  ) {
+  // Replace your existing _buildStatusTracker method with this one
+  Widget _buildStatusTracker(String status, Color neonPink, Color neonBlue,
+      Color neonGreen, Color surfaceColor) {
+    // Normalize the status string for consistent comparison
+    final String normalizedStatus = status.toString().toLowerCase();
+
     // Determine which stages are completed
-    final isPaid = status != 'To Pay';
-    final isShipped = ['To Receive', 'To Review', 'Completed'].contains(status);
-    final isDelivered = ['To Review', 'Completed'].contains(status);
-    final isCompleted = status == 'Completed';
-    
+    final isPaid = normalizedStatus != 'to pay';
+    final isShipped = ['to receive', 'to review', 'delivered', 'completed']
+        .contains(normalizedStatus);
+    final isDelivered =
+        ['to review', 'delivered', 'completed'].contains(normalizedStatus);
+    final isCompleted = ['delivered', 'completed'].contains(normalizedStatus);
+
     // Determine current active step and its color
     Color activeStepColor;
     String activeStepText;
-    
-    switch (status) {
+
+    switch (normalizedStatus) {
       case 'to pay':
         activeStepColor = Colors.orange;
         activeStepText = 'PAYMENT PENDING';
@@ -326,8 +348,12 @@ class OrderDetailsPage extends StatelessWidget {
         activeStepColor = neonGreen;
         activeStepText = 'ORDER DELIVERED';
         break;
+      case 'delivered':
+        activeStepColor = neonGreen;
+        activeStepText = 'ORDER DELIVERED';
+        break;
       case 'completed':
-        activeStepColor = neonGreen.withGreen(255);
+        activeStepColor = neonGreen;
         activeStepText = 'ORDER COMPLETED';
         break;
       case 'cancelled':
@@ -338,10 +364,10 @@ class OrderDetailsPage extends StatelessWidget {
         activeStepColor = neonPink;
         activeStepText = 'PROCESSING';
     }
-    
+
     // Select appropriate icon for current status
     IconData statusIcon;
-    switch (status) {
+    switch (normalizedStatus) {
       case 'to pay':
         statusIcon = Icons.hourglass_empty;
         break;
@@ -354,6 +380,9 @@ class OrderDetailsPage extends StatelessWidget {
       case 'to review':
         statusIcon = Icons.check_circle;
         break;
+      case 'delivered':
+        statusIcon = Icons.check_circle;
+        break;
       case 'completed':
         statusIcon = Icons.verified;
         break;
@@ -363,7 +392,8 @@ class OrderDetailsPage extends StatelessWidget {
       default:
         statusIcon = Icons.help;
     }
-    
+
+    // The rest of your existing method remains the same...
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -419,7 +449,7 @@ class OrderDetailsPage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Dynamic status tracker steps with individual colors
           Padding(
             padding: const EdgeInsets.all(20.0),
@@ -428,50 +458,50 @@ class OrderDetailsPage extends StatelessWidget {
               children: [
                 // Payment step - active only when on "to pay" or completed
                 _buildStatusStep(
-                  'Payment', 
-                  isPaid || status == 'to pay', 
-                  status == 'to pay' ? Colors.orange : (isPaid ? neonPink : Colors.grey.shade800),
-                  isCurrentStep: status == 'to pay'
-                ),
-                
+                    'Payment',
+                    isPaid || normalizedStatus == 'to pay',
+                    normalizedStatus == 'to pay'
+                        ? Colors.orange
+                        : (isPaid ? neonPink : Colors.grey.shade800),
+                    isCurrentStep: normalizedStatus == 'to pay'),
+
                 _buildStatusLine(
-                  isPaid, 
-                  isPaid ? neonPink : Colors.grey.shade800
-                ),
-                
+                    isPaid, isPaid ? neonPink : Colors.grey.shade800),
+
                 // Shipping step - active only when on "to ship" or later
                 _buildStatusStep(
-                  'Processing', 
-                  isShipped || status == 'to ship', 
-                  status == 'to ship' ? neonPink : (isShipped ? neonBlue : Colors.grey.shade800),
-                  isCurrentStep: status == 'to ship'
-                ),
-                
+                    'Processing',
+                    isShipped || normalizedStatus == 'to ship',
+                    normalizedStatus == 'to ship'
+                        ? neonPink
+                        : (isShipped ? neonBlue : Colors.grey.shade800),
+                    isCurrentStep: normalizedStatus == 'to ship'),
+
                 _buildStatusLine(
-                  isShipped, 
-                  isShipped ? neonBlue : Colors.grey.shade800
-                ),
-                
+                    isShipped, isShipped ? neonBlue : Colors.grey.shade800),
+
                 // Delivery step - active only when on "to receive" or later
                 _buildStatusStep(
-                  'Shipping', 
-                  isDelivered || status == 'to receive', 
-                  status == 'to receive' ? neonBlue : (isDelivered ? neonGreen : Colors.grey.shade800),
-                  isCurrentStep: status == 'to receive'
-                ),
-                
-                _buildStatusLine(
-                  isDelivered, 
-                  isDelivered ? neonGreen : Colors.grey.shade800
-                ),
-                
-                // Completed step - active only when "completed"
+                    'Shipping',
+                    isDelivered || normalizedStatus == 'to receive',
+                    normalizedStatus == 'to receive'
+                        ? neonBlue
+                        : (isDelivered ? neonGreen : Colors.grey.shade800),
+                    isCurrentStep: normalizedStatus == 'to receive'),
+
+                _buildStatusLine(isDelivered,
+                    isDelivered ? neonGreen : Colors.grey.shade800),
+
+                // Completed step - active only when "completed" or "delivered"
                 _buildStatusStep(
-                  'Delivered', 
-                  isCompleted || status == 'to review', 
-                  status == 'to review' ? neonGreen : (isCompleted ? Colors.green : Colors.grey.shade800),
-                  isCurrentStep: status == 'to review' || status == 'completed'
-                ),
+                    'Delivered',
+                    isCompleted || normalizedStatus == 'to review',
+                    normalizedStatus == 'to review'
+                        ? neonGreen
+                        : (isCompleted ? neonGreen : Colors.grey.shade800),
+                    isCurrentStep: normalizedStatus == 'to review' ||
+                        normalizedStatus == 'delivered' ||
+                        normalizedStatus == 'completed'),
               ],
             ),
           ),
@@ -481,7 +511,8 @@ class OrderDetailsPage extends StatelessWidget {
   }
 
   // Build a single status step circle with pulsing effect for current step
-  Widget _buildStatusStep(String label, bool isActive, Color color, {bool isCurrentStep = false}) {
+  Widget _buildStatusStep(String label, bool isActive, Color color,
+      {bool isCurrentStep = false}) {
     return Column(
       children: [
         Container(
@@ -506,7 +537,9 @@ class OrderDetailsPage extends StatelessWidget {
           ),
           child: Center(
             child: Icon(
-              isActive ? (isCurrentStep ? Icons.circle : Icons.check) : Icons.circle,
+              isActive
+                  ? (isCurrentStep ? Icons.circle : Icons.check)
+                  : Icons.circle,
               color: Colors.white,
               size: isActive ? (isCurrentStep ? 10 : 16) : 8,
             ),
@@ -536,22 +569,25 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  // Build action button based on order status
+// Replace your existing _buildActionButton method
   Widget _buildActionButton(
-    BuildContext context, 
-    String status, 
+    BuildContext context,
+    String status,
     Map<String, dynamic> order,
     Color neonPink,
     Color neonBlue,
     Color neonGreen,
   ) {
+    // Normalize status
+    final String normalizedStatus = status.toString().toLowerCase();
+
     // Configure button based on status
     String buttonText;
     Color buttonColor;
     IconData buttonIcon;
     VoidCallback onPressed;
 
-    switch (status) {
+    switch (normalizedStatus) {
       case 'to pay':
         buttonText = 'PROCEED TO PAYMENT';
         buttonColor = neonPink;
@@ -576,23 +612,32 @@ class OrderDetailsPage extends StatelessWidget {
         buttonIcon = Icons.rate_review;
         onPressed = () => _writeReview(context, order);
         break;
+      case 'delivered':
+        buttonText = 'WRITE A REVIEW';
+        buttonColor = neonGreen;
+        buttonIcon = Icons.rate_review;
+        onPressed = () => _writeReview(context, order);
+        break;
       case 'completed':
         buttonText = 'CONTINUE SHOPPING';
         buttonColor = neonGreen;
         buttonIcon = Icons.shopping_cart;
-        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+        onPressed =
+            () => Navigator.of(context).popUntil((route) => route.isFirst);
         break;
       case 'cancelled':
         buttonText = 'CONTINUE SHOPPING';
         buttonColor = Colors.grey;
         buttonIcon = Icons.shopping_cart;
-        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+        onPressed =
+            () => Navigator.of(context).popUntil((route) => route.isFirst);
         break;
       default:
         buttonText = 'CONTINUE SHOPPING';
         buttonColor = neonBlue;
         buttonIcon = Icons.shopping_cart;
-        onPressed = () => Navigator.of(context).popUntil((route) => route.isFirst);
+        onPressed =
+            () => Navigator.of(context).popUntil((route) => route.isFirst);
     }
 
     return SizedBox(
@@ -822,6 +867,281 @@ class OrderDetailsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Add these methods to the OrderDetailsPage class
+
+  // Method to determine if current user is a seller or admin
+  bool _isSellerOrAdmin() {
+    // For demo purposes - set to true to see admin controls
+    // In production, you'd check user roles in Firestore
+    return true;
+  }
+
+  // Build status update controls for admin/seller users
+  Widget _buildAdminStatusControls(BuildContext context, String currentStatus) {
+    final neonPink = const Color(0xFFFF0077);
+    final neonBlue = const Color(0xFF00E5FF);
+    final neonGreen = const Color(0xFF00FF66);
+
+    // Normalize current status for comparison
+    final normalizedStatus = currentStatus.toLowerCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'UPDATE ORDER STATUS',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: 14,
+              color: Colors.white70,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black12,
+            border: Border.all(color: neonPink.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildStatusUpdateButton(
+                  context, 'To Ship', normalizedStatus == 'to ship'),
+              _buildStatusUpdateButton(
+                  context, 'To Receive', normalizedStatus == 'to receive'),
+              _buildStatusUpdateButton(
+                  context, 'To Review', normalizedStatus == 'to review'),
+              _buildStatusUpdateButton(
+                  context, 'Delivered', normalizedStatus == 'delivered'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build individual status update button
+  Widget _buildStatusUpdateButton(
+      BuildContext context, String status, bool isSelected) {
+    // Status-specific styling
+    Color color;
+    String firestoreStatus = status.toLowerCase();
+
+    switch (status) {
+      case 'To Pay':
+        color = Colors.orange;
+        break;
+      case 'To Ship':
+        color = const Color(0xFF00E5FF);
+        break;
+      case 'To Receive':
+        color = const Color(0xFFFFCC00);
+        break;
+      case 'To Review':
+        color = const Color(0xFFFF0077);
+        break;
+      case 'Delivered':
+        color = const Color(0xFF00FF66);
+        firestoreStatus = 'delivered';
+        break;
+      default:
+        color = const Color(0xFFFF0077);
+    }
+
+    return InkWell(
+      onTap: () => _updateOrderStatus(context, firestoreStatus),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
+          border: Border.all(color: color, width: 1.5),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  )
+                ]
+              : null,
+        ),
+        child: Text(
+          status,
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? color : color.withOpacity(0.8),
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Method to update order status in both Firebase collections
+  Future<void> _updateOrderStatus(
+      BuildContext context, String newStatus) async {
+    try {
+      final String orderId = order['documentId'] ?? '';
+      final String systemOrderId = order['orderId'] ?? '';
+      String userId = order['userId'] ?? '';
+
+      if (orderId.isEmpty && systemOrderId.isEmpty) {
+        throw Exception("Cannot identify order");
+      }
+
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final WriteBatch batch = firestore.batch();
+
+      // Find and update the order document
+      DocumentReference? orderRef;
+
+      if (orderId.isNotEmpty) {
+        // If we have the document ID, use it directly
+        orderRef = firestore.collection('orders').doc(orderId);
+      } else if (systemOrderId.isNotEmpty) {
+        // Otherwise find by orderId
+        QuerySnapshot orderQuery = await firestore
+            .collection('orders')
+            .where('orderId', isEqualTo: systemOrderId)
+            .limit(1)
+            .get();
+
+        if (orderQuery.docs.isNotEmpty) {
+          orderRef = orderQuery.docs.first.reference;
+
+          // Get userId if not available
+          if (userId.isEmpty) {
+            final orderData =
+                orderQuery.docs.first.data() as Map<String, dynamic>;
+            userId = orderData['userId'] ?? '';
+          }
+        }
+      }
+
+      // Update main order document
+      if (orderRef != null) {
+        batch.update(orderRef, {
+          'status': newStatus,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Update user's order copy
+      if (userId.isNotEmpty && systemOrderId.isNotEmpty) {
+        QuerySnapshot userOrderQuery = await firestore
+            .collection('users')
+            .doc(userId)
+            .collection('orders')
+            .where('orderId', isEqualTo: systemOrderId)
+            .limit(1)
+            .get();
+
+        if (userOrderQuery.docs.isNotEmpty) {
+          batch.update(userOrderQuery.docs.first.reference, {
+            'status': newStatus,
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      await batch.commit();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order updated to ${newStatus.toUpperCase()}',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Refresh the page - easiest way is to pop and push
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderDetailsPage(
+            order: {...order, 'status': newStatus},
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error updating order status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update order: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Add this new method to the OrderDetailsPage class:
+  Widget _buildOrderHistoryButton(BuildContext context, Color neonBlue) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => _navigateToOrderHistory(context),
+          icon: const Icon(Icons.history),
+          label: const Text(
+            'VIEW ORDER HISTORY',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: neonBlue, width: 1.5),
+            foregroundColor: neonBlue,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Add this method to handle navigation
+  void _navigateToOrderHistory(BuildContext context) {
+    // Navigate to order history page
+    // Replace this with actual navigation to your order history page
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Navigating to order history...',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.blue,
+      ),
+    );
+    
+    // When you have the actual OrderHistoryPage, use this:
+    // Navigator.of(context).push(
+    //   MaterialPageRoute(
+    //     builder: (context) => OrderHistoryPage(),
+    //   ),
+    // );
   }
 }
 

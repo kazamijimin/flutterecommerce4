@@ -18,7 +18,7 @@ class _OrderHistoryState extends State<OrderHistory>
     'To Ship',
     'To Receive',
     'To Review',
-    'Completed',  // Added Completed tab
+    'Delivered',  // Changed from 'Completed'
     'Return/Refund',
     'Cancellation'
   ];
@@ -29,7 +29,7 @@ class _OrderHistoryState extends State<OrderHistory>
     'To Ship': 'to ship',
     'To Receive': 'to receive',
     'To Review': 'to review',
-    'Completed': 'completed',  // Added mapping for Completed
+    'Delivered': 'delivered',  // Changed from 'completed'
     'Return/Refund': 'return/refund',
     'Cancellation': 'cancellation'
   };
@@ -196,7 +196,7 @@ class _OrderHistoryState extends State<OrderHistory>
         return Icons.assignment_return;
       case 'cancellation':
         return Icons.cancel;
-      case 'completed':
+      case 'delivered':  // Changed from 'completed'
         return Icons.check_circle;
       default:
         return Icons.shopping_bag;
@@ -222,7 +222,7 @@ class _OrderHistoryState extends State<OrderHistory>
         return const Color(0xFF00E5FF); // Cyan
       case 'To Review':
         return const Color(0xFFFFCC00); // Yellow
-      case 'Completed':
+      case 'Delivered':  // Changed from 'Completed'
         return const Color(0xFF00FF66); // Green
       case 'Return/Refund':
         return Colors.redAccent;
@@ -244,8 +244,8 @@ class _OrderHistoryState extends State<OrderHistory>
         return 'You have no orders in transit';
       case 'to review':
         return 'You have no orders waiting for review';
-      case 'completed':
-        return 'You have no completed orders';
+      case 'delivered':  // Changed from 'completed'
+        return 'You have no delivered orders';  // Updated message
       case 'return/refund':
         return 'You have no return or refund requests';
       case 'cancellation':
@@ -255,7 +255,7 @@ class _OrderHistoryState extends State<OrderHistory>
     }
   }
 
-  // Updated order card with status indicators
+  // Modify _buildOrderCard to display item-specific status
   Widget _buildOrderCard(Map<String, dynamic> order, String currentTab) {
     final items = order['items'] as List<dynamic>;
     final status = order['status'] as String;
@@ -289,7 +289,7 @@ class _OrderHistoryState extends State<OrderHistory>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status header
+            // Status header (Same as before)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -385,62 +385,143 @@ class _OrderHistoryState extends State<OrderHistory>
                   const SizedBox(height: 8),
                   for (final item in items)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: statusColor),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(3),
-                              child: Image.network(
-                                item['imageUrl'],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.broken_image,
-                                    color: Colors.grey,
-                                  );
-                                },
-                              ),
-                            ),
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.2),
+                            width: 1,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                Text(
-                                  item['title'],
-                                  style: const TextStyle(
-                                    fontFamily: 'PixelFont',
-                                    fontSize: 14,
-                                    color: Colors.white,
+                                // Product image
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: statusColor),
+                                    borderRadius: BorderRadius.circular(4),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: statusColor.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        spreadRadius: 0,
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: Image.network(
+                                      item['imageUrl'],
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Icon(
+                                          Icons.broken_image,
+                                          color: Colors.grey,
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
-                                Text(
-                                  'Price: \$${item['price']} x ${item['quantity']}',
-                                  style: const TextStyle(
-                                    fontFamily: 'PixelFont',
-                                    fontSize: 12,
-                                    color: Colors.cyan,
+                                const SizedBox(width: 12),
+                                
+                                // Product details with status indicator
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item['title'],
+                                        style: const TextStyle(
+                                          fontFamily: 'PixelFont',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            '${item['price']} × ${item['quantity']}',
+                                            style: const TextStyle(
+                                              fontFamily: 'PixelFont',
+                                              fontSize: 14,
+                                              color: Colors.cyan,
+                                            ),
+                                          ),
+                                          // Status indicator for item
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, 
+                                              vertical: 3
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: statusColor.withOpacity(0.3),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  _getStatusIcon(status),
+                                                  color: statusColor,
+                                                  size: 12,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _getStatusLabel(status),
+                                                  style: TextStyle(
+                                                    fontFamily: 'PixelFont',
+                                                    fontSize: 10,
+                                                    color: statusColor,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      // Product ID for reference
+                                      if (item.containsKey('productId'))
+                                        Text(
+                                          'Product ID: ${item['productId'].toString().substring(0, 6)}...',
+                                          style: const TextStyle(
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 11,
+                                            color: Colors.white38,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
 
+                  // Order tracking timeline
+                  const SizedBox(height: 16),
+                  _buildOrderTimeline(status),
+                  
                   // Action button based on status
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _buildActionButton(order, status),
                 ],
               ),
@@ -451,7 +532,165 @@ class _OrderHistoryState extends State<OrderHistory>
     );
   }
 
-// Helper to get a user-friendly status label
+  // Add order timeline visualization
+  Widget _buildOrderTimeline(String status) {
+    final List<Map<String, dynamic>> steps = [
+      {'status': 'to pay', 'label': 'Payment', 'icon': Icons.payment},
+      {'status': 'to ship', 'label': 'Processing', 'icon': Icons.inventory},
+      {'status': 'to receive', 'label': 'Shipping', 'icon': Icons.local_shipping},
+      {'status': 'to review', 'label': 'To Review', 'icon': Icons.rate_review},
+      {'status': 'delivered', 'label': 'Delivered', 'icon': Icons.check_circle},
+    ];
+    
+    // Find the current step index
+    int currentStepIndex = steps.indexWhere((step) => step['status'] == status);
+    if (currentStepIndex == -1) {
+      if (status == 'return/refund' || status == 'cancellation') {
+        // Special handling for these statuses
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                status == 'return/refund' 
+                    ? Icons.assignment_return 
+                    : Icons.cancel,
+                color: Colors.red,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  status == 'return/refund'
+                      ? 'Return/Refund requested'
+                      : 'Order cancelled',
+                  style: const TextStyle(
+                    fontFamily: 'PixelFont',
+                    color: Colors.red,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      currentStepIndex = 0; // Default to first step if status not found
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Order Status',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.white70,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(steps.length, (index) {
+            // Determine colors based on completed/active/upcoming
+            Color circleColor;
+            Color lineColor;
+            
+            if (index < currentStepIndex) {
+              // Completed step
+              circleColor = const Color(0xFF00FF66);
+              lineColor = const Color(0xFF00FF66);
+            } else if (index == currentStepIndex) {
+              // Current step
+              circleColor = _getStatusColor(steps[index]['status']);
+              lineColor = Colors.grey.withOpacity(0.5);
+            } else {
+              // Upcoming step
+              circleColor = Colors.grey.withOpacity(0.3);
+              lineColor = Colors.grey.withOpacity(0.3);
+            }
+            
+            return Expanded(
+              child: Row(
+                children: [
+                  // Status circle
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: circleColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: circleColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        steps[index]['icon'],
+                        color: circleColor,
+                        size: 12,
+                      ),
+                    ),
+                  ),
+                  
+                  // Connecting line (except for last item)
+                  if (index < steps.length - 1)
+                    Expanded(
+                      child: Container(
+                        height: 2,
+                        color: lineColor,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+        ),
+        
+        // Labels
+        const SizedBox(height: 4),
+        Row(
+          children: List.generate(steps.length, (index) {
+            Color textColor;
+            
+            if (index < currentStepIndex) {
+              textColor = Colors.white60;
+            } else if (index == currentStepIndex) {
+              textColor = _getStatusColor(steps[index]['status']);
+            } else {
+              textColor = Colors.white38;
+            }
+            
+            return Expanded(
+              child: Center(
+                child: Text(
+                  steps[index]['label'],
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontSize: 10,
+                    color: textColor,
+                    fontWeight: index == currentStepIndex 
+                        ? FontWeight.bold 
+                        : FontWeight.normal,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  // Helper to get a user-friendly status label
   String _getStatusLabel(String status) {
     switch (status) {
       case 'to pay':
@@ -462,8 +701,8 @@ class _OrderHistoryState extends State<OrderHistory>
         return 'SHIPPING';
       case 'to review':
         return 'DELIVERED';
-      case 'completed':
-        return 'COMPLETED';
+      case 'delivered':  // Changed from 'completed'
+        return 'DELIVERED';  // Changed from 'COMPLETED'
       case 'return/refund':
         return 'RETURN/REFUND';
       case 'cancellation':
@@ -505,7 +744,7 @@ class _OrderHistoryState extends State<OrderHistory>
         buttonIcon = Icons.rate_review;
         onPressed = () => _writeReview(order);
         break;
-      case 'completed':  // ADD THIS CASE
+      case 'delivered':  // Changed from 'completed'
         buttonText = 'ORDER DETAILS';
         buttonColor = const Color(0xFF00FF66);  // Green
         buttonIcon = Icons.check_circle;
@@ -605,5 +844,62 @@ class _OrderHistoryState extends State<OrderHistory>
       ),
     );
     _viewOrderDetails(order);
+  }
+
+  // Add this method to your OrderHistory class to update order status
+  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // 1. Get the status value from your map
+      String firestoreStatus = _tabToStatusMap[newStatus] ?? newStatus.toLowerCase();
+      
+      // 2. Update in user's orders collection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders')
+          .doc(orderId)
+          .update({'status': firestoreStatus});
+      
+      // 3. Update in global orders collection if needed
+      // This is useful for admin/seller access to orders
+      final orderRef = await FirebaseFirestore.instance
+          .collection('orders')
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+      
+      if (orderRef.docs.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('orders')
+            .doc(orderRef.docs.first.id)
+            .update({'status': firestoreStatus});
+      }
+      
+      // 4. Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order status updated to $newStatus',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+    } catch (e) {
+      print('Error updating order status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update order status: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
