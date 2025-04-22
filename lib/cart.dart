@@ -341,6 +341,26 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ],
                               ),
+                              // Add delete button
+                              const SizedBox(height: 8),
+                              InkWell(
+                                onTap: () => _confirmDelete(context, item.id, itemTitle),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.red),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    "Delete",
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                      fontFamily: 'PixelFont',
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(width: 16),
@@ -610,5 +630,100 @@ class _CartPageState extends State<CartPage> {
     } catch (e) {
       print('Error finding product by name: $e');
     }
+  }
+
+  // Add this method to handle the delete confirmation
+  void _confirmDelete(BuildContext context, String itemId, String itemName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: const Text(
+          'Delete Item',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Remove $itemName from your cart?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontFamily: 'PixelFont',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Get user reference
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                try {
+                  // Delete the cart item
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('cart')
+                      .doc(itemId)
+                      .delete();
+                  
+                  // Update the selection map to remove the deleted item
+                  setState(() {
+                    _selectedItems.remove(itemId);
+                  });
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Removed $itemName from cart',
+                          style: const TextStyle(fontFamily: 'PixelFont'),
+                        ),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Error removing item: $e',
+                          style: const TextStyle(fontFamily: 'PixelFont'),
+                        ),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

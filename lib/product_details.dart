@@ -45,6 +45,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   double _averageRating = 0.0;
   int _reviewCount = 0;
   int _actualStockCount = 0;
+  int _totalSold = 0;
 
   @override
   void initState() {
@@ -348,6 +349,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         setState(() {
           _actualStockCount = data['stockCount'] ?? 0;
           _reviewCount = data['reviewCount'] ?? 0;
+          _totalSold = data['totalSold'] ?? 0; // Add this line
 
           // Only use the rating if there are reviews
           if (_reviewCount > 0) {

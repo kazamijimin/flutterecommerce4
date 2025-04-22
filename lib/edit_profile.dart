@@ -20,6 +20,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String gender = "Not specified"; // Default gender value
   File? _selectedImage; // To store the selected image
   final User? user = FirebaseAuth.instance.currentUser; // Get current user
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -29,6 +30,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // Load user data from Firestore
   Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     if (user != null) {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -46,6 +51,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     }
+    
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   // Function to pick an image
@@ -85,6 +94,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // Function to save profile changes
   Future<void> _saveProfileChanges() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       if (user != null) {
         // Update display name
@@ -119,7 +132,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
+            SnackBar(
+              content: const Text(
+                'Profile updated successfully!',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green[700],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
           );
         }
 
@@ -132,9 +155,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Handle errors
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile: $e')),
+          SnackBar(
+            content: Text(
+              'Failed to update profile: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         );
       }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -143,194 +180,347 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Edit Profile',
-          style: TextStyle(fontFamily: 'PixelFont'), // Apply PixelFont
+          'EDIT PROFILE',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
         ),
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF1A1A2E),
+        centerTitle: true,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Profile Picture Section
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey[800],
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
-                        : (user?.photoURL != null
-                            ? NetworkImage(user!.photoURL!)
-                            : const AssetImage('assets/default_profile.png'))
-                            as ImageProvider,
-                    child: _selectedImage == null && user?.photoURL == null
-                        ? const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white70,
-                            size: 40,
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Name',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameController,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  hintText: 'Enter your name',
-                  hintStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontFamily: 'PixelFont', // Apply PixelFont
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Phone Number',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: phoneController,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  hintText: 'Enter your phone number',
-                  hintStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontFamily: 'PixelFont', // Apply PixelFont
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Age',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: ageController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  hintText: 'Enter your age',
-                  hintStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontFamily: 'PixelFont', // Apply PixelFont
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Gender',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: gender,
-                items: const [
-                  DropdownMenuItem(value: "Male", child: Text("Male")),
-                  DropdownMenuItem(value: "Female", child: Text("Female")),
-                  DropdownMenuItem(value: "Not specified", child: Text("Not specified")),
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF1A1A2E),
+                  Color(0xFF0F0F1B),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    gender = value!;
-                  });
-                },
-                dropdownColor: Colors.grey[800],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PixelFont', // Apply PixelFont
+              ),
+            ),
+          ),
+          
+          // Neon grid effect overlay
+          CustomPaint(
+            size: Size(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height),
+            painter: NeonGridPainter(),
+          ),
+          
+          // Content
+          _isLoading 
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF0080),
                 ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey[800],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+              )
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 100.0, 16.0, 16.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Picture Section with neon glow effect
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF0080).withOpacity(0.6),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: GestureDetector(
+                                onTap: _pickImage,
+                                child: CircleAvatar(
+                                  radius: 60,
+                                  backgroundColor: Colors.grey[800],
+                                  backgroundImage: _selectedImage != null
+                                      ? FileImage(_selectedImage!)
+                                      : (user?.photoURL != null
+                                          ? NetworkImage(user!.photoURL!)
+                                          : const AssetImage('assets/default_profile.png'))
+                                          as ImageProvider,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFFF0080),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF0080).withOpacity(0.6),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 32),
+                      
+                      // Custom form fields with cyberpunk design
+                      buildFormField(
+                        label: 'NAME', 
+                        controller: nameController, 
+                        icon: Icons.person,
+                      ),
+                      
+                      buildFormField(
+                        label: 'PHONE', 
+                        controller: phoneController, 
+                        icon: Icons.phone,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      
+                      buildFormField(
+                        label: 'AGE', 
+                        controller: ageController, 
+                        icon: Icons.calendar_today,
+                        keyboardType: TextInputType.number,
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Gender dropdown with cyberpunk design
+                      Text(
+                        'GENDER',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 16,
+                          fontFamily: 'PixelFont',
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFFF0080).withOpacity(0.5),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF0080).withOpacity(0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: gender,
+                          items: const [
+                            DropdownMenuItem(value: "Male", child: Text("Male")),
+                            DropdownMenuItem(value: "Female", child: Text("Female")),
+                            DropdownMenuItem(value: "Not specified", child: Text("Not specified")),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              gender = value!;
+                            });
+                          },
+                          dropdownColor: const Color(0xFF1A1A2E),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                          ),
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.person_outline, color: Color(0xFFFF0080)),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 40),
+                      
+                      // Save button with neon effect
+                      Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF0080).withOpacity(0.5),
+                                blurRadius: 15,
+                                spreadRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: _saveProfileChanges,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF0080),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 36, vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'SAVE CHANGES',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontFamily: 'PixelFont',
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.save, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 30),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _saveProfileChanges,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyan,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontFamily: 'PixelFont', // Apply PixelFont
-                    ),
-                  ),
-                ),
+        ],
+      ),
+    );
+  }
+  
+  Widget buildFormField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 16,
+            fontFamily: 'PixelFont',
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFFFF0080).withOpacity(0.5),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF0080).withOpacity(0.2),
+                blurRadius: 8,
+                spreadRadius: 0,
               ),
             ],
           ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'PixelFont',
+            ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(
+                icon,
+                color: const Color(0xFFFF0080),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
+          ),
         ),
-      ),
-      backgroundColor: Colors.black,
+      ],
     );
   }
+}
+
+// Custom painter to create cyberpunk grid effect
+class NeonGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFF0080).withOpacity(0.08)
+      ..strokeWidth = 1;
+
+    // Horizontal lines
+    for (double i = 0; i < size.height; i += 30) {
+      canvas.drawLine(
+        Offset(0, i),
+        Offset(size.width, i),
+        paint,
+      );
+    }
+
+    // Vertical lines
+    for (double i = 0; i < size.width; i += 30) {
+      canvas.drawLine(
+        Offset(i, 0),
+        Offset(i, size.height),
+        paint,
+      );
+    }
+    
+    // Add some random "neon" dots for that tech feel
+    final dotPaint = Paint()
+      ..color = const Color(0xFFFF0080).withOpacity(0.4)
+      ..strokeWidth = 2;
+      
+    // Add random dots to simulate twinkling lights
+    for (int i = 0; i < 30; i++) {
+      final x = (i * 37) % size.width;
+      final y = (i * 53) % size.height;
+      canvas.drawCircle(Offset(x, y), 1, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

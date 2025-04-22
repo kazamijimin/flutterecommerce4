@@ -38,44 +38,19 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
         'sellerStatus': 'pending', // Default status for new applications
         'createdAt': FieldValue.serverTimestamp(), // Add timestamp
         'joinDate': joinDate, // Add join date
-        'role': 'seller', // Explicitly set role to seller
       };
 
-      // First check if the user document exists
-      final userDoc = await FirebaseFirestore.instance
+      // Save the application in the sellerApplications collection
+      await FirebaseFirestore.instance
+          .collection('sellerApplications')
+          .doc(user.uid)
+          .set(sellerData);
+
+      // Also update the users collection with the same data
+      await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .get();
-          
-      if (!userDoc.exists) {
-        throw Exception("User profile not found. Please create a profile first.");
-      }
-
-      // Use a batch to ensure both operations succeed or fail together
-      final batch = FirebaseFirestore.instance.batch();
-      
-      // Save the application in the sellerApplications collection
-      batch.set(
-        FirebaseFirestore.instance.collection('sellerApplications').doc(user.uid),
-        sellerData
-      );
-
-      // Create a more minimal set of data for the user update
-      final userUpdateData = {
-        'role': 'seller',
-        'sellerStatus': 'pending',
-        'storeName': _storeNameController.text.trim(),
-        'joinDate': joinDate,
-      };
-
-      // Update the user document with just seller-related fields
-      batch.update(
-        FirebaseFirestore.instance.collection('users').doc(user.uid),
-        userUpdateData
-      );
-      
-      // Commit the batch
-      await batch.commit();
+          .update(sellerData);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -88,15 +63,12 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
       );
 
       Navigator.pop(context); // Navigate back to the previous screen
-    } else {
-      throw Exception("You must be logged in to submit a seller application");
     }
   } catch (e) {
-    print("Error submitting seller application: $e"); // Add logging
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Failed to submit application: ${e.toString()}',
+          'Failed to submit application: $e',
           style: const TextStyle(fontFamily: 'PixelFont'),
         ),
         backgroundColor: Colors.red,

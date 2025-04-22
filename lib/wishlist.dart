@@ -98,16 +98,32 @@ class _WishlistPageState extends State<WishlistPage> {
                     final imageUrl = itemData['imageUrl'] ?? '';
 
                     return Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16), // Added horizontal margin
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        border: Border.all(color: Colors.grey.shade800), // Added border
+                        borderRadius: BorderRadius.circular(4), // Added rounded corners
+                      ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start, // Changed to align at top
                         children: [
                           // Game image
-                          SizedBox(
-                            width: 140,
-                            height: 80,
-                            child: Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
+                          ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(4),
+                              bottomLeft: Radius.circular(4),
+                            ),
+                            child: SizedBox(
+                              width: 110, // Reduced width
+                              height: 80,
+                              child: Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: Colors.grey.shade900,
+                                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                                ),
+                              ),
                             ),
                           ),
                           
@@ -115,36 +131,37 @@ class _WishlistPageState extends State<WishlistPage> {
                           Expanded(
                             child: Container(
                               height: 80,
-                              color: Colors.black,
-                              padding: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   // Title and price
                                   Expanded(
+                                    flex: 3,
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment: CrossAxisAlignment.start, // Changed to start
                                       children: [
                                         Text(
                                           title,
                                           style: const TextStyle(
                                             color: Colors.white,
-                                            fontSize: 16,
+                                            fontSize: 14, // Reduced font size
                                             fontWeight: FontWeight.bold,
                                             fontFamily: 'PixelFont',
                                           ),
-                                          textAlign: TextAlign.right,
+                                          maxLines: 2, // Limit to 2 lines
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        const SizedBox(height: 4),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           color: Colors.grey[800],
                                           child: Text(
                                             price,
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 12,
+                                              fontSize: 11, // Reduced font size
                                               fontFamily: 'PixelFont',
                                             ),
                                           ),
@@ -153,93 +170,129 @@ class _WishlistPageState extends State<WishlistPage> {
                                     ),
                                   ),
                                   
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 4),
                                   
                                   // Quantity controls and checkbox
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          InkWell(
-                                            onTap: () {
-                                              setState(() {
-                                                if (_itemQuantities[item.id]! > 1) {
-                                                  _itemQuantities[item.id] = _itemQuantities[item.id]! - 1;
-                                                }
-                                              });
-                                            },
-                                            child: const Text(
-                                              "—",
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end, // Align to end
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min, // Make row take minimum space
+                                          children: [
+                                            InkWell(
+                                              onTap: () {
+                                                setState(() {
+                                                  if (_itemQuantities[item.id]! > 1) {
+                                                    _itemQuantities[item.id] = _itemQuantities[item.id]! - 1;
+                                                  }
+                                                });
+                                              },
+                                              child: Container(
+                                                width: 18, // Smaller width
+                                                height: 18, // Smaller height
+                                                alignment: Alignment.center,
+                                                child: const Text(
+                                                  "—",
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontSize: 16, // Smaller font
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          Container(
-                                            margin: const EdgeInsets.symmetric(horizontal: 8),
-                                            child: Text(
-                                              "$quantity",
-                                              style: const TextStyle(
+                                            Container(
+                                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                                              child: Text(
+                                                "$quantity",
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14, // Smaller font
+                                                  fontFamily: 'PixelFont',
+                                                ),
+                                              ),
+                                            ),
+                                            InkWell(
+                                              onTap: () {
+                                                setState(() {
+                                                  _itemQuantities[item.id] = _itemQuantities[item.id]! + 1;
+                                                });
+                                              },
+                                              child: Container(
+                                                width: 18, // Smaller width
+                                                height: 18, // Smaller height
+                                                alignment: Alignment.center,
+                                                child: const Text(
+                                                  "+",
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontSize: 16, // Smaller font
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min, // Make row take minimum space
+                                          children: [
+                                            Container(
+                                              width: 16, // Smaller checkbox
+                                              height: 16, // Smaller checkbox
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: Colors.white),
+                                                color: isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
+                                              ),
+                                              child: Checkbox(
+                                                value: isSelected,
+                                                onChanged: (value) {
+                                                  setState(() {
+                                                    _selectedItems[item.id] = value ?? false;
+                                                  });
+                                                },
+                                                fillColor: MaterialStateProperty.all(Colors.transparent),
+                                                checkColor: Colors.white,
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            const Text(
+                                              "Confirm",
+                                              style: TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 16,
+                                                fontSize: 10, // Smaller font
+                                                fontFamily: 'PixelFont',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // Delete button - made more compact
+                                        InkWell(
+                                          onTap: () => _confirmDelete(context, item.id, title),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.red, width: 0.5), // Thinner border
+                                              borderRadius: BorderRadius.circular(2), // Smaller radius
+                                            ),
+                                            child: const Text(
+                                              "Delete",
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 10, // Smaller font
                                                 fontFamily: 'PixelFont',
                                               ),
                                             ),
                                           ),
-                                          InkWell(
-                                            onTap: () {
-                                              setState(() {
-                                                _itemQuantities[item.id] = _itemQuantities[item.id]! + 1;
-                                              });
-                                            },
-                                            child: const Text(
-                                              "+",
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Container(
-                                            width: 20,
-                                            height: 20,
-                                            decoration: BoxDecoration(
-                                              border: Border.all(color: Colors.white),
-                                              color: isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
-                                            ),
-                                            child: Checkbox(
-                                              value: isSelected,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  _selectedItems[item.id] = value ?? false;
-                                                });
-                                              },
-                                              fillColor: MaterialStateProperty.all(Colors.transparent),
-                                              checkColor: Colors.white,
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          const Text(
-                                            "Confirm",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontFamily: 'PixelFont',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -334,6 +387,102 @@ class _WishlistPageState extends State<WishlistPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // Method to show delete confirmation dialog
+  void _confirmDelete(BuildContext context, String itemId, String itemName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: const Text(
+          'Delete Item',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Remove $itemName from your wishlist?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontFamily: 'PixelFont',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Get user reference
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                try {
+                  // Delete the wishlist item
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('wishlist')
+                      .doc(itemId)
+                      .delete();
+                  
+                  // Update state to remove the deleted item
+                  setState(() {
+                    _selectedItems.remove(itemId);
+                    _itemQuantities.remove(itemId);
+                  });
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Removed $itemName from wishlist',
+                          style: const TextStyle(fontFamily: 'PixelFont'),
+                        ),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Error removing item: $e',
+                          style: const TextStyle(fontFamily: 'PixelFont'),
+                        ),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -155,26 +155,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _executeSearch(String query) {
+    if (query.trim().isEmpty) return;
+    
     // Save the search query to recent searches
     _saveRecentSearch(query);
     
     // Clear focus to hide suggestions
     _searchFocusNode.unfocus();
     
-    // Here you would normally navigate to search results page
-    // For now, show a dialog with the search query
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey.shade900,
-        title: Text('Search Results', style: pixelFontStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        content: Text('Searching for: $query', style: pixelFontStyle()),
-        actions: [
-          TextButton(
-            child: Text('Close', style: pixelFontStyle(color: Colors.cyan)),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
+    // Navigate to a dedicated search results page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultsPage(searchQuery: query),
       ),
     );
   }
@@ -908,5 +901,293 @@ class _HomePageState extends State<HomePage> {
         _currentNavIndex = index;
       });
     });
+  }
+}
+
+// Add this class at the bottom of your home.dart file or create a new search_results.dart file
+
+class SearchResultsPage extends StatefulWidget {
+  final String searchQuery;
+  
+  const SearchResultsPage({Key? key, required this.searchQuery}) : super(key: key);
+
+  @override
+  State<SearchResultsPage> createState() => _SearchResultsPageState();
+}
+
+class _SearchResultsPageState extends State<SearchResultsPage> {
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = true;
+  bool _hasError = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _performSearch();
+  }
+  
+  Future<void> _performSearch() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    
+    try {
+      List<Map<String, dynamic>> results = [];
+      final searchTerm = widget.searchQuery.toLowerCase();
+      
+      // First try direct query for performance
+      var querySnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isEqualTo: widget.searchQuery)
+          .where('archived', isNotEqualTo: true)
+          .get();
+          
+      if (querySnapshot.docs.isNotEmpty) {
+        // Add exact matches
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          results.add(data);
+        }
+      }
+      
+      // Try prefix match
+      querySnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('name', isGreaterThanOrEqualTo: widget.searchQuery)
+          .where('name', isLessThanOrEqualTo: widget.searchQuery + '\uf8ff')
+          .where('archived', isNotEqualTo: true)
+          .get();
+          
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        // Avoid duplicates from the first query
+        if (!results.any((item) => item['id'] == doc.id)) {
+          results.add(data);
+        }
+      }
+      
+      // If still no results, try a more general search
+      if (results.isEmpty) {
+        // Get all products and filter locally
+        querySnapshot = await FirebaseFirestore.instance
+            .collection('products')
+            .where('archived', isNotEqualTo: true)
+            .get();
+            
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data();
+          final name = (data['name'] ?? '').toString().toLowerCase();
+          final description = (data['description'] ?? '').toString().toLowerCase();
+          
+          if (name.contains(searchTerm) || description.contains(searchTerm)) {
+            data['id'] = doc.id;
+            results.add(data);
+          }
+        }
+      }
+      
+      setState(() {
+        _searchResults = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error searching products: $e');
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
+  
+  // Text style with pixel font
+  TextStyle pixelFontStyle({
+    double fontSize = 14.0,
+    FontWeight fontWeight = FontWeight.normal,
+    Color color = Colors.white,
+  }) {
+    return TextStyle(
+      fontFamily: 'PixelFont',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          'SEARCH: ${widget.searchQuery}',
+          style: pixelFontStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
+          : _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error loading search results',
+                        style: pixelFontStyle(color: Colors.white),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _performSearch,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pink,
+                        ),
+                        child: Text(
+                          'Try Again',
+                          style: pixelFontStyle(),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _searchResults.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.search_off, color: Colors.grey, size: 48),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No products found for "${widget.searchQuery}"',
+                            style: pixelFontStyle(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.7,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final product = _searchResults[index];
+                        return _buildProductCard(product);
+                      },
+                    ),
+    );
+  }
+  
+  Widget _buildProductCard(Map<String, dynamic> product) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(
+              imageUrl: product['imageUrl'] ?? '',
+              title: product['name'] ?? 'Unknown Product',
+              price: 'PHP ${product['price'] ?? '0.00'}',
+              description: product['description'] ?? 'No description available',
+              userId: product['userId'] ?? 'Unknown User',
+              productId: product['id'],
+            ),
+          ),
+        );
+      },
+      child: Card(
+        color: Colors.grey.shade900,
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: Colors.grey.shade800),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product Image
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+              child: Image.network(
+                product['imageUrl'] ?? '',
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 120,
+                  width: double.infinity,
+                  color: Colors.grey.shade800,
+                  child: const Icon(Icons.broken_image, color: Colors.white),
+                ),
+              ),
+            ),
+            // Product Details
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['name'] ?? 'Unknown Product',
+                    style: pixelFontStyle(
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'PHP ${product['price'] ?? '0.00'}',
+                    style: pixelFontStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  
+                  // Stock indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (product['stockCount'] ?? 0) > 0 
+                          ? Colors.green.withOpacity(0.2) 
+                          : Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      (product['stockCount'] ?? 0) > 0 ? 'In Stock' : 'Out of Stock',
+                      style: pixelFontStyle(
+                        fontSize: 10,
+                        color: (product['stockCount'] ?? 0) > 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
