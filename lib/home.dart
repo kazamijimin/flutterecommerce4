@@ -11,7 +11,7 @@ import 'settings.dart';
 import 'dart:async';
 import 'notifications.dart';
 import 'message.dart';
-
+import 'see_all_recommend.dart';
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -859,7 +859,7 @@ class _HomePageState extends State<HomePage> {
     if (isProductsLoading) {
       return const SizedBox(
         height: 220,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: CircularProgressIndicator(color: Colors.cyan)),
       );
     }
 
@@ -871,71 +871,255 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        controller: _productScrollController,
-        scrollDirection: Axis.horizontal,
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final productData = products[index];
-
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetails(
-                    imageUrl: productData['imageUrl'] ?? '',
-                    title: productData['name'] ?? 'Unknown Product',
-                    price: 'PHP ${productData['price'] ?? '0.00'}',
-                    description: productData['description'] ??
-                        'No description available',
-                    userId: productData['userId'] ?? 'Unknown User',
-                    productId: productData['id'],
+    return Column(
+      children: [
+        // Add this Row with See All button
+        Padding(
+          padding: const EdgeInsets.only(right: 16, bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SeeAllProductsScreen(),
+                    ),
+                  );
+                },
+                child: Text(
+                  'See All >',
+                  style: pixelFontStyle(
+                    color: Colors.cyan,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Product ListView
+        SizedBox(
+          height: 270, // Increased height for the new price layout
+          child: ListView.builder(
+            controller: _productScrollController,
+            scrollDirection: Axis.horizontal,
+            itemCount: products.length,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemBuilder: (context, index) {
+              final productData = products[index];
+              
+              // Determine if product has a discount
+              final bool hasDiscount = index % 3 == 0 || productData['discount'] == true;
+              final int discountPercent = hasDiscount ? (productData['discountPercent'] ?? 20) : 0;
+              
+              // Calculate prices for responsive display
+              final String currentPrice = productData['price']?.toString() ?? '0.00';
+              final double originalPriceValue = hasDiscount ? 
+                double.parse(currentPrice) * (100 / (100 - discountPercent)) : 
+                double.parse(currentPrice);
+              final String originalPrice = originalPriceValue.toStringAsFixed(2);
+              
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProductDetails(
+                        imageUrl: productData['imageUrl'] ?? '',
+                        title: productData['name'] ?? 'Unknown Product',
+                        price: currentPrice,
+                        description: productData['description'] ??
+                            'No description available',
+                        userId: productData['userId'] ?? 'Unknown User',
+                        productId: productData['id'],
+                        category: productData['category'] ?? 'Games',
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 150, // Wider cards
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade800),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Product Image with Low Stock Indicator
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(8),
+                              topRight: Radius.circular(8),
+                            ),
+                            child: Image.network(
+                              productData['imageUrl'] ?? '',
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                height: 140,
+                                width: double.infinity,
+                                color: Colors.grey.shade800,
+                                child: const Icon(Icons.error, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          
+                          // Discount badge in the top-left corner
+                          if (hasDiscount)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade600,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(8),
+                                    bottomRight: Radius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  '$discountPercent% OFF',
+                                  style: pixelFontStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          
+                          // Low stock indicator
+                          if ((productData['stockCount'] ?? 0) < 5 && (productData['stockCount'] ?? 0) > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Low Stock',
+                                  style: pixelFontStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      // Product Details
+                      Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              productData['name'] ?? 'Unknown Product',
+                              style: pixelFontStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            
+                            // Price section - updated layout with prices stacked
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Price column
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (hasDiscount)
+                                      Text(
+                                        'PHP $originalPrice',
+                                        style: pixelFontStyle(
+                                          color: Colors.grey,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.normal,
+                                        ).copyWith(
+                                          decoration: TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                    Text(
+                                      'PHP $currentPrice',
+                                      style: pixelFontStyle(
+                                        color: hasDiscount ? 
+                                          const Color.fromARGB(255, 212, 0, 0) : 
+                                          Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: hasDiscount ? 16 : 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                // Rating display
+                                if (productData['rating'] != null)
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.star, color: Colors.amber, size: 14),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '${(productData['rating'] ?? 0.0).toStringAsFixed(1)}',
+                                        style: pixelFontStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 8),
+                            // Category tag
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.cyan.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                productData['category'] ?? 'Games',
+                                style: pixelFontStyle(
+                                  fontSize: 10,
+                                  color: Colors.cyan,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
             },
-            child: Container(
-              width: 120,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      productData['imageUrl'] ?? '',
-                      height: 140,
-                      width: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 140,
-                        width: 120,
-                        color: Colors.grey.shade800,
-                        child: const Icon(Icons.error, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    productData['name'] ?? 'Unknown Product',
-                    style: pixelFontStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'PHP ${productData['price'] ?? '0.00'}',
-                    style: pixelFontStyle(
-                        color: const Color.fromARGB(255, 212, 0, 0)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+          ),
+        ),
+      ],
     );
   }
 

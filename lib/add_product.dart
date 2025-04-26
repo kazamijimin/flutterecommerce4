@@ -29,7 +29,23 @@ class _AddProductState extends State<AddProduct> {
     'Games',
     'Consoles',
     'Accessories',
-    'Collectibles'
+    'Collectibles',
+    'Action RPG',
+    'Turn Based RPG',
+    'Visual Novel',
+    'Horror',
+    'Souls Like',
+    'Rogue Like',
+    'Puzzle',
+    'Open World',
+    'MMORPG',
+    'Sports',
+    'Casual',
+    'Slice of Life',
+    'Farming Simulator',
+    'Card Game',
+    'Gacha',
+    'Shooting',
   ];
   String _selectedCategory = 'Games'; // Default category
 
@@ -73,103 +89,110 @@ class _AddProductState extends State<AddProduct> {
       _stockCountController.text = (currentValue + 1).toString();
     });
   }
-Future<void> _addProduct() async {
-  final name = _nameController.text.trim();
-  final price = _priceController.text.trim();
-  final description = _descriptionController.text.trim();
-  final stockCount = _stockCountController.text.trim();
-  final discount = _discountController.text.trim();
 
-  if (name.isEmpty || price.isEmpty || description.isEmpty || stockCount.isEmpty || _selectedImage == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please fill in all fields and select an image')),
-    );
-    return;
+  Future<void> _addProduct() async {
+    final name = _nameController.text.trim();
+    final price = _priceController.text.trim();
+    final description = _descriptionController.text.trim();
+    final stockCount = _stockCountController.text.trim();
+    final discount = _discountController.text.trim();
+
+    if (name.isEmpty ||
+        price.isEmpty ||
+        description.isEmpty ||
+        stockCount.isEmpty ||
+        _selectedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please fill in all fields and select an image')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      // Get the current user
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Fetch the store information from the users collection
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        throw Exception('User information not found for user ID: ${user.uid}');
+      }
+
+      final userData = userDoc.data();
+      final storeName = userData?['storeName'];
+      final storeDescription = userData?['storeDescription'];
+      final joinDate = userData?['joinDate'];
+      final sellerStatus = userData?['sellerStatus'];
+
+      if (storeName == null || storeName.isEmpty) {
+        throw Exception('Store name is missing in the user document.');
+      }
+
+      if (sellerStatus != 'approved') {
+        throw Exception('Your seller application is not approved yet.');
+      }
+
+      // Upload the image and get its URL
+      final imageUrl = await _uploadImage(_selectedImage!);
+      if (imageUrl == null) return;
+
+      // Add the product to Firestore
+      await FirebaseFirestore.instance.collection('products').add({
+        'name': name,
+        'price': double.parse(price),
+        'description': description,
+        'stockCount': int.parse(stockCount),
+        'category': _selectedCategory,
+        'discount': discount.isNotEmpty ? double.parse(discount) : 0.0,
+        'imageUrl': imageUrl,
+        'sellerId': user.uid, // Add seller ID
+        'storeName': storeName, // Add store name
+        'storeDescription': storeDescription, // Add store description
+        'joinDate': joinDate, // Add join date
+        'createdAt': FieldValue.serverTimestamp(),
+        'availability': true,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product added successfully!')),
+      );
+
+      // Clear the input fields and image
+      _nameController.clear();
+      _priceController.clear();
+      _descriptionController.clear();
+      _stockCountController.text = '1';
+      _discountController.clear();
+      setState(() {
+        _selectedImage = null;
+        _selectedCategory = 'Games'; // Reset category to default
+      });
+
+      // Navigate back to the previous screen
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add product: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
   }
 
-  setState(() {
-    _isUploading = true;
-  });
-
-  try {
-    // Get the current user
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User not logged in');
-    }
-
-    // Fetch the store information from the users collection
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (!userDoc.exists) {
-      throw Exception('User information not found for user ID: ${user.uid}');
-    }
-
-    final userData = userDoc.data();
-    final storeName = userData?['storeName'];
-    final storeDescription = userData?['storeDescription'];
-    final joinDate = userData?['joinDate'];
-    final sellerStatus = userData?['sellerStatus'];
-
-    if (storeName == null || storeName.isEmpty) {
-      throw Exception('Store name is missing in the user document.');
-    }
-
-    if (sellerStatus != 'approved') {
-      throw Exception('Your seller application is not approved yet.');
-    }
-
-    // Upload the image and get its URL
-    final imageUrl = await _uploadImage(_selectedImage!);
-    if (imageUrl == null) return;
-
-    // Add the product to Firestore
-    await FirebaseFirestore.instance.collection('products').add({
-      'name': name,
-      'price': double.parse(price),
-      'description': description,
-      'stockCount': int.parse(stockCount),
-      'category': _selectedCategory,
-      'discount': discount.isNotEmpty ? double.parse(discount) : 0.0,
-      'imageUrl': imageUrl,
-      'sellerId': user.uid, // Add seller ID
-      'storeName': storeName, // Add store name
-      'storeDescription': storeDescription, // Add store description
-      'joinDate': joinDate, // Add join date
-      'createdAt': FieldValue.serverTimestamp(),
-      'availability': true,
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Product added successfully!')),
-    );
-
-    // Clear the input fields and image
-    _nameController.clear();
-    _priceController.clear();
-    _descriptionController.clear();
-    _stockCountController.text = '1';
-    _discountController.clear();
-    setState(() {
-      _selectedImage = null;
-      _selectedCategory = 'Games'; // Reset category to default
-    });
-
-    // Navigate back to the previous screen
-    Navigator.pop(context);
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to add product: $e')),
-    );
-  } finally {
-    setState(() {
-      _isUploading = false;
-    });
-  }
-}
   Widget _buildStockCounter() {
     final screenWidth = MediaQuery.of(context).size.width;
 

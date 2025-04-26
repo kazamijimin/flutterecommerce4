@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'add_product.dart';
 import 'order_status.dart';
 import 'your_products.dart';
+
 class SellerDashboard extends StatefulWidget {
   const SellerDashboard({super.key});
 
@@ -22,6 +23,8 @@ class _SellerDashboardState extends State<SellerDashboard> {
   int canceledOrders = 0;
   int completedOrders = 0;
 
+  String storeName = "Seller"; // Default value
+
   // Cyberpunk theme colors
   final Color _primaryRed = const Color(0xFFFF003C);
   final Color _darkBackground = const Color(0xFF0D0D0D);
@@ -31,6 +34,31 @@ class _SellerDashboardState extends State<SellerDashboard> {
   void initState() {
     super.initState();
     _loadDashboardStats();
+    _fetchStoreName(); // Fetch the store name
+  }
+
+  Future<void> _fetchStoreName() async {
+    try {
+      final String? userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        debugPrint('User ID is null');
+        return;
+      }
+
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        debugPrint('User document data: $data');
+        setState(() {
+          storeName = data?['storeName'] ?? "Seller";
+          debugPrint('Fetched storeName: $storeName');
+        });
+      } else {
+        debugPrint('User document does not exist');
+      }
+    } catch (e) {
+      debugPrint('Error fetching store name: $e');
+    }
   }
 
   Future<void> _loadDashboardStats() async {
@@ -307,7 +335,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: _buildDrawer(context), // Replace with the new drawer method
+      drawer: _buildDrawer(context),
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
@@ -331,6 +359,22 @@ class _SellerDashboardState extends State<SellerDashboard> {
       backgroundColor: Colors.black,
       body: Column(
         children: [
+          // Welcome message
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: Colors.black,
+            child: Text(
+              'Welcome, $storeName',
+              style: const TextStyle(
+                color: Colors.cyan,
+                fontSize: 24,
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
           // Stats summary section
           Container(
             padding: const EdgeInsets.all(16),
@@ -686,7 +730,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
             title: const Text(
               'Dashboard',
               style: TextStyle(
-                color: Colors.white, 
+                color: Colors.white,
                 fontFamily: 'PixelFont',
                 fontWeight: FontWeight.bold,
               ),

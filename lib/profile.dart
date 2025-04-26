@@ -142,16 +142,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .doc(currentUser.uid)
             .get();
 
+        // Also check the users collection to get the current status
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
         setState(() {
           if (sellerDoc.exists) {
             final data = sellerDoc.data();
-            if (data != null &&
-                data['storeName'] != null &&
-                data['storeName'].isNotEmpty) {
-              sellerStatus = "approved"; // User is an approved seller
-            } else {
-              sellerStatus = "pending"; // Application is pending
+            // Get the actual sellerStatus from the user document
+            if (userDoc.exists && userDoc.data()?['sellerStatus'] != null) {
+              sellerStatus = userDoc.data()?['sellerStatus'];
+            } else if (data != null) {
+              // Fallback to application data if user document doesn't have status
+              sellerStatus = data['sellerStatus'] ?? "pending";
             }
+            
+            // Debug print the status
+            debugPrint("Current seller status: $sellerStatus");
           } else {
             sellerStatus = "notApplied"; // No application found
           }
@@ -686,6 +695,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _navigateToSeller,
                         icon: Icons.store,
                       ),
+                    if (sellerStatus == "pending")
+                      _buildNavButton(
+                        'Check Application Status', 
+                        _showSellerStatusDialog,
+                        icon: Icons.hourglass_top,
+                      ),
+                    if (sellerStatus == "approved")
+                      _buildNavButton(
+                        'Manage Store', // Updated name
+                        _navigateToSellerDashboard,
+                        icon: Icons.store,
+                      ),
                     _buildNavButton(
                         'Shipping Address', _navigateToShippingAddress,
                         icon: Icons.local_shipping),
@@ -794,6 +815,154 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showSellerStatusDialog() async {
+    // Get the latest status from Firestore to ensure it's current
+    await _checkSellerApplicationStatus();
+    
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        String statusTitle;
+        String statusMessage;
+        Color statusColor;
+        IconData statusIcon;
+        String additionalInfo = "";
+        
+        switch (sellerStatus) {
+          case "pending":
+            statusTitle = "Application Pending Approval";
+            statusMessage = "Your seller application is waiting for admin approval. This usually takes 1-2 business days.";
+            statusColor = Colors.amber;
+            statusIcon = Icons.hourglass_top;
+            additionalInfo = "You will be notified when your application is approved.";
+            break;
+          case "approved":
+            statusTitle = "Application Approved!";
+            statusMessage = "Congratulations! Your seller account is active. You can now list games and manage your store.";
+            statusColor = Colors.green;
+            statusIcon = Icons.check_circle;
+            break;
+          case "rejected":
+            statusTitle = "Application Declined";
+            statusMessage = "Unfortunately, your application was not approved. Please contact customer support for more information.";
+            statusColor = Colors.red;
+            statusIcon = Icons.cancel;
+            break;
+          default:
+            statusTitle = "Status Unknown";
+            statusMessage = "We couldn't determine your application status. Please try again later.";
+            statusColor = Colors.grey;
+            statusIcon = Icons.help;
+        }
+        
+        return AlertDialog(
+          backgroundColor: const Color(0xFF13131A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: statusColor, width: 2),
+          ),
+          title: Text(
+            statusTitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'PixelFont',
+              fontSize: 22,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black38,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade800),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Icon(
+                        statusIcon,
+                        color: Colors.black,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        statusMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'PixelFont',
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (additionalInfo.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  additionalInfo,
+                  style: const TextStyle(
+                    color: Colors.cyan,
+                    fontFamily: 'PixelFont',
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 20),
+              Text(
+                "Application Date: ${userData?['joinDate'] ?? 'Unknown'}",
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: statusColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontFamily: 'PixelFont',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

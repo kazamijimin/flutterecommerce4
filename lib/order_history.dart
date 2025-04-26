@@ -712,7 +712,7 @@ class _OrderHistoryState extends State<OrderHistory>
     }
   }
 
-  // Add a context-appropriate action button
+  // Modify the _buildActionButton method to include a cancel option for "to pay" orders
   Widget _buildActionButton(Map<String, dynamic> order, String status) {
     late String buttonText;
     late Color buttonColor;
@@ -721,11 +721,59 @@ class _OrderHistoryState extends State<OrderHistory>
 
     switch (status) {
       case 'to pay':
-        buttonText = 'PAY NOW';
-        buttonColor = Colors.orange;
-        buttonIcon = Icons.payment;
-        onPressed = () => _handlePayment(order);
-        break;
+        // For "to pay" orders, show both Pay Now and Cancel buttons
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _handlePayment(order),
+                icon: const Icon(Icons.payment, size: 16),
+                label: const Text(
+                  'PAY NOW',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showCancelConfirmation(order),
+                icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                label: const Text(
+                  'CANCEL ORDER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.red,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       case 'to ship':
         buttonText = 'VIEW DETAILS';
         buttonColor = const Color(0xFFFF0077);
@@ -792,6 +840,161 @@ class _OrderHistoryState extends State<OrderHistory>
         ),
       ),
     );
+  }
+
+  // Add this method to show a confirmation dialog before cancelling
+  void _showCancelConfirmation(Map<String, dynamic> order) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.red, width: 1),
+        ),
+        title: const Text(
+          'Cancel Order',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to cancel this order?',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'You can only cancel orders in "To Pay" status.',
+                      style: TextStyle(
+                        fontFamily: 'PixelFont',
+                        fontSize: 12,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'NO, KEEP ORDER',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.cyan,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelOrder(order);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text(
+              'YES, CANCEL',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this method to handle the actual cancellation
+  Future<void> _cancelOrder(Map<String, dynamic> order) async {
+    final documentId = order['documentId'];
+    
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) => const AlertDialog(
+          backgroundColor: Color(0xFF1A1A2E),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Cancelling your order...',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Update order status to 'cancellation'
+      await updateOrderStatus(documentId, 'Cancellation');
+      
+      // Dismiss loading dialog
+      Navigator.of(context, rootNavigator: true).pop();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Order cancelled successfully',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Optionally refresh the page or navigate to the Cancellation tab
+      _tabController.animateTo(_tabs.indexOf('Cancellation'));
+      
+    } catch (e) {
+      // Dismiss loading dialog if there's an error
+      Navigator.of(context, rootNavigator: true).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to cancel order: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Action handlers

@@ -76,20 +76,48 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   // Approve seller application
   Future<void> _approveSeller(String userId) async {
     try {
+      // Update the seller's status to "approved"
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .update({'sellerStatus': 'approved'});
 
+      // Delete the seller application
       await FirebaseFirestore.instance
           .collection('sellerApplications')
           .doc(userId)
           .delete();
 
-      _loadStats(); // Refresh stats after approval
-      debugPrint('Seller approved for userId: $userId');
+      // Add a notification for the user
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': userId,
+        'title': 'Congratulations!',
+        'message': 'Your seller request has been approved. Start selling now!',
+        'type': 'sellerApproval',
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Refresh stats after approval
+      _loadStats();
+
+      // Show a success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Approved seller and notification sent.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      debugPrint('Seller approved and notification sent for userId: $userId');
     } catch (e) {
       debugPrint('Error approving seller: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error approving seller: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

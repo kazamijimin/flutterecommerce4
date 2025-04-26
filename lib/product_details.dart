@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutterecommerce4/checkout.dart';
 
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
@@ -56,6 +57,54 @@ class _ProductDetailsState extends State<ProductDetails> {
     _fetchAddedByUserInfo();
     _checkIfCanAddReview();
     _loadProductDetails(); // Add this new method call
+  }
+
+  Future<void> _buyNow() async {
+    if (widget.stockCount > 0) {
+      try {
+        // Clean the price string to ensure it's a valid double
+        final cleanedPrice = widget.price.replaceAll(RegExp(r'[^\d.]'), '');
+        final totalPrice = double.parse(cleanedPrice) * quantity;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CheckoutPage(
+              totalPrice: totalPrice,
+              selectedItems: [
+                {
+                  'productId': widget.productId,
+                  'title': widget.title,
+                  'imageUrl': widget.imageUrl,
+                  'price': widget.price,
+                  'quantity': quantity,
+                },
+              ],
+            ),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString()}',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Out of Stock!',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Updated method to check if user has completed order for this product
@@ -370,6 +419,49 @@ class _ProductDetailsState extends State<ProductDetails> {
     setState(() {
       _isInFavorites = isFavorite;
     });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRelatedProducts() async {
+    try {
+      // Query products in the same category, excluding the current one
+      final relatedQuery = await FirebaseFirestore.instance
+          .collection('products')
+          .where('category', isEqualTo: widget.category)
+          .where(FieldPath.documentId, isNotEqualTo: widget.productId)
+          .limit(6)
+          .get();
+      
+      List<Map<String, dynamic>> relatedProducts = relatedQuery.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+      
+      // If we don't have enough products in the same category
+      if (relatedProducts.length < 6) {
+        // Get products from other categories to fill up to 6
+        final otherQuery = await FirebaseFirestore.instance
+            .collection('products')
+            .where('category', isNotEqualTo: widget.category)
+            .limit(6 - relatedProducts.length)
+            .get();
+        
+        final otherProducts = otherQuery.docs.map((doc) {
+          return {
+            'id': doc.id,
+            ...doc.data(),
+          };
+        }).toList();
+        
+        relatedProducts.addAll(otherProducts);
+      }
+      
+      return relatedProducts;
+    } catch (e) {
+      print('Error fetching related products: $e');
+      return [];
+    }
   }
 
   @override
@@ -725,6 +817,23 @@ class _ProductDetailsState extends State<ProductDetails> {
                 child: const Text("ADD TO CART"),
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.stockCount > 0 ? _buyNow : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+                child: const Text("BUY NOW"),
+              ),
+            ),
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(12),
@@ -965,6 +1074,167 @@ class _ProductDetailsState extends State<ProductDetails> {
                         .map((review) => ReviewItem(review: review))
                         .toList(),
                   ),
+            const SizedBox(height: 24),
+            // Products You May Also Like Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[800]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.whatshot, color: Colors.orange, size: 24),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'PRODUCTS YOU MAY ALSO LIKE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: 220,
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _fetchRelatedProducts(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: Colors.orange),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No related products found',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          );
+                        }
+
+                        final relatedProducts = snapshot.data!;
+
+                        return ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: relatedProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = relatedProducts[index];
+                            
+                            return Container(
+                              width: 140,
+                              margin: const EdgeInsets.only(right: 12),
+                              child: GestureDetector(
+                                onTap: () {
+                                  // Navigate to the product details
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ProductDetails(
+                                        productId: product['id'],
+                                        imageUrl: product['imageUrl'] ?? '',
+                                        title: product['name'] ?? 'Unknown Product',
+                                        price: product['price']?.toString() ?? '0.00',
+                                        description: product['description'] ?? 'No description available',
+                                        rating: (product['rating'] ?? 0.0).toDouble(),
+                                        stockCount: product['stockCount'] ?? 0,
+                                        userId: product['userId'] ?? '',
+                                        category: product['category'] ?? 'Unknown',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Product Image
+                                    Container(
+                                      height: 140,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.grey[700]!),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(5),
+                                        child: Image.network(
+                                          product['imageUrl'] ?? '',
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey[900],
+                                              child: const Center(
+                                                child: Icon(Icons.image_not_supported, color: Colors.grey),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      product['name'] ?? 'Unknown Product',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontFamily: 'PixelFont',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'PHP ${product['price'] ?? '0.00'}',
+                                      style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 12,
+                                        fontFamily: 'PixelFont',
+                                      ),
+                                    ),
+                                    // Small rating display
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star, color: Colors.amber, size: 12),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          '${(product['rating'] ?? 0.0).toStringAsFixed(1)}',
+                                          style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 11,
+                                            fontFamily: 'PixelFont',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
           ],
         ),

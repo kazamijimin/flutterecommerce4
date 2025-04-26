@@ -827,7 +827,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
                   )
                 : ElevatedButton(
-                    onPressed: _selectedAddress.isEmpty ? null : _confirmOrder,
+                    onPressed: _selectedAddress.isEmpty ? null : _showPaymentConfirmationDialog,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _neonPink,
                       disabledBackgroundColor: Colors.grey,
@@ -840,7 +840,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       ),
                     ),
                     child: const Text(
-                      'PLACE ORDER',
+                      'PROCEED TO PAYMENT',
                       style: TextStyle(
                         fontFamily: 'PixelFont',
                         fontWeight: FontWeight.bold,
@@ -1096,6 +1096,132 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _isLoading = false;
     });
   }
+}
+
+  void _showPaymentConfirmationDialog() {
+  if (_selectedAddress.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please select a shipping address to proceed.',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: _surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Confirm Payment',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: _neonPink,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Shipping Address:',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: _neonBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _selectedAddress,
+              style: const TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Payment Method:',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: _neonBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _selectedPaymentMethod,
+              style: const TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Total Payment:',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: _neonBlue,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '\$${_totalPayment.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _neonPink,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmOrder();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _neonPink,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text(
+              'Proceed',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
