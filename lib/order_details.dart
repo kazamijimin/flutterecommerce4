@@ -1068,6 +1068,41 @@ class OrderDetailsPage extends StatelessWidget {
         ),
       );
 
+      // Create notification about order status change
+      if (userId.isNotEmpty) {
+        String title = 'Order Status Updated';
+        String message = 'Your order has been updated to $newStatus.';
+        
+        // Customize message based on order status
+        switch (newStatus) {
+          case 'to ship':
+            title = 'Order Confirmed';
+            message = 'Your order #$systemOrderId has been confirmed and is being prepared.';
+            break;
+          case 'to receive':
+            title = 'Order Shipped';
+            message = 'Your order #$systemOrderId has been shipped and is on its way!';
+            break;
+          case 'delivered':
+            title = 'Order Delivered';
+            message = 'Your order #$systemOrderId has been delivered. Enjoy!';
+            break;
+          case 'cancelled':
+            title = 'Order Cancelled';
+            message = 'Your order #$systemOrderId has been cancelled.';
+            break;
+        }
+
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'userId': userId,
+          'type': 'orders',
+          'title': title,
+          'message': message,
+          'orderId': systemOrderId,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+
       // Refresh the page - easiest way is to pop and push
       Navigator.pop(context);
       Navigator.push(

@@ -9,6 +9,8 @@ import 'product_details.dart';
 import 'profile.dart';
 import 'settings.dart';
 import 'dart:async';
+import 'notifications.dart';
+import 'message.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -25,7 +27,7 @@ class _HomePageState extends State<HomePage> {
   final ScrollController _productScrollController = ScrollController();
   int cartCount = 0;
   int wishlistCount = 0;
-  
+
   // Search-related variables
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -34,7 +36,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _suggestedProducts = [];
   bool _isLoadingSuggestions = false;
   Timer? _debounceTimer;
-  
+
   // Preload product data
   List<Map<String, dynamic>> products = [];
   bool isProductsLoading = true;
@@ -60,14 +62,14 @@ class _HomePageState extends State<HomePage> {
     _startAutoScroll();
     _loadCounts();
     _loadRecentSearches();
-    
+
     // Listen for search focus changes
     _searchFocusNode.addListener(() {
       setState(() {
         _isSearchFocused = _searchFocusNode.hasFocus;
       });
     });
-    
+
     // Listen for search text changes
     _searchController.addListener(_onSearchChanged);
   }
@@ -89,19 +91,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _saveRecentSearch(String search) async {
     if (search.trim().isEmpty) return;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final searches = prefs.getStringList('recentSearches') ?? [];
-    
+
     // Remove duplicates and add to the beginning
     searches.remove(search);
     searches.insert(0, search);
-    
+
     // Limit to 5 recent searches
     final limitedSearches = searches.take(5).toList();
-    
+
     await prefs.setStringList('recentSearches', limitedSearches);
-    
+
     setState(() {
       _recentSearches = limitedSearches;
     });
@@ -122,11 +124,11 @@ class _HomePageState extends State<HomePage> {
       });
       return;
     }
-    
+
     setState(() {
       _isLoadingSuggestions = true;
     });
-    
+
     try {
       final querySnapshot = await FirebaseFirestore.instance
           .collection('products')
@@ -134,7 +136,7 @@ class _HomePageState extends State<HomePage> {
           .where('name', isLessThanOrEqualTo: query + '\uf8ff')
           .limit(5)
           .get();
-      
+
       if (mounted) {
         setState(() {
           _suggestedProducts = querySnapshot.docs.map((doc) {
@@ -156,13 +158,13 @@ class _HomePageState extends State<HomePage> {
 
   void _executeSearch(String query) {
     if (query.trim().isEmpty) return;
-    
+
     // Save the search query to recent searches
     _saveRecentSearch(query);
-    
+
     // Clear focus to hide suggestions
     _searchFocusNode.unfocus();
-    
+
     // Navigate to a dedicated search results page
     Navigator.push(
       context,
@@ -173,32 +175,34 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Fetch products in advance to avoid loading during scrolling
- Future<void> _fetchProducts() async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('products')
-        .where('archived', isNotEqualTo: true)  // Only fetch non-archived products
-        .limit(10)
-        .get();
-    
-    if (mounted) {
-      setState(() {
-        products = snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          return data;
-        }).toList();
-        isProductsLoading = false;
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        isProductsLoading = false;
-      });
+  Future<void> _fetchProducts() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('archived',
+              isNotEqualTo: true) // Only fetch non-archived products
+          .limit(10)
+          .get();
+
+      if (mounted) {
+        setState(() {
+          products = snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+          isProductsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isProductsLoading = false;
+        });
+      }
     }
   }
-}
+
   void _startAutoScroll() {
     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (_pageController.hasClients) {
@@ -224,13 +228,13 @@ class _HomePageState extends State<HomePage> {
           .collection('carts')
           .where('userId', isEqualTo: user.uid)
           .get();
-      
+
       // Load wishlist count
       final wishlistSnapshot = await FirebaseFirestore.instance
           .collection('wishlists')
           .where('userId', isEqualTo: user.uid)
           .get();
-      
+
       if (mounted) {
         setState(() {
           cartCount = cartSnapshot.docs.length;
@@ -244,11 +248,13 @@ class _HomePageState extends State<HomePage> {
     if (_productScrollController.hasClients) {
       final currentPosition = _productScrollController.offset;
       final scrollAmount = 130.0; // Width of product card + margin
-      
+
       _productScrollController.animateTo(
-        scrollLeft ? 
-          (currentPosition - scrollAmount).clamp(0, _productScrollController.position.maxScrollExtent) : 
-          (currentPosition + scrollAmount).clamp(0, _productScrollController.position.maxScrollExtent),
+        scrollLeft
+            ? (currentPosition - scrollAmount)
+                .clamp(0, _productScrollController.position.maxScrollExtent)
+            : (currentPosition + scrollAmount)
+                .clamp(0, _productScrollController.position.maxScrollExtent),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -272,12 +278,12 @@ class _HomePageState extends State<HomePage> {
     precacheImage(const AssetImage('assets/images/banner1.jpg'), context);
     precacheImage(const AssetImage('assets/images/banner2.jpg'), context);
     precacheImage(const AssetImage('assets/images/banner3.jpg'), context);
-    
+
     return Theme(
       data: Theme.of(context).copyWith(
         textTheme: Theme.of(context).textTheme.apply(
-          fontFamily: 'PixelFont',
-        ),
+              fontFamily: 'PixelFont',
+            ),
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -307,7 +313,8 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.red,
                           shape: BoxShape.circle,
                         ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 16),
                         child: Text(
                           '$cartCount',
                           style: pixelFontStyle(fontSize: 10),
@@ -334,7 +341,8 @@ class _HomePageState extends State<HomePage> {
                       prefixIcon: const Icon(Icons.search, color: Colors.white),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.white, size: 20),
+                              icon: const Icon(Icons.clear,
+                                  color: Colors.white, size: 20),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -355,9 +363,12 @@ class _HomePageState extends State<HomePage> {
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.favorite, color: Colors.white),
+                    icon: const Icon(Icons.notifications, color: Colors.white),
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const WishlistPage()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const NotificationsPage()));
                     },
                   ),
                   if (wishlistCount > 0)
@@ -370,7 +381,8 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.red,
                           shape: BoxShape.circle,
                         ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 16),
                         child: Text(
                           '$wishlistCount',
                           style: pixelFontStyle(fontSize: 10),
@@ -394,7 +406,8 @@ class _HomePageState extends State<HomePage> {
               ),
             if (!_isSearchFocused)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: Colors.black,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -417,7 +430,8 @@ class _HomePageState extends State<HomePage> {
                   color: Colors.cyan,
                   backgroundColor: Colors.grey.shade900,
                   child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(), // This is important for RefreshIndicator to work
+                    physics:
+                        const AlwaysScrollableScrollPhysics(), // This is important for RefreshIndicator to work
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -432,9 +446,12 @@ class _HomePageState extends State<HomePage> {
                               });
                             },
                             children: [
-                              Image.asset('assets/images/banner1.jpg', fit: BoxFit.cover),
-                              Image.asset('assets/images/banner2.jpg', fit: BoxFit.cover),
-                              Image.asset('assets/images/banner3.jpg', fit: BoxFit.cover),
+                              Image.asset('assets/images/banner1.jpg',
+                                  fit: BoxFit.cover),
+                              Image.asset('assets/images/banner2.jpg',
+                                  fit: BoxFit.cover),
+                              Image.asset('assets/images/banner3.jpg',
+                                  fit: BoxFit.cover),
                             ],
                           ),
                         ),
@@ -443,7 +460,8 @@ class _HomePageState extends State<HomePage> {
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(3, (index) => _buildDot(index)),
+                            children:
+                                List.generate(3, (index) => _buildDot(index)),
                           ),
                         ),
                         // Recommended Products with Navigation Arrows
@@ -463,12 +481,14 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   // Left arrow
                                   IconButton(
-                                    icon: const Icon(Icons.arrow_back_ios, color: Colors.cyan, size: 20),
+                                    icon: const Icon(Icons.arrow_back_ios,
+                                        color: Colors.cyan, size: 20),
                                     onPressed: () => _scrollProducts(true),
                                   ),
                                   // Right arrow
                                   IconButton(
-                                    icon: const Icon(Icons.arrow_forward_ios, color: Colors.cyan, size: 20),
+                                    icon: const Icon(Icons.arrow_forward_ios,
+                                        color: Colors.cyan, size: 20),
                                     onPressed: () => _scrollProducts(false),
                                   ),
                                 ],
@@ -477,7 +497,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         _buildProductGrid(),
-                        
+
                         // GameBox Summer Sale Banner
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 16),
@@ -518,24 +538,37 @@ class _HomePageState extends State<HomePage> {
               case 0: // Home - already here
                 break;
               case 1: // Category
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoryPage()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const CategoryPage()));
                 break;
               case 2: // Message
-                _showMessageDialog();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatPage()),
+                );
                 break;
               case 3: // Shop
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const CartPage()));
                 break;
               case 4: // Profile
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ProfileScreen()));
                 break;
             }
           },
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
-            BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
-            BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Shop'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.category), label: 'Category'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.message), label: 'Message'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_bag), label: 'Shop'),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           ],
         ),
@@ -583,7 +616,8 @@ class _HomePageState extends State<HomePage> {
                       width: 40,
                       height: 40,
                       color: Colors.grey.shade800,
-                      child: const Icon(Icons.error, color: Colors.white, size: 16),
+                      child: const Icon(Icons.error,
+                          color: Colors.white, size: 16),
                     ),
                   ),
                 ),
@@ -595,7 +629,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 subtitle: Text(
                   'PHP ${product['price'] ?? '0.00'}',
-                  style: pixelFontStyle(color: Colors.grey.shade400, fontSize: 12),
+                  style:
+                      pixelFontStyle(color: Colors.grey.shade400, fontSize: 12),
                 ),
                 onTap: () {
                   // Navigate to product details and save search
@@ -608,7 +643,8 @@ class _HomePageState extends State<HomePage> {
                         imageUrl: product['imageUrl'] ?? '',
                         title: product['name'] ?? 'Unknown Product',
                         price: 'PHP ${product['price'] ?? '0.00'}',
-                        description: product['description'] ?? 'No description available',
+                        description: product['description'] ??
+                            'No description available',
                         userId: product['userId'] ?? 'Unknown User',
                         productId: product['id'],
                       ),
@@ -617,7 +653,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
           ],
-          
+
           // Recent searches section
           if (_recentSearches.isNotEmpty && _suggestedProducts.isEmpty) ...[
             Padding(
@@ -662,17 +698,17 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
           ],
-          
+
           // Loading indicator for suggestions
           if (_isLoadingSuggestions)
             const Padding(
               padding: EdgeInsets.all(16.0),
               child: Center(child: CircularProgressIndicator()),
             ),
-          
+
           // No results message
-          if (_searchController.text.isNotEmpty && 
-              _suggestedProducts.isEmpty && 
+          if (_searchController.text.isNotEmpty &&
+              _suggestedProducts.isEmpty &&
               !_isLoadingSuggestions)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -683,7 +719,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            
+
           const SizedBox(height: 8),
         ],
       ),
@@ -694,19 +730,21 @@ class _HomePageState extends State<HomePage> {
     return TextButton.icon(
       icon: Icon(icon, color: Colors.white, size: 18),
       label: Text(
-        title, 
+        title,
         style: pixelFontStyle(fontSize: 12),
       ),
       onPressed: () {
         if (title == 'WISHLIST') {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const WishlistPage()));
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => const WishlistPage()));
         } else if (title == 'WALLET') {
           // Navigate to wallet
         } else if (title == 'MENU') {
           _showMenuDialog();
         }
       },
-      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+      style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8)),
     );
   }
 
@@ -721,7 +759,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  
+
   void _showMenuDialog() {
     showDialog(
       context: context,
@@ -745,7 +783,7 @@ class _HomePageState extends State<HomePage> {
                 child: Text(
                   'MENU',
                   style: pixelFontStyle(
-                    fontSize: 18, 
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -755,10 +793,14 @@ class _HomePageState extends State<HomePage> {
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const SettingsPage()));
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Text(
                     'Library',
                     style: pixelFontStyle(
@@ -775,7 +817,8 @@ class _HomePageState extends State<HomePage> {
                   // Navigate to login screen
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Text(
                     'Your store',
                     style: pixelFontStyle(
@@ -792,13 +835,14 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  
+
   void _showMessageDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        title: Text('Messages', style: pixelFontStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text('Messages',
+            style: pixelFontStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         content: Text('No new messages', style: pixelFontStyle()),
         actions: [
           TextButton(
@@ -818,14 +862,15 @@ class _HomePageState extends State<HomePage> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     if (products.isEmpty) {
       return SizedBox(
         height: 220,
-        child: Center(child: Text('No products available', style: pixelFontStyle())),
+        child: Center(
+            child: Text('No products available', style: pixelFontStyle())),
       );
     }
-    
+
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -834,7 +879,7 @@ class _HomePageState extends State<HomePage> {
         itemCount: products.length,
         itemBuilder: (context, index) {
           final productData = products[index];
-          
+
           return GestureDetector(
             onTap: () {
               Navigator.push(
@@ -844,7 +889,8 @@ class _HomePageState extends State<HomePage> {
                     imageUrl: productData['imageUrl'] ?? '',
                     title: productData['name'] ?? 'Unknown Product',
                     price: 'PHP ${productData['price'] ?? '0.00'}',
-                    description: productData['description'] ?? 'No description available',
+                    description: productData['description'] ??
+                        'No description available',
                     userId: productData['userId'] ?? 'Unknown User',
                     productId: productData['id'],
                   ),
@@ -881,7 +927,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   Text(
                     'PHP ${productData['price'] ?? '0.00'}',
-                    style: pixelFontStyle(color: const Color.fromARGB(255, 212, 0, 0)),
+                    style: pixelFontStyle(
+                        color: const Color.fromARGB(255, 212, 0, 0)),
                   ),
                 ],
               ),
@@ -908,8 +955,9 @@ class _HomePageState extends State<HomePage> {
 
 class SearchResultsPage extends StatefulWidget {
   final String searchQuery;
-  
-  const SearchResultsPage({Key? key, required this.searchQuery}) : super(key: key);
+
+  const SearchResultsPage({Key? key, required this.searchQuery})
+      : super(key: key);
 
   @override
   State<SearchResultsPage> createState() => _SearchResultsPageState();
@@ -919,30 +967,30 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   List<Map<String, dynamic>> _searchResults = [];
   bool _isLoading = true;
   bool _hasError = false;
-  
+
   @override
   void initState() {
     super.initState();
     _performSearch();
   }
-  
+
   Future<void> _performSearch() async {
     setState(() {
       _isLoading = true;
       _hasError = false;
     });
-    
+
     try {
       List<Map<String, dynamic>> results = [];
       final searchTerm = widget.searchQuery.toLowerCase();
-      
+
       // First try direct query for performance
       var querySnapshot = await FirebaseFirestore.instance
           .collection('products')
           .where('name', isEqualTo: widget.searchQuery)
           .where('archived', isNotEqualTo: true)
           .get();
-          
+
       if (querySnapshot.docs.isNotEmpty) {
         // Add exact matches
         for (var doc in querySnapshot.docs) {
@@ -951,7 +999,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           results.add(data);
         }
       }
-      
+
       // Try prefix match
       querySnapshot = await FirebaseFirestore.instance
           .collection('products')
@@ -959,7 +1007,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           .where('name', isLessThanOrEqualTo: widget.searchQuery + '\uf8ff')
           .where('archived', isNotEqualTo: true)
           .get();
-          
+
       for (var doc in querySnapshot.docs) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -968,7 +1016,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           results.add(data);
         }
       }
-      
+
       // If still no results, try a more general search
       if (results.isEmpty) {
         // Get all products and filter locally
@@ -976,19 +1024,20 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             .collection('products')
             .where('archived', isNotEqualTo: true)
             .get();
-            
+
         for (var doc in querySnapshot.docs) {
           final data = doc.data();
           final name = (data['name'] ?? '').toString().toLowerCase();
-          final description = (data['description'] ?? '').toString().toLowerCase();
-          
+          final description =
+              (data['description'] ?? '').toString().toLowerCase();
+
           if (name.contains(searchTerm) || description.contains(searchTerm)) {
             data['id'] = doc.id;
             results.add(data);
           }
         }
       }
-      
+
       setState(() {
         _searchResults = results;
         _isLoading = false;
@@ -1001,7 +1050,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
       });
     }
   }
-  
+
   // Text style with pixel font
   TextStyle pixelFontStyle({
     double fontSize = 14.0,
@@ -1042,7 +1091,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Text(
                         'Error loading search results',
@@ -1067,7 +1117,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.search_off, color: Colors.grey, size: 48),
+                          const Icon(Icons.search_off,
+                              color: Colors.grey, size: 48),
                           const SizedBox(height: 16),
                           Text(
                             'No products found for "${widget.searchQuery}"',
@@ -1079,7 +1130,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(16),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         childAspectRatio: 0.7,
                         crossAxisSpacing: 16,
@@ -1093,7 +1145,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     ),
     );
   }
-  
+
   Widget _buildProductCard(Map<String, dynamic> product) {
     return GestureDetector(
       onTap: () {
@@ -1149,7 +1201,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   Text(
                     product['name'] ?? 'Unknown Product',
                     style: pixelFontStyle(
-                      fontWeight: FontWeight.bold, 
+                      fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                     maxLines: 2,
@@ -1164,21 +1216,26 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // Stock indicator
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (product['stockCount'] ?? 0) > 0 
-                          ? Colors.green.withOpacity(0.2) 
+                      color: (product['stockCount'] ?? 0) > 0
+                          ? Colors.green.withOpacity(0.2)
                           : Colors.red.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      (product['stockCount'] ?? 0) > 0 ? 'In Stock' : 'Out of Stock',
+                      (product['stockCount'] ?? 0) > 0
+                          ? 'In Stock'
+                          : 'Out of Stock',
                       style: pixelFontStyle(
                         fontSize: 10,
-                        color: (product['stockCount'] ?? 0) > 0 ? Colors.green : Colors.red,
+                        color: (product['stockCount'] ?? 0) > 0
+                            ? Colors.green
+                            : Colors.red,
                       ),
                     ),
                   ),

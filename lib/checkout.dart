@@ -949,8 +949,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
   }
-// Update the _confirmOrder method to include cart cleanup
-Future<void> _confirmOrder() async {
+
+  Future<void> _confirmOrder() async {
   // Validate that an address is selected
   if (_selectedAddress.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -979,15 +979,15 @@ Future<void> _confirmOrder() async {
 
       // Create the order data
       final orderData = {
-        'orderId': orderId, // Save the generated order ID
+        'orderId': orderId,
         'totalPrice': _totalPayment,
         'paymentMethod': _selectedPaymentMethod,
         'shippingOption': _selectedShippingOption,
         'shippingAddress': _selectedAddress,
         'orderDate': DateTime.now().toIso8601String(),
-        'items': [widget.selectedItems.first], // Include only the first product
-        'status': 'to pay', // Set the initial status to "to pay"
-        'userId': user.uid, // Add user ID for reference
+        'items': widget.selectedItems,
+        'status': 'to pay',
+        'userId': user.uid,
       };
 
       // Add the order to the user's orders collection
@@ -999,7 +999,37 @@ Future<void> _confirmOrder() async {
 
       // Add the order to the global orders collection
       final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
-      await globalOrdersRef.add(orderData);
+      final docRef = await globalOrdersRef.add(orderData);
+
+      // Create a notification with better formatting and product image
+      String itemsText = "";
+      if (widget.selectedItems.length == 1) {
+        itemsText = widget.selectedItems.first['title'];
+      } else {
+        itemsText = "${widget.selectedItems.first['title']} and ${widget.selectedItems.length - 1} more item(s)";
+      }
+      
+      // Get first item's image for the notification
+      String? mainImageUrl;
+      if (widget.selectedItems.isNotEmpty && widget.selectedItems.first['imageUrl'] != null) {
+        mainImageUrl = widget.selectedItems.first['imageUrl'];
+      }
+
+      final notification = {
+        'userId': user.uid,
+        'type': 'orders',  // Make sure this field is set
+        'title': 'Order #$orderId Placed Successfully',
+        'message': 'Your order for $itemsText has been placed and is awaiting payment.',
+        'orderId': orderId,
+        'timestamp': FieldValue.serverTimestamp(),  // Use serverTimestamp
+        'isRead': false,
+        'imageUrl': mainImageUrl ?? '',  // Provide empty string fallback
+      };
+
+      // Add notification to the notifications collection
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .add(notification);
 
       // Delete purchased items from the cart
       final cartRef = FirebaseFirestore.instance
@@ -1008,13 +1038,16 @@ Future<void> _confirmOrder() async {
           .collection('cart');
       final cartSnapshot = await cartRef.get();
 
-      for (var cartDoc in cartSnapshot.docs) {
-        final cartData = cartDoc.data();
-        final purchasedTitle = widget.selectedItems.first['title'] ?? '';
-
-        if (cartData['title'] == purchasedTitle) {
-          await cartRef.doc(cartDoc.id).delete();
-          break;
+      // Remove all purchased items from cart
+      for (var item in widget.selectedItems) {
+        final String purchasedTitle = item['title'] ?? '';
+        
+        for (var cartDoc in cartSnapshot.docs) {
+          final cartData = cartDoc.data();
+          if (cartData['title'] == purchasedTitle) {
+            await cartRef.doc(cartDoc.id).delete();
+            break;
+          }
         }
       }
 
@@ -1064,35 +1097,6 @@ Future<void> _confirmOrder() async {
     });
   }
 }
-}
-
-// Custom painter for cyberpunk grid background effect
-class GridPainter extends CustomPainter {
-  final Color lineColor;
-  final double lineWidth;
-  final double gridSpacing;
-
-  GridPainter({
-    required this.lineColor,
-    required this.lineWidth,
-    required this.gridSpacing,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = lineColor
-      ..strokeWidth = lineWidth;
-
-    for (double y = 0; y < size.height; y += gridSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    for (double x = 0; x < size.width; x += gridSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-  }
-
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
