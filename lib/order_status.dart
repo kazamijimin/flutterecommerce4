@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'seller_dashboard.dart';
 import 'your_products.dart';
 import 'add_product.dart';
+import 'revenue_graph.dart'; // Import the RevenueGraph screen
 
 class OrderStatus extends StatelessWidget {
   const OrderStatus({super.key});
@@ -832,6 +833,20 @@ class OrderStatus extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AddProduct()),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.bar_chart, color: const Color(0xFFFF0077)), // Icon for Revenue Graphs
+            title: const Text(
+              'Revenue Graphs',
+              style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RevenueGraph()),
               );
             },
           ),
