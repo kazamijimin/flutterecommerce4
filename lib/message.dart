@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'home.dart';
+import 'category.dart';
+import 'profile.dart';
+import 'see_all_recommend.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({Key? key}) : super(key: key);
@@ -21,6 +25,8 @@ class _ChatPageState extends State<ChatPage> {
   bool _isLoading = true;
   bool _isSearching = false;
 
+  int _currentNavIndex = 2; // Message is the 3rd item (index 2)
+
   @override
   void initState() {
     super.initState();
@@ -32,7 +38,6 @@ class _ChatPageState extends State<ChatPage> {
     if (currentUser == null) return;
 
     try {
-      // Listen to conversations in real-time
       _firestore
           .collection('conversations')
           .where('participants', arrayContains: currentUser.uid)
@@ -45,12 +50,13 @@ class _ChatPageState extends State<ChatPage> {
           return data;
         }).toList();
 
-        // Fetch user details for all participants
         for (var conversation in conversations) {
           final participants = conversation['participants'] as List;
-          final recipientId = participants.firstWhere((id) => id != currentUser.uid, 
-              orElse: () => '');
-          
+          final recipientId = participants.firstWhere(
+            (id) => id != currentUser.uid,
+            orElse: () => '',
+          );
+
           if (recipientId.isNotEmpty && !_userDetails.containsKey(recipientId)) {
             await _fetchUserDetails(recipientId);
           }
@@ -72,11 +78,11 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _fetchUserDetails(String userId) async {
     try {
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      
+
       if (userDoc.exists) {
         final userData = userDoc.data()!;
         userData['id'] = userDoc.id;
-        
+
         setState(() {
           _userDetails[userId] = userData;
         });
@@ -112,11 +118,10 @@ class _ChatPageState extends State<ChatPage> {
             return data;
           })
           .where((user) =>
-              user['id'] != currentUser.uid && // Exclude current user
-              (user['displayName'] ?? '').toLowerCase().contains(query.toLowerCase())) // Match query
+              user['id'] != currentUser.uid &&
+              (user['displayName'] ?? '').toLowerCase().contains(query.toLowerCase()))
           .toList();
-      
-      // Add user details to the cache
+
       for (var user in results) {
         _userDetails[user['id']] = user;
       }
@@ -133,21 +138,48 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _navigateWithBottomBar(int index) {
+    if (index == _currentNavIndex) return;
+
+    Widget page;
+    switch (index) {
+      case 0:
+        page = const HomePage();
+        break;
+      case 1:
+        page = const CategoryPage();
+        break;
+      case 2:
+        page = const ChatPage(); // Current page
+        break;
+      case 3:
+        page = const SeeAllProductsScreen(); // Shop page
+        break;
+      case 4:
+        page = const ProfileScreen();
+        break;
+      default:
+        page = const HomePage();
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+    );
+  }
+
   void _startChat(String userId, String userName) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    // Generate a unique conversation ID
     final conversationId = currentUser.uid.compareTo(userId) < 0
         ? '${currentUser.uid}_$userId'
         : '${userId}_${currentUser.uid}';
 
-    // Check if the conversation already exists
     final conversationRef = _firestore.collection('conversations').doc(conversationId);
     final conversationSnapshot = await conversationRef.get();
 
     if (!conversationSnapshot.exists) {
-      // Create a new conversation
       await conversationRef.set({
         'participants': [currentUser.uid, userId],
         'lastMessage': '',
@@ -155,7 +187,6 @@ class _ChatPageState extends State<ChatPage> {
       });
     }
 
-    // Navigate to the chat detail page
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -167,44 +198,27 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  String _formatTimestamp(Timestamp? timestamp) {
-    if (timestamp == null) return '';
-    
-    final now = DateTime.now();
-    final messageTime = timestamp.toDate();
-    final difference = now.difference(messageTime);
-    
-    if (difference.inDays == 0) {
-      // Today, show time only
-      return DateFormat('h:mm a').format(messageTime);
-    } else if (difference.inDays < 7) {
-      // Within a week, show day of week
-      return DateFormat('E').format(messageTime);
-    } else {
-      // Older, show date
-      return DateFormat('MMM d').format(messageTime);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Messages'),
+        title: const Text(
+          'Messages',
+          style: TextStyle(fontFamily: 'PixelFont'), // Apply PixelFont
+        ),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
               decoration: InputDecoration(
                 hintText: 'Search users...',
-                hintStyle: const TextStyle(color: Colors.grey),
+                hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
                 prefixIcon: const Icon(Icons.search, color: Colors.white),
                 filled: true,
                 fillColor: Colors.grey.shade800,
@@ -216,7 +230,6 @@ class _ChatPageState extends State<ChatPage> {
               onChanged: (value) => _searchUsers(value),
             ),
           ),
-          // Search results or conversations
           Expanded(
             child: _isSearching
                 ? const Center(
@@ -230,20 +243,20 @@ class _ChatPageState extends State<ChatPage> {
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: Colors.grey.shade800,
-                              backgroundImage: user['photoURL'] != null 
-                                ? CachedNetworkImageProvider(user['photoURL'])
-                                : null,
+                              backgroundImage: user['photoURL'] != null
+                                  ? CachedNetworkImageProvider(user['photoURL'])
+                                  : null,
                               child: user['photoURL'] == null
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
+                                  ? const Icon(Icons.person, color: Colors.white)
+                                  : null,
                             ),
                             title: Text(
                               user['displayName'] ?? 'Unknown User',
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
                             ),
                             subtitle: Text(
                               user['email'] ?? '',
-                              style: const TextStyle(color: Colors.grey),
+                              style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
                             ),
                             onTap: () => _startChat(user['id'], user['displayName']),
                           );
@@ -257,7 +270,7 @@ class _ChatPageState extends State<ChatPage> {
                             ? const Center(
                                 child: Text(
                                   'No conversations found',
-                                  style: TextStyle(color: Colors.white, fontSize: 16),
+                                  style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'PixelFont'), // Apply PixelFont
                                 ),
                               )
                             : ListView.builder(
@@ -269,31 +282,31 @@ class _ChatPageState extends State<ChatPage> {
                                     (id) => id != _auth.currentUser?.uid,
                                     orElse: () => '',
                                   );
-                                  
+
                                   final recipientDetails = _userDetails[recipientId];
                                   final recipientName = recipientDetails?['displayName'] ?? 'Unknown User';
                                   final photoURL = recipientDetails?['photoURL'];
-                                  
+
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: Colors.grey.shade800,
-                                      backgroundImage: photoURL != null 
-                                        ? CachedNetworkImageProvider(photoURL)
-                                        : null,
+                                      backgroundImage: photoURL != null
+                                          ? CachedNetworkImageProvider(photoURL)
+                                          : null,
                                       child: photoURL == null
-                                        ? const Icon(Icons.person, color: Colors.white)
-                                        : null,
+                                          ? const Icon(Icons.person, color: Colors.white)
+                                          : null,
                                     ),
                                     title: Text(
                                       recipientName,
-                                      style: const TextStyle(color: Colors.white),
+                                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
                                     ),
                                     subtitle: Row(
                                       children: [
                                         Expanded(
                                           child: Text(
                                             conversation['lastMessage'] ?? '',
-                                            style: const TextStyle(color: Colors.grey),
+                                            style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -302,7 +315,7 @@ class _ChatPageState extends State<ChatPage> {
                                     ),
                                     trailing: Text(
                                       _formatTimestamp(conversation['timestamp']),
-                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontFamily: 'PixelFont'), // Apply PixelFont
                                     ),
                                     onTap: () => Navigator.push(
                                       context,
@@ -318,6 +331,29 @@ class _ChatPageState extends State<ChatPage> {
                               ),
           ),
         ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
+        unselectedItemColor: Colors.white,
+        currentIndex: _currentNavIndex,
+        onTap: _navigateWithBottomBar,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
+          BottomNavigationBarItem(icon: Icon(Icons.shop), label: 'Shop'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+        selectedLabelStyle: const TextStyle(
+          fontFamily: 'PixelFont',
+          fontSize: 12,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: 'PixelFont',
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -593,5 +629,21 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         ],
       ),
     );
+  }
+}
+
+String _formatTimestamp(Timestamp? timestamp) {
+  if (timestamp == null) return '';
+
+  final now = DateTime.now();
+  final messageTime = timestamp.toDate();
+  final difference = now.difference(messageTime);
+
+  if (difference.inDays == 0) {
+    return DateFormat('h:mm a').format(messageTime);
+  } else if (difference.inDays < 7) {
+    return DateFormat('E').format(messageTime);
+  } else {
+    return DateFormat('MMM d').format(messageTime);
   }
 }

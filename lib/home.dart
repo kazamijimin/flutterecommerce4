@@ -12,6 +12,7 @@ import 'dart:async';
 import 'notifications.dart';
 import 'message.dart';
 import 'see_all_recommend.dart';
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -464,7 +465,51 @@ class _HomePageState extends State<HomePage> {
                                 List.generate(3, (index) => _buildDot(index)),
                           ),
                         ),
-                        // Recommended Products with Navigation Arrows
+
+                        // Add the standard ads carousel here (with free shipping, vouchers, etc.)
+                        const ShopAdCarousel(allAds: false),
+                        const SizedBox(height: 16),
+
+                        // SWAP 1: Move ShoppingAdCarousel (with ad1, ad2, ad3) to appear first
+                        ShoppingAdCarousel(
+                          ads: [
+                            {
+                              'imagePath': 'assets/images/ad1.jpg',
+                              'title': 'SUMMER GAMING SALE\nUP TO 70% OFF'
+                            },
+                            {
+                              'imagePath': 'assets/images/ad2.jpg',
+                              'title': 'NEW RELEASES\nPRE-ORDER NOW'
+                            },
+                            {
+                              'imagePath': 'assets/images/ad3.jpg',
+                              'title': 'GAMING HARDWARE\nULTIMATE PERFORMANCE'
+                            },
+                          ],
+                          onTap: (index) {
+                            String category = 'Sale';
+                            switch (index) {
+                              case 0:
+                                category = 'Sale';
+                                break;
+                              case 1:
+                                category = 'New';
+                                break;
+                              case 2:
+                                category = 'Hardware';
+                                break;
+                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CategoryPage(initialCategory: category),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Recommended Products section
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
@@ -499,6 +544,9 @@ class _HomePageState extends State<HomePage> {
                         _buildProductGrid(),
 
                         // GameBox Summer Sale Banner
+
+                        // SWAP 2: Move ShopAdCarousel (featured deals) to appear later
+                        const ShopAdCarousel(allAds: true),
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 16),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -515,6 +563,9 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
+
+                        // Add some bottom padding
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -909,18 +960,22 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             itemBuilder: (context, index) {
               final productData = products[index];
-              
+
               // Determine if product has a discount
-              final bool hasDiscount = index % 3 == 0 || productData['discount'] == true;
-              final int discountPercent = hasDiscount ? (productData['discountPercent'] ?? 20) : 0;
-              
+              final bool hasDiscount =
+                  index % 3 == 0 || productData['discount'] == true;
+              final int discountPercent =
+                  hasDiscount ? (productData['discountPercent'] ?? 20) : 0;
+
               // Calculate prices for responsive display
-              final String currentPrice = productData['price']?.toString() ?? '0.00';
-              final double originalPriceValue = hasDiscount ? 
-                double.parse(currentPrice) * (100 / (100 - discountPercent)) : 
-                double.parse(currentPrice);
-              final String originalPrice = originalPriceValue.toStringAsFixed(2);
-              
+              final String currentPrice =
+                  productData['price']?.toString() ?? '0.00';
+              final double originalPriceValue = hasDiscount
+                  ? double.parse(currentPrice) * (100 / (100 - discountPercent))
+                  : double.parse(currentPrice);
+              final String originalPrice =
+                  originalPriceValue.toStringAsFixed(2);
+
               return GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -941,7 +996,8 @@ class _HomePageState extends State<HomePage> {
                 },
                 child: Container(
                   width: 150, // Wider cards
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade900,
                     borderRadius: BorderRadius.circular(8),
@@ -970,22 +1026,25 @@ class _HomePageState extends State<HomePage> {
                               height: 140,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
                                 height: 140,
                                 width: double.infinity,
                                 color: Colors.grey.shade800,
-                                child: const Icon(Icons.error, color: Colors.white),
+                                child: const Icon(Icons.error,
+                                    color: Colors.white),
                               ),
                             ),
                           ),
-                          
+
                           // Discount badge in the top-left corner
                           if (hasDiscount)
                             Positioned(
                               top: 0,
                               left: 0,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade600,
                                   borderRadius: const BorderRadius.only(
@@ -1003,14 +1062,16 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                             ),
-                          
+
                           // Low stock indicator
-                          if ((productData['stockCount'] ?? 0) < 5 && (productData['stockCount'] ?? 0) > 0)
+                          if ((productData['stockCount'] ?? 0) < 5 &&
+                              (productData['stockCount'] ?? 0) > 0)
                             Positioned(
                               top: 8,
                               right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.red.withOpacity(0.8),
                                   borderRadius: BorderRadius.circular(4),
@@ -1042,7 +1103,7 @@ class _HomePageState extends State<HomePage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
-                            
+
                             // Price section - updated layout with prices stacked
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1059,27 +1120,30 @@ class _HomePageState extends State<HomePage> {
                                           fontSize: 11,
                                           fontWeight: FontWeight.normal,
                                         ).copyWith(
-                                          decoration: TextDecoration.lineThrough,
+                                          decoration:
+                                              TextDecoration.lineThrough,
                                         ),
                                       ),
                                     Text(
                                       'PHP $currentPrice',
                                       style: pixelFontStyle(
-                                        color: hasDiscount ? 
-                                          const Color.fromARGB(255, 212, 0, 0) : 
-                                          Colors.white,
+                                        color: hasDiscount
+                                            ? const Color.fromARGB(
+                                                255, 212, 0, 0)
+                                            : Colors.white,
                                         fontWeight: FontWeight.bold,
                                         fontSize: hasDiscount ? 16 : 14,
                                       ),
                                     ),
                                   ],
                                 ),
-                                
+
                                 // Rating display
                                 if (productData['rating'] != null)
                                   Row(
                                     children: [
-                                      const Icon(Icons.star, color: Colors.amber, size: 14),
+                                      const Icon(Icons.star,
+                                          color: Colors.amber, size: 14),
                                       const SizedBox(width: 2),
                                       Text(
                                         '${(productData['rating'] ?? 0.0).toStringAsFixed(1)}',
@@ -1092,11 +1156,12 @@ class _HomePageState extends State<HomePage> {
                                   ),
                               ],
                             ),
-                            
+
                             const SizedBox(height: 8),
                             // Category tag
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.cyan.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
@@ -1426,6 +1491,643 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Update the ShopAdCarousel class
+
+class ShopAdCarousel extends StatefulWidget {
+  final bool allAds;
+
+  const ShopAdCarousel({Key? key, this.allAds = false}) : super(key: key);
+
+  @override
+  State<ShopAdCarousel> createState() => _ShopAdCarouselState();
+}
+
+class _ShopAdCarouselState extends State<ShopAdCarousel> {
+  int _currentAdPage = 0;
+  final PageController _adPageController = PageController();
+  Timer? _adTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAdAutoScroll();
+  }
+
+  void _startAdAutoScroll() {
+    _adTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_adPageController.hasClients) {
+        final int pageCount = widget.allAds ? 3 : 3;
+        if (_currentAdPage < pageCount - 1) {
+          _currentAdPage++;
+        } else {
+          _currentAdPage = 0;
+        }
+        _adPageController.animateToPage(
+          _currentAdPage,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _adTimer?.cancel();
+    _adPageController.dispose();
+    super.dispose();
+  }
+
+// Add this method to the _ShopAdCarouselState class
+
+  Widget _buildShopAd({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color1,
+    required Color color2,
+    required VoidCallback onTap,
+    bool isSponsored = true,
+  }) {
+    return Stack(
+      children: [
+        // Main container
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color1, color2],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Icon
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Text content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontFamily: 'PixelFont',
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontFamily: 'PixelFont',
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Arrow indicator
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Sponsored tag
+        if (isSponsored)
+          Positioned(
+            top: 8,
+            right: 24, // Adjusted for the container margin
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0077).withOpacity(0.8),
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.stars, color: Colors.white, size: 12),
+                  SizedBox(width: 4),
+                  Text(
+                    'SPONSORED',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+// Also add this method to show ad details
+  void _showAdDetails(BuildContext context, String title, String details) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          details,
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white,
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.cyan,
+              ),
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: const Text(
+              'Shop Now',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.pink,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to relevant category based on ad
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CategoryPage(
+                    initialCategory: title.contains('Shipping')
+                        ? 'All'
+                        : title.contains('Voucher')
+                            ? 'New'
+                            : 'Sale',
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                widget.allAds ? 'FEATURED DEALS' : 'FEATURED DEALS',
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              // Indicator dots
+              Row(
+                children: List.generate(
+                  3,
+                  (index) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _currentAdPage == index
+                          ? Colors.cyan
+                          : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Ad carousel
+        SizedBox(
+          height: 140,
+          child: PageView(
+            controller: _adPageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentAdPage = index;
+              });
+            },
+            children:
+                widget.allAds ? _allAdsPageView() : _standardAdsPageView(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _standardAdsPageView() {
+    return [
+      // Free Shipping Ad
+      _buildShopAd(
+        title: 'FREE SHIPPING',
+        subtitle: 'On orders over PHP 1,500',
+        icon: Icons.local_shipping,
+        color1: const Color(0xFF1A237E),
+        color2: const Color(0xFF0D47A1),
+        onTap: () => _showAdDetails(
+          context,
+          'Free Shipping',
+          'Enjoy free shipping on all orders over PHP 1,500. Valid until May 31, 2025.',
+        ),
+        isSponsored: true,
+      ),
+
+      // Voucher Card Ad
+      _buildShopAd(
+        title: 'PHP 500 VOUCHER',
+        subtitle: 'For new users. Limited time only!',
+        icon: Icons.card_giftcard,
+        color1: const Color(0xFF4A148C),
+        color2: const Color(0xFF7B1FA2),
+        onTap: () => _showAdDetails(
+          context,
+          'New User Voucher',
+          'Register now and get PHP 500 off on your first purchase. Use code: NEWGAMER500',
+        ),
+        isSponsored: true,
+      ),
+
+      // Flash Sale Ad
+      _buildShopAd(
+        title: 'FLASH SALE',
+        subtitle: '12-hour deal: 50% off accessories',
+        icon: Icons.flash_on,
+        color1: const Color(0xFFBF360C),
+        color2: const Color(0xFFE64A19),
+        onTap: () => _showAdDetails(
+          context,
+          'Flash Sale',
+          'Hurry! Get 50% off on all gaming accessories for the next 12 hours only!',
+        ),
+        isSponsored: true,
+      ),
+    ];
+  }
+
+  List<Widget> _allAdsPageView() {
+    return [
+      // Special Bundle Deal
+      _buildShopAd(
+        title: 'BUNDLE DEALS',
+        subtitle: 'Buy 2 games, get 1 free',
+        icon: Icons.inventory_2,
+        color1: const Color(0xFF006064),
+        color2: const Color(0xFF00838F),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const CategoryPage(initialCategory: 'Bundles'),
+          ),
+        ),
+        isSponsored: true,
+      ),
+
+      // Game Pass Subscription
+      _buildShopAd(
+        title: 'GAME PASS',
+        subtitle: '30% off annual subscriptions',
+        icon: Icons.games,
+        color1: const Color(0xFF1B5E20),
+        color2: const Color(0xFF2E7D32),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const CategoryPage(initialCategory: 'Subscriptions'),
+          ),
+        ),
+        isSponsored: true,
+      ),
+
+      // Limited Edition Collection
+      _buildShopAd(
+        title: 'LIMITED EDITIONS',
+        subtitle: 'Collector\'s items now available',
+        icon: Icons.star,
+        color1: const Color(0xFF880E4F),
+        color2: const Color(0xFFC2185B),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const CategoryPage(initialCategory: 'Limited'),
+          ),
+        ),
+        isSponsored: true,
+      ),
+    ];
+  }
+
+  // No changes needed to _buildShopAd or _showAdDetails methods
+}
+
+// Add this ShoppingAdCarousel class to your file
+
+class ShoppingAdCarousel extends StatefulWidget {
+  final List<Map<String, dynamic>> ads;
+  final Function(int) onTap;
+
+  const ShoppingAdCarousel({
+    Key? key,
+    required this.ads,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  State<ShoppingAdCarousel> createState() => _ShoppingAdCarouselState();
+}
+
+class _ShoppingAdCarouselState extends State<ShoppingAdCarousel> {
+  int _currentAdIndex = 0;
+  final PageController _adController = PageController();
+  Timer? _adTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    _adTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_adController.hasClients) {
+        if (_currentAdIndex < widget.ads.length - 1) {
+          _currentAdIndex++;
+        } else {
+          _currentAdIndex = 0;
+        }
+        _adController.animateToPage(
+          _currentAdIndex,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _adTimer?.cancel();
+    _adController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 150,
+          child: PageView.builder(
+            controller: _adController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentAdIndex = index;
+              });
+            },
+            itemCount: widget.ads.length,
+            itemBuilder: (context, index) {
+              final ad = widget.ads[index];
+              return ShoppingBannerAd(
+                imagePath: ad['imagePath'],
+                title: ad['title'],
+                onTap: () => widget.onTap(index),
+                isSponsored: true,
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Ad Carousel Indicator
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            widget.ads.length,
+            (index) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 8,
+              width: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentAdIndex == index
+                    ? const Color(0xFFFF0077)
+                    : Colors.grey.shade700,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Add this ShoppingBannerAd widget class
+class ShoppingBannerAd extends StatelessWidget {
+  final String imagePath;
+  final String title;
+  final VoidCallback onTap;
+  final bool isSponsored;
+
+  const ShoppingBannerAd({
+    Key? key,
+    required this.imagePath,
+    required this.title,
+    required this.onTap,
+    this.isSponsored = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Banner Image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey.shade800,
+                  child: const Center(
+                    child: Icon(Icons.error_outline,
+                        color: Colors.white, size: 32),
+                  ),
+                ),
+              ),
+            ),
+            // Gradient overlay for text readability
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.7),
+                  ],
+                  stops: const [0.5, 1.0],
+                ),
+              ),
+            ),
+            // Ad title
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 4,
+                      color: Colors.black,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Sponsored tag
+            if (isSponsored)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0077)
+                        .withOpacity(0.8), // Pink background
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stars, color: Colors.white, size: 12),
+                      SizedBox(width: 4),
+                      Text(
+                        'SPONSORED',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -104,7 +104,7 @@ Widget build(BuildContext context) {
           Stack(
             children: [
               Container(
-                height: 240,
+                height: 340,
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   image: DecorationImage(

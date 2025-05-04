@@ -28,6 +28,7 @@ dependencies:
   shared_preferences: ^2.2.2
   intl: ^0.18.0
   fl_chart: ^0.35.0
+  firebase_crashlytics: ^4.3.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -42,6 +43,9 @@ flutter:
     - assets/images/banner1.jpg
     - assets/images/banner2.jpg
     - assets/images/banner3.jpg
+    - assets/images/ad1.jpg
+    - assets/images/ad2.jpg
+    - assets/images/ad3.jpg
     - assets/images/default_profile_picture.png
 
   fonts:

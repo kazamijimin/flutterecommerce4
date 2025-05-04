@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'product_details.dart';
 
 class CategoryPage extends StatefulWidget {
-  const CategoryPage({Key? key}) : super(key: key);
+  final String? initialCategory;
+  
+  const CategoryPage({Key? key, this.initialCategory}) : super(key: key);
 
   @override
   State<CategoryPage> createState() => _CategoryPageState();
