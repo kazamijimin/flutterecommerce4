@@ -284,22 +284,27 @@ class _ChatPageState extends State<ChatPage> {
                                   );
 
                                   final recipientDetails = _userDetails[recipientId];
-                                  final recipientName = recipientDetails?['displayName'] ?? 'Unknown User';
-                                  final photoURL = recipientDetails?['photoURL'];
+                                  final isStore = conversation['type'] == 'store';
+                                  final displayName = isStore
+                                      ? (conversation['storeName'] ?? 'Store')
+                                      : (recipientDetails?['displayName'] ?? 'Unknown User');
+                                  final avatarUrl = isStore
+                                      ? (recipientDetails?['storeAvatar'] ?? null)
+                                      : (recipientDetails?['photoURL'] ?? null);
 
                                   return ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: Colors.grey.shade800,
-                                      backgroundImage: photoURL != null
-                                          ? CachedNetworkImageProvider(photoURL)
+                                      backgroundImage: avatarUrl != null
+                                          ? CachedNetworkImageProvider(avatarUrl)
                                           : null,
-                                      child: photoURL == null
-                                          ? const Icon(Icons.person, color: Colors.white)
+                                      child: avatarUrl == null
+                                          ? Icon(isStore ? Icons.store : Icons.person, color: Colors.white)
                                           : null,
                                     ),
                                     title: Text(
-                                      recipientName,
-                                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
+                                      displayName,
+                                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
                                     ),
                                     subtitle: Row(
                                       children: [
@@ -362,11 +367,13 @@ class _ChatPageState extends State<ChatPage> {
 class ChatDetailPage extends StatefulWidget {
   final String conversationId;
   final String recipientId;
+  final String? recipientName; // <-- Add this
 
   const ChatDetailPage({
     Key? key,
     required this.conversationId,
     required this.recipientId,
+    this.recipientName, // <-- Add this
   }) : super(key: key);
 
   @override
@@ -445,9 +452,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: _isLoading
-            ? const Text('Loading...')
-            : Row(
+        title: widget.recipientName != null
+            ? Row(
                 children: [
                   CircleAvatar(
                     radius: 16,
@@ -460,9 +466,27 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                         : null,
                   ),
                   const SizedBox(width: 8),
-                  Text(_recipientData?['displayName'] ?? 'Unknown User'),
+                  Text(widget.recipientName!), // <-- Use store name if provided
                 ],
-              ),
+              )
+            : _isLoading
+                ? const Text('Loading...')
+                : Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.grey.shade800,
+                        backgroundImage: _recipientData?['photoURL'] != null
+                            ? CachedNetworkImageProvider(_recipientData!['photoURL'])
+                            : null,
+                        child: _recipientData?['photoURL'] == null
+                            ? const Icon(Icons.person, color: Colors.white, size: 16)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_recipientData?['displayName'] ?? 'Unknown User'),
+                    ],
+                  ),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
@@ -630,6 +654,39 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       ),
     );
   }
+}
+
+void startStoreChat(BuildContext context, String sellerId, String sellerName) async {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final currentUser = _auth.currentUser;
+  if (currentUser == null) return;
+
+  final conversationId = currentUser.uid.compareTo(sellerId) < 0
+      ? '${currentUser.uid}_$sellerId'
+      : '${sellerId}_${currentUser.uid}';
+
+  final conversationRef = _firestore.collection('conversations').doc(conversationId);
+  final conversationSnapshot = await conversationRef.get();
+
+  if (!conversationSnapshot.exists) {
+    await conversationRef.set({
+      'participants': [currentUser.uid, sellerId],
+      'lastMessage': '',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ChatDetailPage(
+        conversationId: conversationId,
+        recipientId: sellerId,
+        recipientName: sellerName, // <-- Pass store name here
+      ),
+    ),
+  );
 }
 
 String _formatTimestamp(Timestamp? timestamp) {

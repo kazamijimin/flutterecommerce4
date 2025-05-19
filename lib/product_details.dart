@@ -6,6 +6,7 @@ import 'package:flutterecommerce4/widgets/guest_action_bar.dart';
 import 'package:flutterecommerce4/login.dart'; // Make sure this import exists
 import 'error_messages.dart';
 import 'package:flutterecommerce4/signup.dart'; // Make sure this import exists
+import 'package:flutterecommerce4/message.dart'; // <-- Add this import
 
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
@@ -15,7 +16,7 @@ class ProductDetails extends StatefulWidget {
   final String description;
   final double rating;
   final int stockCount;
-  final String userId;
+  final String sellerId; // <-- Change from userId to sellerId
   final String category;
 
   const ProductDetails({
@@ -27,7 +28,7 @@ class ProductDetails extends StatefulWidget {
     required this.description,
     this.rating = 4.9,
     this.stockCount = 41,
-    required this.userId,
+    required this.sellerId, // <-- Change here
     this.category = "RPG",
   }) : super(key: key);
 
@@ -51,6 +52,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _reviewCount = 0;
   int _actualStockCount = 0;
   int _totalSold = 0;
+  String storeName = "Loading...";
 
   @override
   void initState() {
@@ -292,20 +294,36 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   Future<void> _fetchAddedByUserInfo() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        setState(() {
-          addedByUserName = user.displayName ?? "Guest User";
-        });
+      final sellerId = widget.sellerId; // <-- Use sellerId
+      if (sellerId.isNotEmpty) {
+        final sellerDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(sellerId)
+            .get();
+        if (sellerDoc.exists) {
+          final data = sellerDoc.data() as Map<String, dynamic>;
+          setState(() {
+            storeName = data['storeName'] ?? "Unknown Store";
+            addedByUserName = data['storeName'] ?? "Unknown Store";
+            addedByUserAvatar = data['photoURL'];
+          });
+        } else {
+          setState(() {
+            storeName = "Unknown Store";
+            addedByUserName = "Unknown Store";
+          });
+        }
       } else {
         setState(() {
-          addedByUserName = "Guest User";
+          storeName = "Unknown Store";
+          addedByUserName = "Unknown Store";
         });
       }
     } catch (e) {
-      print("Error fetching user name: $e");
+      print("Error fetching store name: $e");
       setState(() {
-        addedByUserName = "Guest User";
+        storeName = "Unknown Store";
+        addedByUserName = "Unknown Store";
       });
     }
   }
@@ -353,7 +371,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           widget.imageUrl,
           widget.price,
           quantity,
-          widget.userId,
+          widget.sellerId,
         );
 
         final productRef = FirebaseFirestore.instance
@@ -512,7 +530,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 widget.imageUrl,
                 widget.price,
                 widget.description,
-                widget.userId,
+                widget.sellerId,
               );
               setState(() {
                 _isInFavorites = !_isInFavorites;
@@ -551,7 +569,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 widget.imageUrl,
                 widget.price,
                 widget.description,
-                widget.userId,
+                widget.sellerId,
               );
               setState(() {
                 _isInWishlist = !_isInWishlist;
@@ -898,27 +916,59 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 color: Colors.cyan, size: 32),
                       ),
                       const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Added by",
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                              fontFamily: 'PixelFont',
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Store Name",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                                fontFamily: 'PixelFont',
+                              ),
                             ),
-                          ),
-                          Text(
-                            addedByUserName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'PixelFont',
+                            Text(
+                              storeName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'PixelFont',
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                      // --- Add the Chat with Seller button here ---
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                        label: const Text(
+                          "Chat with Seller",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyan,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (!_isUserLoggedIn) {
+                            MessageService.showGameMessage(
+                              context,
+                              message: 'Please log in to chat with the seller',
+                              isSuccess: false,
+                            );
+                            return;
+                          }
+                          startStoreChat(context, widget.sellerId, storeName); // Pass storeName
+                        },
                       ),
                     ],
                   ),
@@ -1185,7 +1235,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                                             description: product['description'] ?? 'No description available',
                                             rating: (product['rating'] ?? 0.0).toDouble(),
                                             stockCount: product['stockCount'] ?? 0,
-                                            userId: product['userId'] ?? '',
+                                            sellerId: product['sellerId'] ?? '', // <-- Use sellerId here
                                             category: product['category'] ?? 'Unknown',
                                           ),
                                         ),

@@ -977,6 +977,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final random = Random();
       final orderId = List.generate(12, (_) => random.nextInt(10)).join();
 
+      // You need to know the sellerId for each item.
+      // If each item already has a sellerId, skip this step.
+      // If not, and you know the sellerId (e.g., item['sellerId'] or item['userId'] is the seller), do this:
+      final itemsWithSellerId = await _addSellerIdsToItems(widget.selectedItems);
+
       // Create the order data
       final orderData = {
         'orderId': orderId,
@@ -985,7 +990,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         'shippingOption': _selectedShippingOption,
         'shippingAddress': _selectedAddress,
         'orderDate': DateTime.now().toIso8601String(),
-        'items': widget.selectedItems,
+        'items': itemsWithSellerId, // <-- use this!
         'status': 'to pay',
         'userId': user.uid,
       };
@@ -1223,6 +1228,28 @@ class _CheckoutPageState extends State<CheckoutPage> {
     },
   );
 }
+
+Future<List<Map<String, dynamic>>> _addSellerIdsToItems(List<Map<String, dynamic>> items) async {
+  List<Map<String, dynamic>> updatedItems = [];
+  for (var item in items) {
+    if (item.containsKey('sellerId') && item['sellerId'] != null) {
+      updatedItems.add(item);
+    } else {
+      // Fetch the product from Firestore to get the sellerId
+      final productDoc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(item['productId'])
+          .get();
+      final productData = productDoc.data();
+      updatedItems.add({
+        ...item,
+        'sellerId': productData?['sellerId'] ?? '',
+      });
+    }
+  }
+  return updatedItems;
+}
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

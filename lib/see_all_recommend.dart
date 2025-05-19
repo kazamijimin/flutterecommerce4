@@ -67,8 +67,8 @@ class SeeAllProductsScreen extends StatelessWidget {
                 'PHP ${productData?['price'] ?? '0.00'}', // Default to '0.00' if price is missing
                 productData?['description'] ??
                     'No description available', // Default to 'No description available'
-                productData?['userId'] ??
-                    'Unknown User', // Default to 'Unknown User' if userId is missing
+                productData?['sellerId'] ??
+                    'Unknown Seller', // Default to 'Unknown Seller' if sellerId is missing
                 product
                     .id, // Pass the Firestore document ID as the seventh argument
               );
@@ -79,7 +79,7 @@ class SeeAllProductsScreen extends StatelessWidget {
     );
   }
 Widget _buildProductCard(BuildContext context, String imageUrl, String title,
-    String price, String description, String userId, String productId) {
+    String price, String description, String sellerId, String productId) {
   return GestureDetector(
     onTap: () {
       Navigator.push(
@@ -91,7 +91,7 @@ Widget _buildProductCard(BuildContext context, String imageUrl, String title,
             title: title,
             price: price,
             description: description,
-            userId: userId,
+            sellerId: sellerId, // Use sellerId here
             rating: 0.0, // Provide a default value for rating
             stockCount: 0, // Provide a default value for stockCount
             category: 'Unknown', // Provide a default value for category

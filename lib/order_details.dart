@@ -113,116 +113,154 @@ class OrderDetailsPage extends StatelessWidget {
                   neonPink: neonPink,
                   neonBlue: neonBlue,
                   surfaceColor: surfaceColor,
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Product image with animated border
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          border: Border.all(
-                            color: neonPink,
-                            width: 2,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Product image with animated border
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.black26,
+                              border: Border.all(
+                                color: neonPink,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: neonPink.withOpacity(0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              child: Image.network(
+                                item['imageUrl'] ?? '',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      color: neonPink,
+                                      value: loadingProgress.expectedTotalBytes !=
+                                              null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: neonPink.withOpacity(0.5),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          child: Image.network(
-                            item['imageUrl'] ?? '',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                              Icons.image_not_supported,
-                              color: Colors.grey,
-                              size: 40,
-                            ),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  color: neonPink,
-                                  value: loadingProgress.expectedTotalBytes !=
-                                          null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
+                          const SizedBox(width: 16),
+                          // Product details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['title'] ?? 'Unknown Item',
+                                  style: const TextStyle(
+                                    fontFamily: 'PixelFont',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black38,
+                                    border: Border.all(
+                                      color: Colors.grey.shade700,
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Quantity: ${item['quantity']}',
+                                    style: TextStyle(
+                                      fontFamily: 'PixelFont',
+                                      fontSize: 12,
+                                      color: Colors.white.withOpacity(0.7),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: neonBlue.withOpacity(0.2),
+                                    border: Border.all(
+                                      color: neonBlue.withOpacity(0.5),
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '\$${item['price']}',
+                                    style: TextStyle(
+                                      fontFamily: 'PixelFont',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: neonBlue,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Add payment method and shipping address here
+                                Row(
+                                  children: [
+                                    Icon(Icons.payment, color: neonPink, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      order['paymentMethod'] ?? '',
+                                      style: const TextStyle(
+                                        fontFamily: 'PixelFont',
+                                        fontSize: 12,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.location_on, color: neonBlue, size: 16),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        order['shippingAddress'] ?? '',
+                                        style: const TextStyle(
+                                          fontFamily: 'PixelFont',
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Product details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['title'] ?? 'Unknown Item',
-                              style: const TextStyle(
-                                fontFamily: 'PixelFont',
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black38,
-                                border: Border.all(
-                                  color: Colors.grey.shade700,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Quantity: ${item['quantity']}',
-                                style: TextStyle(
-                                  fontFamily: 'PixelFont',
-                                  fontSize: 12,
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: neonBlue.withOpacity(0.2),
-                                border: Border.all(
-                                  color: neonBlue.withOpacity(0.5),
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '\$${item['price']}',
-                                style: TextStyle(
-                                  fontFamily: 'PixelFont',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: neonBlue,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ],
                   ),

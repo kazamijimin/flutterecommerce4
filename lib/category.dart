@@ -368,7 +368,7 @@ class _CategoryPageState extends State<CategoryPage> {
                               description: productData?['description'] ??
                                   'No description available',
                               stockCount: productData?['stockCount'] ?? 0,
-                              userId: productData?['userId'] ?? 'Unknown User',
+                              sellerId: productData?['sellerId'] ?? 'Unknown Seller', // <-- FIXED
                               category: _selectedCategory,
                             ),
                           ),

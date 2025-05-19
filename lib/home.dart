@@ -28,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   final ScrollController _productScrollController = ScrollController();
   int cartCount = 0;
   int wishlistCount = 0;
+  int notifCount = 0; // <-- Add this line
 
   // Search-related variables
   final TextEditingController _searchController = TextEditingController();
@@ -63,6 +64,7 @@ class _HomePageState extends State<HomePage> {
     _startAutoScroll();
     _loadCounts();
     _loadRecentSearches();
+    _loadNotifCount(); // <-- Add this line
 
     // Listen for search focus changes
     _searchFocusNode.addListener(() {
@@ -245,6 +247,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadNotifCount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final notifSnapshot = await FirebaseFirestore.instance
+          .collection('notifications')
+          .where('userId', isEqualTo: user.uid)
+          .where('read', isEqualTo: false)
+          .get();
+      if (mounted) {
+        setState(() {
+          notifCount = notifSnapshot.docs.length;
+        });
+      }
+    }
+  }
+
   void _scrollProducts(bool scrollLeft) {
     if (_productScrollController.hasClients) {
       final currentPosition = _productScrollController.offset;
@@ -370,6 +388,38 @@ class _HomePageState extends State<HomePage> {
                           context,
                           MaterialPageRoute(
                               builder: (context) => const NotificationsPage()));
+                    },
+                  ),
+                  if (notifCount > 0)
+                    Positioned(
+                      right: 5,
+                      top: 5,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$notifCount',
+                          style: pixelFontStyle(fontSize: 10),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.favorite, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const WishlistPage()));
                     },
                   ),
                   if (wishlistCount > 0)
@@ -696,7 +746,7 @@ class _HomePageState extends State<HomePage> {
                         price: 'PHP ${product['price'] ?? '0.00'}',
                         description: product['description'] ??
                             'No description available',
-                        userId: product['userId'] ?? 'Unknown User',
+                        sellerId: product['sellerId'] ?? 'Unknown Seller', // <-- FIXED
                         productId: product['id'],
                       ),
                     ),
@@ -987,7 +1037,7 @@ class _HomePageState extends State<HomePage> {
                         price: currentPrice,
                         description: productData['description'] ??
                             'No description available',
-                        userId: productData['userId'] ?? 'Unknown User',
+                        sellerId: productData['sellerId'] ?? 'Unknown Seller', // <-- FIXED
                         productId: productData['id'],
                         category: productData['category'] ?? 'Games',
                       ),
@@ -1406,7 +1456,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               title: product['name'] ?? 'Unknown Product',
               price: 'PHP ${product['price'] ?? '0.00'}',
               description: product['description'] ?? 'No description available',
-              userId: product['userId'] ?? 'Unknown User',
+              sellerId: product['sellerId'] ?? 'Unknown Seller', // <-- FIXED
               productId: product['id'],
             ),
           ),

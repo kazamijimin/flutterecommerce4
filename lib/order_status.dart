@@ -91,29 +91,42 @@ class OrderStatus extends StatelessWidget {
                       );
                     }
 
-                    // Calculate statistics
-                    final orders = snapshot.data!.docs;
-                    int totalOrders = orders.length;
+                    final user = FirebaseAuth.instance.currentUser;
+                    final currentUserId = user?.uid ?? '';
+
+                    // Filter orders: only include orders where at least one item was sold by the current user
+                    final sellerOrders = snapshot.data!.docs.where((order) {
+                      final data = order.data() as Map<String, dynamic>;
+                      final items = data['items'] as List<dynamic>? ?? [];
+                      return items.any((item) =>
+                        item is Map<String, dynamic> &&
+                        item['sellerId'] == currentUserId
+                      );
+                    }).toList();
+
+                    int totalOrders = sellerOrders.length;
                     double totalRevenue = 0;
 
-                    // Count status types
                     int toShip = 0;
                     int toDeliver = 0;
                     int delivered = 0;
                     int canceled = 0;
 
-                    for (var order in orders) {
+                    for (var order in sellerOrders) {
                       final data = order.data() as Map<String, dynamic>;
+                      final items = data['items'] as List<dynamic>? ?? [];
 
-                      // Add to total revenue
-                      if (data.containsKey('totalPrice')) {
-                        totalRevenue +=
-                            double.parse(data['totalPrice'].toString());
+                      // Only sum revenue for items sold by this seller
+                      for (var item in items) {
+                        if (item is Map<String, dynamic> && item['sellerId'] == currentUserId) {
+                          if (item.containsKey('price') && item['price'] != null) {
+                            totalRevenue += double.tryParse(item['price'].toString()) ?? 0;
+                          }
+                        }
                       }
 
-                      // Count by status
-                      final status =
-                          data['status']?.toString().toLowerCase() ?? '';
+                      // Count by status (order-level)
+                      final status = data['status']?.toString().toLowerCase() ?? '';
                       switch (status) {
                         case 'to ship':
                           toShip++;
@@ -125,6 +138,7 @@ class OrderStatus extends StatelessWidget {
                           delivered++;
                           break;
                         case 'canceled':
+                        case 'cancelled':
                           canceled++;
                           break;
                       }
@@ -245,7 +259,64 @@ class OrderStatus extends StatelessWidget {
                     );
                   }
 
-                  final orders = snapshot.data!.docs;
+                  final user = FirebaseAuth.instance.currentUser;
+                  final currentUserId = user?.uid ?? '';
+
+                  // DEBUG: Print all items' sellerIds
+                  for (var order in snapshot.data!.docs) {
+                    final orderData = order.data() as Map<String, dynamic>;
+                    final items = orderData['items'] as List<dynamic>? ?? [];
+                    for (var item in items) {
+                      if (item is Map<String, dynamic>) {
+                        print('Order ${order.id} item sellerId: ${item['sellerId']}');
+                      }
+                    }
+                  }
+
+                  // Filter orders: only show orders where at least one item was sold by the current user
+                  final orders = snapshot.data!.docs.where((order) {
+                    final orderData = order.data() as Map<String, dynamic>;
+                    final items = orderData['items'] as List<dynamic>? ?? [];
+                    // Only show orders where at least one item was sold by the current user (sellerId)
+                    return items.any((item) =>
+                      item is Map<String, dynamic> &&
+                      item['sellerId'] == currentUserId
+                    );
+                  }).toList();
+
+                  if (orders.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long,
+                            size: 64,
+                            color: const Color(0xFFFF0077).withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'NO ORDERS FOUND',
+                            style: TextStyle(
+                              fontFamily: 'PixelFont',
+                              color: Colors.white,
+                              fontSize: 18,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Orders will appear here',
+                            style: TextStyle(
+                              fontFamily: 'PixelFont',
+                              color: Colors.white60,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -255,8 +326,12 @@ class OrderStatus extends StatelessWidget {
                       final order = orders[index];
                       final orderData = order.data() as Map<String, dynamic>;
 
-                      // Safely handle the items field
-                      final items = orderData['items'] as List<dynamic>? ?? [];
+                      // Only show items in this order that were sold by the current user
+                      final items = (orderData['items'] as List<dynamic>? ?? [])
+                          .where((item) =>
+                              item is Map<String, dynamic> &&
+                              (item['sellerId'] == currentUserId))
+                          .toList();
 
                       // Determine status color
                       // Determine status color
@@ -837,7 +912,8 @@ class OrderStatus extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.bar_chart, color: const Color(0xFFFF0077)), // Icon for Revenue Graphs
+            leading: Icon(Icons.bar_chart,
+                color: const Color(0xFFFF0077)), // Icon for Revenue Graphs
             title: const Text(
               'Revenue Graphs',
               style: TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
@@ -927,7 +1003,7 @@ class OrderStatus extends StatelessWidget {
       case 'To Review':
         color = const Color(0xFFFF0077); // Pink
         break;
-      case 'Delivered':  // Changed from 'Completed'
+      case 'Delivered': // Changed from 'Completed'
         color = const Color(0xFF00FF66); // Green
         firestoreStatus = 'delivered'; // Changed from 'completed'
         break;
@@ -941,30 +1017,32 @@ class OrderStatus extends StatelessWidget {
         onTap: () async {
           try {
             // 1. First get the complete order document to access essential data
-            DocumentSnapshot orderDoc = await firestore.collection('orders').doc(orderId).get();
-            
+            DocumentSnapshot orderDoc =
+                await firestore.collection('orders').doc(orderId).get();
+
             if (!orderDoc.exists) {
               throw Exception("Order not found");
             }
-            
+
             // 2. Extract necessary information
-            Map<String, dynamic> orderData = orderDoc.data() as Map<String, dynamic>;
+            Map<String, dynamic> orderData =
+                orderDoc.data() as Map<String, dynamic>;
             String userId = orderData['userId'] ?? '';
             String systemOrderId = orderData['orderId'] ?? '';
-            
+
             if (userId.isEmpty || systemOrderId.isEmpty) {
               throw Exception("Invalid order data: missing userId or orderId");
             }
-            
+
             // 3. Begin a batch operation for atomicity
             WriteBatch batch = firestore.batch();
-            
+
             // 4. Update the main order document
             batch.update(firestore.collection('orders').doc(orderId), {
               'status': firestoreStatus,
               'lastUpdated': FieldValue.serverTimestamp(),
             });
-            
+
             // 5. Find the corresponding order in user's subcollection
             QuerySnapshot userOrdersQuery = await firestore
                 .collection('users')
@@ -972,7 +1050,7 @@ class OrderStatus extends StatelessWidget {
                 .collection('orders')
                 .where('orderId', isEqualTo: systemOrderId)
                 .get();
-            
+
             // 6. Update each matching user's order document
             for (var doc in userOrdersQuery.docs) {
               batch.update(doc.reference, {
@@ -980,10 +1058,10 @@ class OrderStatus extends StatelessWidget {
                 'lastUpdated': FieldValue.serverTimestamp(),
               });
             }
-            
+
             // 7. Commit the batch to ensure all updates happen or none do
             await batch.commit();
-            
+
             // 8. Show confirmation to the user
             // ignore: use_build_context_synchronously
             ScaffoldMessenger.of(context).showSnackBar(
@@ -995,14 +1073,13 @@ class OrderStatus extends StatelessWidget {
                 backgroundColor: Colors.green,
               ),
             );
-            
+
             // 9. Show delivered dialog if applicable
             if (firestoreStatus == 'delivered') {
               // Using the complete order data that we already retrieved
               // ignore: use_build_context_synchronously
               _showSalesDeliveredDialog(context, orderData);
             }
-            
           } catch (e) {
             print("Error updating order status: $e");
             // ignore: use_build_context_synchronously
@@ -1319,22 +1396,23 @@ class OrderStatus extends StatelessWidget {
 }
 // Near the bottom of the file, modify the updateOrderStatus function:
 
-Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext context) async {
+Future<void> updateOrderStatus(
+    String orderId, String newStatus, BuildContext context) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
   try {
     // 1. Convert the status to the proper format for Firestore
     String firestoreStatus = newStatus.toLowerCase();
-    
+
     // Map specific status values if needed
     if (newStatus == 'Delivered') {
       firestoreStatus = 'delivered';
     }
-    
+
     // 2. Start a batch operation
     WriteBatch batch = FirebaseFirestore.instance.batch();
-    
+
     // 3. First find the order in the main orders collection
     // This is preferable to looking up in the user collection first
     QuerySnapshot orderQuery = await FirebaseFirestore.instance
@@ -1342,22 +1420,23 @@ Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext co
         .where('orderId', isEqualTo: orderId)
         .limit(1)
         .get();
-        
+
     if (orderQuery.docs.isEmpty) {
       throw Exception("Order not found in main collection");
     }
-    
+
     // Get the main order document and its data
     DocumentReference mainOrderRef = orderQuery.docs.first.reference;
-    Map<String, dynamic> orderData = orderQuery.docs.first.data() as Map<String, dynamic>;
+    Map<String, dynamic> orderData =
+        orderQuery.docs.first.data() as Map<String, dynamic>;
     String userId = orderData['userId'];
-    
+
     // 4. Update in the main orders collection
     batch.update(mainOrderRef, {
       'status': firestoreStatus,
       'lastUpdated': FieldValue.serverTimestamp()
     });
-    
+
     // 5. Find and update in user's orders collection
     if (userId != null && userId.isNotEmpty) {
       QuerySnapshot userOrderQuery = await FirebaseFirestore.instance
@@ -1367,7 +1446,7 @@ Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext co
           .where('orderId', isEqualTo: orderId)
           .limit(1)
           .get();
-          
+
       if (userOrderQuery.docs.isNotEmpty) {
         batch.update(userOrderQuery.docs.first.reference, {
           'status': firestoreStatus,
@@ -1375,10 +1454,10 @@ Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext co
         });
       }
     }
-    
+
     // 6. Commit the batch
     await batch.commit();
-    
+
     // 7. Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1389,7 +1468,6 @@ Future<void> updateOrderStatus(String orderId, String newStatus, BuildContext co
         backgroundColor: Colors.green,
       ),
     );
-    
   } catch (e) {
     print('Error updating order status: $e');
     ScaffoldMessenger.of(context).showSnackBar(
