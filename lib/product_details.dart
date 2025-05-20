@@ -53,6 +53,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _actualStockCount = 0;
   int _totalSold = 0;
   String storeName = "Loading...";
+  List<String> _additionalImages = [];
+  bool _isDescriptionExpanded = false;
 
   @override
   void initState() {
@@ -430,6 +432,9 @@ class _ProductDetailsState extends State<ProductDetails> {
           _reviewCount = data['reviewCount'] ?? 0;
           _totalSold = data['totalSold'] ?? 0; // Add this line
 
+          // Load additional images
+          _additionalImages = List<String>.from(data['additionalImages'] ?? []);
+
           // Only use the rating if there are reviews
           if (_reviewCount > 0) {
             _averageRating = (data['rating'] ?? 0.0).toDouble();
@@ -460,14 +465,14 @@ class _ProductDetailsState extends State<ProductDetails> {
           .where(FieldPath.documentId, isNotEqualTo: widget.productId)
           .limit(6)
           .get();
-      
+
       List<Map<String, dynamic>> relatedProducts = relatedQuery.docs.map((doc) {
         return {
           'id': doc.id,
           ...doc.data(),
         };
       }).toList();
-      
+
       // If we don't have enough products in the same category
       if (relatedProducts.length < 6) {
         // Get products from other categories to fill up to 6
@@ -476,17 +481,17 @@ class _ProductDetailsState extends State<ProductDetails> {
             .where('category', isNotEqualTo: widget.category)
             .limit(6 - relatedProducts.length)
             .get();
-        
+
         final otherProducts = otherQuery.docs.map((doc) {
           return {
             'id': doc.id,
             ...doc.data(),
           };
         }).toList();
-        
+
         relatedProducts.addAll(otherProducts);
       }
-      
+
       return relatedProducts;
     } catch (e) {
       print('Error fetching related products: $e');
@@ -608,7 +613,8 @@ class _ProductDetailsState extends State<ProductDetails> {
               padding: const EdgeInsets.all(16.0),
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.black,
@@ -637,9 +643,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                       child: Image.network(
                         widget.imageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                            child: Icon(Icons.image_not_supported,
-                                color: Colors.white)),
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                                child: Icon(Icons.image_not_supported,
+                                    color: Colors.white)),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -647,15 +654,45 @@ class _ProductDetailsState extends State<ProductDetails> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.description,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontFamily: 'PixelFont',
+                          Container(
+                            width: double.infinity,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.description,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontFamily: 'PixelFont',
+                                  ),
+                                  maxLines: _isDescriptionExpanded ? null : 3,
+                                  overflow: _isDescriptionExpanded
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _isDescriptionExpanded =
+                                          !_isDescriptionExpanded;
+                                    });
+                                  },
+                                  child: Text(
+                                    _isDescriptionExpanded
+                                        ? "Show Less"
+                                        : "Show More",
+                                    style: TextStyle(
+                                      color: Colors.cyan,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'PixelFont',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            maxLines: 6,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 16),
                           Container(
@@ -663,8 +700,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                             decoration: BoxDecoration(
                               color: Colors.black45,
                               borderRadius: BorderRadius.circular(4),
-                              border:
-                                  Border.all(color: Colors.amber.withOpacity(0.5)),
+                              border: Border.all(
+                                  color: Colors.amber.withOpacity(0.5)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,23 +719,29 @@ class _ProductDetailsState extends State<ProductDetails> {
                                     ),
                                     const SizedBox(width: 8),
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: List.generate(5, (index) {
-                                            if (index < _averageRating.floor()) {
+                                            if (index <
+                                                _averageRating.floor()) {
                                               return const Icon(Icons.star,
-                                                  color: Colors.amber, size: 16);
+                                                  color: Colors.amber,
+                                                  size: 16);
                                             } else if (index ==
                                                     _averageRating.floor() &&
                                                 _averageRating -
                                                         _averageRating.floor() >
                                                     0) {
                                               return const Icon(Icons.star_half,
-                                                  color: Colors.amber, size: 16);
+                                                  color: Colors.amber,
+                                                  size: 16);
                                             } else {
-                                              return const Icon(Icons.star_border,
-                                                  color: Colors.amber, size: 16);
+                                              return const Icon(
+                                                  Icons.star_border,
+                                                  color: Colors.amber,
+                                                  size: 16);
                                             }
                                           }),
                                         ),
@@ -719,8 +762,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                                   LinearProgressIndicator(
                                     value: 1.0,
                                     backgroundColor: Colors.grey[800],
-                                    valueColor: const AlwaysStoppedAnimation<Color>(
-                                        Colors.amber),
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                            Colors.amber),
                                     minHeight: 4,
                                   ),
                                   const SizedBox(height: 4),
@@ -769,7 +813,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                                   fontFamily: 'PixelFont',
                                 ),
                               ),
-                              if (_actualStockCount < 5 && _actualStockCount > 0)
+                              if (_actualStockCount < 5 &&
+                                  _actualStockCount > 0)
                                 const Padding(
                                   padding: EdgeInsets.only(left: 8.0),
                                   child: Text(
@@ -850,6 +895,169 @@ class _ProductDetailsState extends State<ProductDetails> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_additionalImages.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4.0),
+                        child: Text(
+                          "More Views",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: MediaQuery.of(context).size.width *
+                            0.25, // Responsive height based on screen width
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            // Limited preview of images (max 4)
+                            for (int i = 0;
+                                i <
+                                    (_additionalImages.length > 4
+                                        ? 4
+                                        : _additionalImages.length);
+                                i++)
+                              GestureDetector(
+                                onTap: () {
+                                  // Replace the main image with this one
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => Dialog(
+                                      backgroundColor: Colors.transparent,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            child: Image.network(
+                                              _additionalImages[i],
+                                              fit: BoxFit.contain,
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .height *
+                                                  0.6, // Responsive height
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.pink,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              "Close",
+                                              style: TextStyle(
+                                                fontFamily: 'PixelFont',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: MediaQuery.of(context).size.width *
+                                      0.25, // Responsive width
+                                  height: MediaQuery.of(context).size.width *
+                                      0.25, // Responsive height
+                                  margin: EdgeInsets.only(
+                                      right: MediaQuery.of(context).size.width *
+                                          0.02), // Responsive margin
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Colors.pink.withOpacity(0.7),
+                                        width: 1.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(7),
+                                    child: Image.network(
+                                      _additionalImages[i],
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, _) =>
+                                          const Center(
+                                        child: Icon(Icons.broken_image,
+                                            color: Colors.grey,
+                                            size: 32), // Larger icon
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // "+X more" button if more than 4 images
+                            if (_additionalImages.length > 4)
+                              GestureDetector(
+                                onTap: () => _showAllImages(context),
+                                child: Container(
+                                  width: MediaQuery.of(context).size.width *
+                                      0.25, // Responsive width
+                                  height: MediaQuery.of(context).size.width *
+                                      0.25, // Responsive height
+                                  decoration: BoxDecoration(
+                                    color: Colors.black38,
+                                    border: Border.all(
+                                        color: Colors.pink.withOpacity(0.7),
+                                        width: 1.5), // Thicker border
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "+${_additionalImages.length - 4}",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.055, // Responsive font size
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'PixelFont',
+                                        ),
+                                      ),
+                                      Text(
+                                        "more",
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.035, // Responsive font size
+                                          fontFamily: 'PixelFont',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Add more spacing here after the image gallery
+                      const SizedBox(height: 24), // Increase from 16 to 24
+                    ],
+                  ],
+                ),
+// Add this before the Add to Cart button
+                const SizedBox(height: 16),
+
+// Then the existing Add to Cart button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -906,10 +1114,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 child: Image.network(
                                   addedByUserAvatar!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, _) => const Icon(
-                                      Icons.person,
-                                      color: Colors.cyan,
-                                      size: 32),
+                                  errorBuilder: (context, error, _) =>
+                                      const Icon(Icons.person,
+                                          color: Colors.cyan, size: 32),
                                 ),
                               )
                             : const Icon(Icons.person,
@@ -942,7 +1149,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                       ),
                       // --- Add the Chat with Seller button here ---
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                        icon: const Icon(Icons.chat_bubble_outline,
+                            color: Colors.white),
                         label: const Text(
                           "Chat with Seller",
                           style: TextStyle(
@@ -953,7 +1161,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.cyan,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -967,7 +1176,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                             );
                             return;
                           }
-                          startStoreChat(context, widget.sellerId, storeName); // Pass storeName
+                          startStoreChat(context, widget.sellerId,
+                              storeName); // Pass storeName
                         },
                       ),
                     ],
@@ -1042,11 +1252,13 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 fillColor: Colors.black45,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(color: Colors.grey[700]!),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[700]!),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.cyan),
+                                  borderSide:
+                                      const BorderSide(color: Colors.cyan),
                                 ),
                               ),
                             ),
@@ -1057,7 +1269,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 onPressed: _submitReview,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.amber,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                 ),
                                 child: const Text(
                                   "SUBMIT REVIEW",
@@ -1116,7 +1329,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                                     const SnackBar(
                                       content: Text(
                                         'You can only review products from completed orders.',
-                                        style: TextStyle(fontFamily: 'PixelFont'),
+                                        style:
+                                            TextStyle(fontFamily: 'PixelFont'),
                                       ),
                                       backgroundColor: Colors.red,
                                     ),
@@ -1124,7 +1338,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.grey[800],
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                 ),
                                 child: const Text(
                                   "COMPLETE AN ORDER FIRST",
@@ -1172,7 +1387,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                         child: Row(
                           children: [
-                            const Icon(Icons.whatshot, color: Colors.orange, size: 24),
+                            const Icon(Icons.whatshot,
+                                color: Colors.orange, size: 24),
                             const SizedBox(width: 8),
                             const Text(
                               'PRODUCTS YOU MAY ALSO LIKE',
@@ -1191,9 +1407,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                         child: FutureBuilder<List<Map<String, dynamic>>>(
                           future: _fetchRelatedProducts(),
                           builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
                               return const Center(
-                                child: CircularProgressIndicator(color: Colors.orange),
+                                child: CircularProgressIndicator(
+                                    color: Colors.orange),
                               );
                             }
 
@@ -1213,11 +1431,12 @@ class _ProductDetailsState extends State<ProductDetails> {
 
                             return ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: relatedProducts.length,
                               itemBuilder: (context, index) {
                                 final product = relatedProducts[index];
-                                
+
                                 return Container(
                                   width: 140,
                                   margin: const EdgeInsets.only(right: 12),
@@ -1230,38 +1449,55 @@ class _ProductDetailsState extends State<ProductDetails> {
                                           builder: (context) => ProductDetails(
                                             productId: product['id'],
                                             imageUrl: product['imageUrl'] ?? '',
-                                            title: product['name'] ?? 'Unknown Product',
-                                            price: product['price']?.toString() ?? '0.00',
-                                            description: product['description'] ?? 'No description available',
-                                            rating: (product['rating'] ?? 0.0).toDouble(),
-                                            stockCount: product['stockCount'] ?? 0,
-                                            sellerId: product['sellerId'] ?? '', // <-- Use sellerId here
-                                            category: product['category'] ?? 'Unknown',
+                                            title: product['name'] ??
+                                                'Unknown Product',
+                                            price:
+                                                product['price']?.toString() ??
+                                                    '0.00',
+                                            description:
+                                                product['description'] ??
+                                                    'No description available',
+                                            rating: (product['rating'] ?? 0.0)
+                                                .toDouble(),
+                                            stockCount:
+                                                product['stockCount'] ?? 0,
+                                            sellerId: product['sellerId'] ??
+                                                '', // <-- Use sellerId here
+                                            category: product['category'] ??
+                                                'Unknown',
                                           ),
                                         ),
                                       );
                                     },
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         // Product Image
                                         Container(
                                           height: 140,
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: Colors.grey[700]!),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                                color: Colors.grey[700]!),
                                           ),
                                           child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(5),
+                                            borderRadius:
+                                                BorderRadius.circular(5),
                                             child: Image.network(
                                               product['imageUrl'] ?? '',
                                               fit: BoxFit.cover,
                                               width: double.infinity,
-                                              errorBuilder: (context, error, stackTrace) {
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
                                                 return Container(
                                                   color: Colors.grey[900],
                                                   child: const Center(
-                                                    child: Icon(Icons.image_not_supported, color: Colors.grey),
+                                                    child: Icon(
+                                                        Icons
+                                                            .image_not_supported,
+                                                        color: Colors.grey),
                                                   ),
                                                 );
                                               },
@@ -1292,7 +1528,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                                         // Small rating display
                                         Row(
                                           children: [
-                                            const Icon(Icons.star, color: Colors.amber, size: 12),
+                                            const Icon(Icons.star,
+                                                color: Colors.amber, size: 12),
                                             const SizedBox(width: 2),
                                             Text(
                                               '${(product['rating'] ?? 0.0).toStringAsFixed(1)}',
@@ -1317,11 +1554,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                if (!_isUserLoggedIn) 
-                  const SizedBox(height: 80),
+                if (!_isUserLoggedIn) const SizedBox(height: 80),
               ],
             ),
-            
+
             // Show the guest action bar at the bottom if user is not logged in
             if (!_isUserLoggedIn)
               Positioned(
@@ -1331,17 +1567,15 @@ class _ProductDetailsState extends State<ProductDetails> {
                 child: GuestActionBar(
                   message: 'Log in to add items to cart and make purchases',
                   onLogin: () {
-                    Navigator.push(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const Login())
-                    );
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => const Login()));
                   },
                   onSignup: () {
                     // Change this to navigate directly to Signup() instead of Login with isSignUp
                     Navigator.push(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const Signup())
-                    );
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const Signup()));
                   },
                 ),
               ),
@@ -1360,6 +1594,200 @@ class _ProductDetailsState extends State<ProductDetails> {
           color: Colors.grey,
           fontSize: 14,
           fontFamily: 'PixelFont',
+        ),
+      ),
+    );
+  }
+
+  void _showAllImages(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: screenSize.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(screenSize.width * 0.04),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "All Product Images",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.grey),
+            Expanded(
+              child: GridView.builder(
+                padding: EdgeInsets.all(screenSize.width * 0.04),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: screenSize.width > 600
+                      ? 3
+                      : 2, // More columns on larger screens
+                  crossAxisSpacing: screenSize.width * 0.03,
+                  mainAxisSpacing: screenSize.width * 0.03,
+                  childAspectRatio: 1,
+                ),
+                itemCount: _additionalImages.length + 1, // +1 for main image
+                itemBuilder: (context, index) {
+                  String imageUrl = index == 0
+                      ? widget.imageUrl
+                      : _additionalImages[index - 1];
+
+                  return GestureDetector(
+                    onTap: () {
+                      // Show full screen image view with improved UI
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => Scaffold(
+                            backgroundColor: Colors.black,
+                            appBar: AppBar(
+                              backgroundColor: Colors.black,
+                              iconTheme:
+                                  const IconThemeData(color: Colors.white),
+                              title: Text(
+                                "Image ${index + 1}/${_additionalImages.length + 1}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ),
+                            body: SafeArea(
+                              child: Stack(
+                                children: [
+                                  Center(
+                                    child: InteractiveViewer(
+                                      minScale: 0.5,
+                                      maxScale: 4.0,
+                                      child: Hero(
+                                        tag: "product_image_$index",
+                                        child: Image.network(
+                                          imageUrl,
+                                          fit: BoxFit.contain,
+                                          loadingBuilder:
+                                              (context, child, progress) {
+                                            if (progress == null) return child;
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                value: progress
+                                                            .expectedTotalBytes !=
+                                                        null
+                                                    ? progress
+                                                            .cumulativeBytesLoaded /
+                                                        progress
+                                                            .expectedTotalBytes!
+                                                    : null,
+                                                color: Colors.cyan,
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  const Center(
+                                            child: Icon(
+                                              Icons.error_outline,
+                                              color: Colors.red,
+                                              size: 48,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 20,
+                                    left: 0,
+                                    right: 0,
+                                    child: Center(
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: screenSize.width * 0.04,
+                                            vertical: screenSize.width * 0.02),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.7),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          "Pinch to zoom",
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontFamily: 'PixelFont',
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Hero(
+                      tag: "product_image_$index",
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  index == 0 ? Colors.pink : Colors.grey[700]!,
+                              width: index == 0 ? 2.0 : 1.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 5,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -4,6 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'add_product.dart'; // Import the AddProduct widget for navigation
 import 'seller_dashboard.dart'; // Import for navigation
 import 'order_status.dart'; // Import for navigation
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as path;
 
 class YourProducts extends StatelessWidget {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -496,159 +500,501 @@ class YourProducts extends StatelessWidget {
     final TextEditingController nameController = TextEditingController(text: data['name'] ?? '');
     final TextEditingController priceController = TextEditingController(text: (data['price'] ?? '0').toString());
     final TextEditingController descriptionController = TextEditingController(text: data['description'] ?? '');
+    final TextEditingController imageUrlController = TextEditingController(text: data['imageUrl'] ?? '');
     
     // Check if availability exists, default to true if it doesn't
     bool availability = data.containsKey('availability') ? data['availability'] : true;
+    String? previewImageUrl = data['imageUrl'];
+    bool isImageValid = previewImageUrl != null && previewImageUrl.isNotEmpty;
     
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
+            return Dialog(
               backgroundColor: const Color(0xFF1A1A2E),
-              title: const Text(
-                'EDIT PRODUCT',
-                style: TextStyle(
-                  color: Colors.pink,
-                  fontFamily: 'PixelFont',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: SingleChildScrollView(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                width: MediaQuery.of(context).size.width * 0.9,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(
-                      controller: nameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.pink),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.cyan),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: priceController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.pink),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.cyan),
-                        ),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.pink),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.cyan),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Availability toggle
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Availability:',
+                          'EDIT PRODUCT',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: Colors.cyan,
                             fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
                           ),
                         ),
-                        Switch(
-                          value: availability,
-                          onChanged: (bool value) {
-                            setState(() {
-                              availability = value;
-                            });
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Colors.pink, thickness: 1),
+                    const SizedBox(height: 16),
+                    // Image Preview and Editor
+                    Container(
+                      height: 180,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.pink.withOpacity(0.5)),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (isImageValid)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(7),
+                              child: Image.network(
+                                previewImageUrl!,
+                                fit: BoxFit.cover,
+                                height: double.infinity,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  setState(() => isImageValid = false);
+                                  return _buildImagePlaceholder();
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.cyan,
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            _buildImagePlaceholder(),
+                          Positioned(
+                            bottom: 10,
+                            right: 10,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.photo_library, color: Colors.pink),
+                                    onPressed: () async {
+                                      final url = await _pickAndUploadImage(context);
+                                      if (url != null) {
+                                        setState(() {
+                                          previewImageUrl = url;
+                                          isImageValid = true;
+                                        });
+                                      }
+                                    },
+                                    tooltip: 'Choose from Gallery',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.link, color: Colors.cyan),
+                                    onPressed: () {
+                                      _showImageUrlInputDialog(
+                                        context, 
+                                        imageUrlController,
+                                        (url) {
+                                          setState(() {
+                                            previewImageUrl = url;
+                                            isImageValid = url.isNotEmpty;
+                                          });
+                                        }
+                                      );
+                                    },
+                                    tooltip: 'Enter Image URL',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Form Fields
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: nameController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Name',
+                                labelStyle: const TextStyle(color: Colors.cyan),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.pink, width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.cyan, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.black.withOpacity(0.3),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: priceController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Price',
+                                labelStyle: const TextStyle(color: Colors.cyan),
+                                prefixText: '¥ ',
+                                prefixStyle: const TextStyle(color: Colors.cyan),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.pink, width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.cyan, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.black.withOpacity(0.3),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: descriptionController,
+                              style: const TextStyle(color: Colors.white),
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                labelText: 'Description',
+                                alignLabelWithHint: true,
+                                labelStyle: const TextStyle(color: Colors.cyan),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.pink, width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.cyan, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.black.withOpacity(0.3),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Availability toggle
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.pink),
+                                color: Colors.black.withOpacity(0.3),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Product Visibility:',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontFamily: 'PixelFont',
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        availability ? 'VISIBLE' : 'HIDDEN',
+                                        style: TextStyle(
+                                          color: availability ? Colors.green : Colors.red,
+                                          fontFamily: 'PixelFont',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Switch(
+                                        value: availability,
+                                        onChanged: (bool value) {
+                                          setState(() {
+                                            availability = value;
+                                          });
+                                        },
+                                        activeColor: Colors.green,
+                                        activeTrackColor: Colors.green.withOpacity(0.4),
+                                        inactiveThumbColor: Colors.red,
+                                        inactiveTrackColor: Colors.red.withOpacity(0.4),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          child: const Text(
+                            'CANCEL',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontFamily: 'PixelFont',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              // Validate price is a number
+                              double price;
+                              try {
+                                price = double.parse(priceController.text);
+                              } catch (e) {
+                                price = 0; // Default value if parsing fails
+                              }
+                              
+                              await _firestore.collection('products').doc(product.id).update({
+                                'name': nameController.text,
+                                'price': price,
+                                'description': descriptionController.text,
+                                'imageUrl': previewImageUrl,
+                                'availability': availability,
+                                'lastUpdated': FieldValue.serverTimestamp(),
+                              });
+                              
+                              Navigator.pop(context);
+                              
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: const [
+                                      Icon(Icons.check_circle, color: Colors.white),
+                                      SizedBox(width: 8),
+                                      Text('Product updated successfully!'),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } catch (e) {
+                              // Show error snackbar
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           },
-                          activeColor: Colors.green,
-                          inactiveThumbColor: Colors.red,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.pink,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.save),
+                              SizedBox(width: 8),
+                              Text(
+                                'SAVE CHANGES',
+                                style: TextStyle(
+                                  fontFamily: 'PixelFont',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'CANCEL',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      // Validate price is a number
-                      double price;
-                      try {
-                        price = double.parse(priceController.text);
-                      } catch (e) {
-                        price = 0; // Default value if parsing fails
-                      }
-                      
-                      await _firestore.collection('products').doc(product.id).update({
-                        'name': nameController.text,
-                        'price': price,
-                        'description': descriptionController.text,
-                        'availability': availability,
-                        'lastUpdated': FieldValue.serverTimestamp(),
-                      });
-                      
-                      Navigator.pop(context);
-                    } catch (e) {
-                      // Show error snackbar
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pink,
-                  ),
-                  child: const Text(
-                    'SAVE',
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
             );
           }
         );
       },
     );
+  }
+  
+  // Helper method to build image placeholder
+  Widget _buildImagePlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.image, size: 64, color: Colors.grey.withOpacity(0.5)),
+        const SizedBox(height: 8),
+        const Text(
+          'NO IMAGE AVAILABLE',
+          style: TextStyle(
+            color: Colors.grey,
+            fontFamily: 'PixelFont',
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Method to show image URL input dialog
+  void _showImageUrlInputDialog(BuildContext context, TextEditingController controller, Function(String) onConfirm) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          title: const Text(
+            'EDIT IMAGE URL',
+            style: TextStyle(
+              color: Colors.pink,
+              fontFamily: 'PixelFont',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Image URL',
+              labelStyle: const TextStyle(color: Colors.cyan),
+              hintText: 'Enter image URL here',
+              hintStyle: TextStyle(color: Colors.grey.withOpacity(0.7)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.pink),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.cyan, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.black.withOpacity(0.3),
+            ),
+            onChanged: (value) {
+              // You could add live preview here in a more complex implementation
+            },
+          ),
+          actions: [
+            TextButton(
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(color: Colors.white70, fontFamily: 'PixelFont'),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                onConfirm(controller.text.trim());
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pink,
+              ),
+              child: const Text(
+                'CONFIRM',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Add this method to handle image picking and uploading
+  Future<String?> _pickAndUploadImage(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      
+      if (image == null) return null;
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Colors.pink),
+                SizedBox(height: 16),
+                Text(
+                  'UPLOADING...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // Upload image to Firebase Storage
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(image.path)}';
+      final Reference storageRef = FirebaseStorage.instance.ref().child('products/$fileName');
+      final UploadTask uploadTask = storageRef.putFile(File(image.path));
+      
+      // Get download URL
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      return downloadUrl;
+    } catch (e) {
+      // Close loading dialog if open
+      Navigator.pop(context);
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return null;
+    }
   }
 }

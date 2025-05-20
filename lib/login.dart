@@ -20,7 +20,8 @@ class _LoginState extends State<Login> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-
+  
+  bool _obscurePassword = true; // Add this for password visibility toggle
   bool _isLoading = false;
   late bool _isSignUp;
 
@@ -579,6 +580,10 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
+    // Get screen size for responsive design
+    final Size screenSize = MediaQuery.of(context).size;
+    final bool isSmallScreen = screenSize.width < 380;
+    
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -587,9 +592,9 @@ class _LoginState extends State<Login> {
           SingleChildScrollView(
             child: Column(
               children: [
-                // Cyberpunk city image without back button
+                // Cyberpunk city image with responsive height
                 SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.4,
+                  height: screenSize.height * (isSmallScreen ? 0.35 : 0.4),
                   child: Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
@@ -607,15 +612,18 @@ class _LoginState extends State<Login> {
                   width: double.infinity,
                   child: Column(
                     children: [
-                      // Title section - modify to show the correct title based on _isSignUp
+                      // Title section with responsive padding
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isSmallScreen ? 15 : 20,
+                          horizontal: isSmallScreen ? 10 : 20,
+                        ),
                         child: Column(
                           children: [
                             Text(
                               _isSignUp ? "Create Account" : "Log in",
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: isSmallScreen ? 24 : 28,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.pink[400],
                                 fontFamily: 'PixelFont',
@@ -627,16 +635,17 @@ class _LoginState extends State<Login> {
                                 ? "Sign up to start your gaming journey" 
                                 : "Log in to continue shopping",
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: isSmallScreen ? 12 : 14,
                                 color: Colors.pink[200],
                                 fontFamily: 'PixelFont',
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
                       ),
 
-                      // Form section with gray divider
+                      // Form section with responsive padding
                       Container(
                         decoration: const BoxDecoration(
                           border: Border(
@@ -647,13 +656,18 @@ class _LoginState extends State<Login> {
                           ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                          padding: EdgeInsets.fromLTRB(
+                            screenSize.width * 0.05, 
+                            16, 
+                            screenSize.width * 0.05, 
+                            0
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Email TextField - Styled like pixel art
+                              // Email TextField
                               Container(
-                                height: 50,
+                                height: isSmallScreen ? 45 : 50,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFDDDDDD),
                                   borderRadius: BorderRadius.circular(4),
@@ -661,15 +675,17 @@ class _LoginState extends State<Login> {
                                 ),
                                 child: TextField(
                                   controller: _emailController,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.black,
                                     fontFamily: 'PixelFont',
+                                    fontSize: isSmallScreen ? 14 : 16,
                                   ),
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: "Email",
                                     hintStyle: TextStyle(
                                       color: Colors.black54,
                                       fontFamily: 'PixelFont',
+                                      fontSize: isSmallScreen ? 14 : 16,
                                     ),
                                     border: InputBorder.none,
                                     contentPadding:
@@ -677,11 +693,11 @@ class _LoginState extends State<Login> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: isSmallScreen ? 10 : 12),
 
-                              // Password TextField - Styled like pixel art
+                              // Password TextField with corrected alignment
                               Container(
-                                height: 50,
+                                height: isSmallScreen ? 45 : 50,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFDDDDDD),
                                   borderRadius: BorderRadius.circular(4),
@@ -689,30 +705,49 @@ class _LoginState extends State<Login> {
                                 ),
                                 child: TextField(
                                   controller: _passwordController,
-                                  obscureText: true,
-                                  style: const TextStyle(
+                                  obscureText: _obscurePassword,
+                                  style: TextStyle(
                                     color: Colors.black,
                                     fontFamily: 'PixelFont',
+                                    fontSize: isSmallScreen ? 14 : 16,
                                   ),
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: "Password",
                                     hintStyle: TextStyle(
                                       color: Colors.black54,
                                       fontFamily: 'PixelFont',
+                                      fontSize: isSmallScreen ? 14 : 16,
                                     ),
                                     border: InputBorder.none,
-                                    contentPadding:
-                                        EdgeInsets.symmetric(horizontal: 12),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12, 
+                                      vertical: isSmallScreen ? 12 : 14
+                                    ),
+                                    suffixIcon: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: Icon(
+                                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                        color: Colors.black54,
+                                        size: isSmallScreen ? 20 : 24,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                    isDense: true, // This helps with vertical alignment
+                                    alignLabelWithHint: true, // This helps align the hint text properly
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              SizedBox(height: isSmallScreen ? 16 : 20),
 
-                              // Submit button
+                              // Submit button with responsive height
                               Container(
                                 width: double.infinity,
-                                height: 56,
-                                margin: const EdgeInsets.only(bottom: 24),
+                                height: isSmallScreen ? 50 : 56,
+                                margin: EdgeInsets.only(bottom: isSmallScreen ? 20 : 24),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFFF0066),
                                   borderRadius: BorderRadius.circular(4),
@@ -724,12 +759,12 @@ class _LoginState extends State<Login> {
                                           valueColor: AlwaysStoppedAnimation<Color>(
                                               Colors.black),
                                         )
-                                      : const Text(
+                                      : Text(
                                           'LOG IN',
                                           style: TextStyle(
                                             color: Colors.black,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 16,
+                                            fontSize: isSmallScreen ? 14 : 16,
                                             letterSpacing: 1.5,
                                             fontFamily: 'PixelFont',
                                           ),
@@ -737,13 +772,13 @@ class _LoginState extends State<Login> {
                                 ),
                               ),
 
-                              // Social login buttons
+                              // Social login buttons with responsive height
                               Row(
                                 children: [
                                   // Google Sign In button
                                   Expanded(
                                     child: Container(
-                                      height: 44,
+                                      height: isSmallScreen ? 40 : 44,
                                       margin: const EdgeInsets.only(right: 6),
                                       child: OutlinedButton.icon(
                                         onPressed: signInWithGoogle,
@@ -756,15 +791,15 @@ class _LoginState extends State<Login> {
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                         ),
-                                        icon: const Icon(
+                                        icon: Icon(
                                           FontAwesomeIcons.google,
-                                          size: 16,
+                                          size: isSmallScreen ? 14 : 16,
                                         ),
-                                        label: const Text(
+                                        label: Text(
                                           "Google",
                                           style: TextStyle(
                                             fontFamily: 'PixelFont',
-                                            fontSize: 14,
+                                            fontSize: isSmallScreen ? 12 : 14,
                                           ),
                                         ),
                                       ),
@@ -774,7 +809,7 @@ class _LoginState extends State<Login> {
                                   // Apple Sign In button
                                   Expanded(
                                     child: Container(
-                                      height: 44,
+                                      height: isSmallScreen ? 40 : 44,
                                       margin: const EdgeInsets.only(left: 6),
                                       child: OutlinedButton.icon(
                                         onPressed: signInWithApple,
@@ -787,15 +822,15 @@ class _LoginState extends State<Login> {
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                         ),
-                                        icon: const Icon(
+                                        icon: Icon(
                                           FontAwesomeIcons.apple,
-                                          size: 16,
+                                          size: isSmallScreen ? 14 : 16,
                                         ),
-                                        label: const Text(
+                                        label: Text(
                                           "iOS Apple",
                                           style: TextStyle(
                                             fontFamily: 'PixelFont',
-                                            fontSize: 14,
+                                            fontSize: isSmallScreen ? 12 : 14,
                                           ),
                                         ),
                                       ),
@@ -803,9 +838,9 @@ class _LoginState extends State<Login> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: isSmallScreen ? 10 : 12),
 
-                              // Forgot password link
+                              // Forgot password link with responsive font size
                               Center(
                                 child: TextButton(
                                   onPressed: () {
@@ -822,26 +857,27 @@ class _LoginState extends State<Login> {
                                     minimumSize: const Size(50, 30),
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     "Forgot password?",
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: isSmallScreen ? 11 : 12,
                                       fontFamily: 'PixelFont',
                                     ),
                                   ),
                                 ),
                               ),
 
-                              // Toggle between login and signup
+                              // Toggle between login and signup with responsive font size
                               TextButton(
                                 onPressed: _toggleAuthMode,
                                 child: Text(
                                   _isSignUp
                                       ? 'Already have an account? Log in'
                                       : 'Need an account? Sign up',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.cyan,
                                     fontFamily: 'PixelFont',
+                                    fontSize: isSmallScreen ? 12 : 14,
                                   ),
                                 ),
                               ),
@@ -856,20 +892,20 @@ class _LoginState extends State<Login> {
             ),
           ),
           
-          // Back button overlay
+          // Back button overlay with responsive position
           Positioned(
-            top: 40,
-            left: 16,
+            top: MediaQuery.of(context).padding.top + (isSmallScreen ? 5 : 10),
+            left: isSmallScreen ? 10 : 16,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(30),
               ),
               child: IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back,
                   color: Colors.white,
-                  size: 24,
+                  size: isSmallScreen ? 20 : 24,
                 ),
                 onPressed: () {
                   Navigator.of(context).pop();

@@ -526,428 +526,419 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        backgroundColor: AppColors.background,
-        onRefresh: () async {
-          await _loadUser();
-          await _loadFavorites();
-          await _loadPurchases();
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              // Top profile bar with edit button - Improved design
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.border, width: 1),
-                  ),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            // Top profile bar with edit button - Improved design
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.border, width: 1),
                 ),
-                child: Row(
-                  children: [
-                    // Profile picture with glowing effect
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.5),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: userPhotoUrl != null
-                            ? Image.network(
-                                userPhotoUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: AppColors.surface,
-                                    child: Icon(
-                                      Icons.person,
-                                      size: 40,
-                                      color: AppColors.primary,
-                                    ),
-                                  );
-                                },
-                              )
-                            : Image.asset(
-                                'assets/images/default_profile_picture.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: AppColors.surface,
-                                    child: Icon(
-                                      Icons.person,
-                                      size: 40,
-                                      color: AppColors.primary,
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
+              ),
+              child: Row(
+                children: [
+                  // Profile picture with glowing effect
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.5),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    
-                    // Username and level
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            userName,
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 24,
+                    child: ClipOval(
+                      child: userPhotoUrl != null
+                          ? Image.network(
+                              userPhotoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppColors.surface,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: AppColors.primary,
+                                  ),
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              'assets/images/default_profile_picture.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppColors.surface,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: AppColors.primary,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Username and level
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 24,
+                            fontFamily: 'PixelFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.tertiary, AppColors.primary],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'LVL ${userData?['level'] ?? 100}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
                               fontFamily: 'PixelFont',
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [AppColors.tertiary, AppColors.primary],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'LVL ${userData?['level'] ?? 100}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: 'PixelFont',
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          if (sellerStatus == "approved")
-                            Row(
-                              children: [
-                                Icon(Icons.verified, color: AppColors.secondary, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Verified Seller',
-                                  style: TextStyle(
-                                    color: AppColors.secondary,
-                                    fontSize: 14,
-                                    fontFamily: 'PixelFont',
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (sellerStatus == "approved")
+                          Row(
+                            children: [
+                              Icon(Icons.verified, color: AppColors.secondary, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Verified Seller',
+                                style: TextStyle(
+                                  color: AppColors.secondary,
+                                  fontSize: 14,
+                                  fontFamily: 'PixelFont',
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Edit profile button - improved design
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            spreadRadius: 1,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const EditProfileScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.edit, color: Colors.white, size: 16),
-                        label: const Text(
-                          'Edit',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'PixelFont',
-                            fontSize: 14,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Stats bar - Improved with cards
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    // Total Games Card
-                    Expanded(
-                      child: _buildStatsCard(
-                        'Total Games',
-                        '$totalPurchases',
-                        Icons.games,
-                        Colors.pink.shade400,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    
-                    // Friends Card
-                    Expanded(
-                      child: _buildStatsCard(
-                        'Friends',
-                        '${userData?['friendCount'] ?? 1}',
-                        Icons.people,
-                        Colors.purple.shade400,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    
-                    // Order History Card with button
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _navigateToMyOrders,
-                        child: _buildStatsCard(
-                          'Orders',
-                          'View',
-                          Icons.history,
-                          Colors.cyan.shade400,
-                          isButton: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Favorites section header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.favorite, color: Colors.pink.shade400, size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'FAVOURITES',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontFamily: 'PixelFont',
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
                       ],
                     ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: Colors.grey.shade400),
-                      onPressed: _fetchFavorites,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Favorites grid - improved styling
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: favorites.isNotEmpty
-                    ? GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.75,
-                        ),
-                        itemCount: favorites.length,
-                        itemBuilder: (context, index) {
-                          final favorite = favorites[index];
-                          return _buildFavoriteItem(favorite);
-                        },
-                      )
-                    : Container(
-                        padding: const EdgeInsets.all(32),
-                        margin: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade900.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade800),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.favorite_border,
-                                color: Colors.pink.shade300, size: 48),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No favorites yet',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 18,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Heart your favorite games to see them here',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 14,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Additional options section - improved styling
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade900.withOpacity(0.3),
-                  border: Border(
-                    top: BorderSide(color: Colors.grey.shade800),
-                    bottom: BorderSide(color: Colors.grey.shade800),
                   ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.cyan.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.settings, color: Colors.cyan),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'ACCOUNT SETTINGS',
-                          style: TextStyle(
-                            color: Colors.cyan,
-                            fontSize: 16,
-                            fontFamily: 'PixelFont',
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
+                  
+                  // Edit profile button - improved design
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit, color: Colors.white, size: 16),
+                      label: const Text(
+                        'Edit',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'PixelFont',
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                    // Options buttons - with improved styling
-                    if (isAdmin)
-                      _buildNavButton(
-                        'Admin Dashboard', 
-                        _navigateToAdminDashboard,
-                        icon: Icons.admin_panel_settings,
-                        gradient: LinearGradient(
-                          colors: [Colors.red.shade700, Colors.purple.shade900],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    _buildNavButton(
-                      'My Orders', 
-                      _navigateToMyOrders,
-                      icon: Icons.history,
+            // Stats bar - Improved with cards
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  // Total Games Card
+                  Expanded(
+                    child: _buildStatsCard(
+                      'Total Games',
+                      '$totalPurchases',
+                      Icons.games,
+                      Colors.pink.shade400,
                     ),
-                    if (sellerStatus == "approved")
-                      _buildNavButton(
-                        'Manage Store',
-                        _navigateToSellerDashboard,
-                        icon: Icons.store,
-                        gradient: LinearGradient(
-                          colors: [Colors.cyan.shade700, Colors.blue.shade900],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    if (sellerStatus == "notApplied")
-                      _buildNavButton(
-                        'Become a Seller',
-                        _navigateToSeller,
-                        icon: Icons.store,
-                      ),
-                    if (sellerStatus == "pending")
-                      _buildNavButton(
-                        'Check Application Status',
-                        _showSellerStatusDialog,
-                        icon: Icons.hourglass_top,
-                        gradient: LinearGradient(
-                          colors: [Colors.amber.shade700, Colors.orange.shade900],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    _buildNavButton(
-                      'Shipping Address',
-                      _navigateToShippingAddress,
-                      icon: Icons.local_shipping,
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Friends Card
+                  Expanded(
+                    child: _buildStatsCard(
+                      'Friends',
+                      '${userData?['friendCount'] ?? 1}',
+                      Icons.people,
+                      Colors.purple.shade400,
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Order History Card with button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _navigateToMyOrders,
+                      child: _buildStatsCard(
+                        'Orders',
+                        'View',
+                        Icons.history,
+                        Colors.cyan.shade400,
+                        isButton: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Favorites section header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, color: Colors.pink.shade400, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'FAVOURITES',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontFamily: 'PixelFont',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: Colors.grey.shade400),
+                    onPressed: _fetchFavorites,
+                  ),
+                ],
+              ),
+            ),
+
+            // Favorites grid - improved styling
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: favorites.isNotEmpty
+                  ? GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemCount: favorites.length,
+                      itemBuilder: (context, index) {
+                        final favorite = favorites[index];
+                        return _buildFavoriteItem(favorite);
+                      },
+                    )
+                  : Container(
+                      padding: const EdgeInsets.all(32),
+                      margin: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade900.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade800),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.favorite_border,
+                              color: Colors.pink.shade300, size: 48),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No favorites yet',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 18,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Heart your favorite games to see them here',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Additional options section - improved styling
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade900.withOpacity(0.3),
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade800),
+                  bottom: BorderSide(color: Colors.grey.shade800),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.cyan.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.settings, color: Colors.cyan),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'ACCOUNT SETTINGS',
+                        style: TextStyle(
+                          color: Colors.cyan,
+                          fontSize: 16,
+                          fontFamily: 'PixelFont',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Options buttons - with improved styling
+                  if (isAdmin)
                     _buildNavButton(
-                      'Logout', 
-                      _handleLogout,
-                      isDestructive: true, 
-                      icon: Icons.logout,
+                      'Admin Dashboard', 
+                      _navigateToAdminDashboard,
+                      icon: Icons.admin_panel_settings,
                       gradient: LinearGradient(
-                        colors: [Colors.red.shade700, Colors.red.shade900],
+                        colors: [Colors.red.shade700, Colors.purple.shade900],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-              
-              // Footer with version info
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Cyberpunk Games v1.0',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                    fontFamily: 'PixelFont',
+                  _buildNavButton(
+                    'My Orders', 
+                    _navigateToMyOrders,
+                    icon: Icons.history,
                   ),
+                  if (sellerStatus == "approved")
+                    _buildNavButton(
+                      'Manage Store',
+                      _navigateToSellerDashboard,
+                      icon: Icons.store,
+                      gradient: LinearGradient(
+                        colors: [Colors.cyan.shade700, Colors.blue.shade900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  if (sellerStatus == "notApplied")
+                    _buildNavButton(
+                      'Become a Seller',
+                      _navigateToSeller,
+                      icon: Icons.store,
+                    ),
+                  if (sellerStatus == "pending")
+                    _buildNavButton(
+                      'Check Application Status',
+                      _showSellerStatusDialog,
+                      icon: Icons.hourglass_top,
+                      gradient: LinearGradient(
+                        colors: [Colors.amber.shade700, Colors.orange.shade900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  _buildNavButton(
+                    'Shipping Address',
+                    _navigateToShippingAddress,
+                    icon: Icons.local_shipping,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNavButton(
+                    'Logout', 
+                    _handleLogout,
+                    isDestructive: true, 
+                    icon: Icons.logout,
+                    gradient: LinearGradient(
+                      colors: [Colors.red.shade700, Colors.red.shade900],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+            
+            // Footer with version info
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Cyberpunk Games v1.0',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontSize: 12,
+                  fontFamily: 'PixelFont',
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
