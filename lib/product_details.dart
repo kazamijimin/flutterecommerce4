@@ -9,11 +9,16 @@ import 'package:flutterecommerce4/signup.dart'; // Make sure this import exists
 import 'package:flutterecommerce4/message.dart'; // <-- Add this import
 import 'store_profile.dart';
 import 'user_review.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
   final String imageUrl;
   final String title;
   final String price;
+  final String? discountedPrice; // Add this
   final String description;
   final double rating;
   final int stockCount;
@@ -26,11 +31,12 @@ class ProductDetails extends StatefulWidget {
     required this.imageUrl,
     required this.title,
     required this.price,
+    this.discountedPrice, // Add this
     required this.description,
+    required this.sellerId, // Add this
+    required this.category, // Add this
     this.rating = 4.9,
     this.stockCount = 41,
-    required this.sellerId, // <-- Change here
-    this.category = "RPG",
   }) : super(key: key);
 
   @override
@@ -56,6 +62,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   String storeName = "Loading...";
   List<String> _additionalImages = [];
   bool _isDescriptionExpanded = false;
+  List<File> _reviewImages = [];
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -196,104 +204,93 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
-  // Update your _submitReview method
-  void _submitReview() async {
-    // First check if user can add review
-    if (!_canAddReview) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You can only review products from completed orders.',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_reviewController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please write a review before submitting.',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final review = Review(
-        username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
-        comment: _reviewController.text.trim(),
-        rating: _userRating,
-        avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
-        date: DateTime.now().toIso8601String(),
-      );
-
-      // Submit the review
-      await _reviewService.submitReview(widget.productId, review);
-
-      // Update the product document with new rating average
-      final productRef = FirebaseFirestore.instance
-          .collection('products')
-          .doc(widget.productId);
-
-      // Get the current product data
-      final productDoc = await productRef.get();
-      if (productDoc.exists) {
-        final productData = productDoc.data() as Map<String, dynamic>;
-        final int currentReviewCount = productData['reviewCount'] ?? 0;
-        final double currentRating = productData['rating'] ?? 0.0;
-
-        // Calculate new average rating
-        final double totalRatingPoints = currentRating * currentReviewCount;
-        final int newReviewCount = currentReviewCount + 1;
-        final double newAverageRating =
-            (totalRatingPoints + _userRating) / newReviewCount;
-
-        // Update the product with new rating data
-        await productRef.update({
-          'rating': newAverageRating,
-          'reviewCount': newReviewCount,
-          'lastReviewed': FieldValue.serverTimestamp(),
-        });
-
-        // Update local state
-// In your _submitReview method, make sure to update these lines
-        setState(() {
-          _reviews.add(review);
-          _reviewController.clear();
-          _userRating = 5.0; // Reset rating
-          _averageRating = newAverageRating;
-          _reviewCount = newReviewCount;
-        });
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Review submitted successfully!',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to submit review: $e',
-            style: const TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  // Update in your _submitReview method
+void _submitReview() async {
+  // First check if user can add review
+  if (!_canAddReview) {
+    MessageService.showGameMessage(
+      context,
+      message: 'You can only review products from completed orders',
+      isSuccess: false,
+    );
+    return;
   }
+
+  if (_reviewController.text.trim().isEmpty) {
+    MessageService.showGameMessage(
+      context,
+      message: 'Please write a review before submitting',
+      isSuccess: false,
+    );
+    return;
+  }
+
+  try {
+    // Upload images first
+    List<String> imageUrls = await _uploadReviewImages();
+
+    final review = Review(
+      username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
+      comment: _reviewController.text.trim(),
+      rating: _userRating,
+      avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
+      date: DateTime.now().toIso8601String(),
+      images: imageUrls,
+    );
+
+    // Submit the review
+    await _reviewService.submitReview(widget.productId, review);
+
+    // Update the product document with new rating average
+    final productRef = FirebaseFirestore.instance
+        .collection('products')
+        .doc(widget.productId);
+
+    // Get the current product data
+    final productDoc = await productRef.get();
+    if (productDoc.exists) {
+      final productData = productDoc.data() as Map<String, dynamic>;
+      final int currentReviewCount = productData['reviewCount'] ?? 0;
+      final double currentRating = productData['rating'] ?? 0.0;
+
+      // Calculate new average rating
+      final double totalRatingPoints = currentRating * currentReviewCount;
+      final int newReviewCount = currentReviewCount + 1;
+      final double newAverageRating =
+          (totalRatingPoints + _userRating) / newReviewCount;
+
+      // Update the product with new rating data
+      await productRef.update({
+        'rating': newAverageRating,
+        'reviewCount': newReviewCount,
+        'lastReviewed': FieldValue.serverTimestamp(),
+      });
+
+      // Update local state
+      setState(() {
+        _reviews.add(review);
+        _reviewController.clear();
+        _userRating = 5.0;
+        _averageRating = newAverageRating;
+        _reviewCount = newReviewCount;
+        _reviewImages.clear();
+      });
+
+      // Show success message using MessageService
+      MessageService.showGameMessage(
+        context,
+        message: 'Review submitted successfully! Thanks for your feedback!',
+        isSuccess: true,
+      );
+    }
+  } catch (e) {
+    MessageService.showGameMessage(
+      context,
+      message: 'Failed to submit review: ${e.toString()}',
+      isSuccess: false,
+    );
+  }
+}
 
   Future<void> _fetchAddedByUserInfo() async {
     try {
@@ -513,6 +510,45 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
+  Future<void> _pickImage() async {
+    if (_reviewImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Maximum 5 images allowed',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _reviewImages.add(File(image.path));
+      });
+    }
+  }
+
+  Future<List<String>> _uploadReviewImages() async {
+    List<String> imageUrls = [];
+    
+    for (File image in _reviewImages) {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('review_images')
+          .child('${DateTime.now().millisecondsSinceEpoch}_${imageUrls.length}.jpg');
+
+      await storageRef.putFile(image);
+      String downloadUrl = await storageRef.getDownloadURL();
+      imageUrls.add(downloadUrl);
+    }
+
+    return imageUrls;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -668,6 +704,61 @@ class _ProductDetailsState extends State<ProductDetails> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Add price display here
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (widget.discountedPrice != null) ...[
+                                Text(
+                                  'PHP ${widget.discountedPrice}',
+                                  style: const TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'PixelFont',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'PHP ${widget.price}',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 16,
+                                    decoration: TextDecoration.lineThrough,
+                                    fontFamily: 'PixelFont',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red[700],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '-${_calculateDiscountPercentage(widget.price, widget.discountedPrice!)}%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'PixelFont',
+                                    ),
+                                  ),
+                                ),
+                              ] else ...[
+                                Text(
+                                  'PHP ${widget.price}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'PixelFont',
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 16),
                           Container(
                             width: double.infinity,
                             child: Column(
@@ -1078,6 +1169,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                     onPressed: widget.stockCount > 0 ? _addToCart : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.pink,
+                      foregroundColor: Colors.black, // Changed to black
+
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       textStyle: const TextStyle(
                         fontSize: 16,
@@ -1095,6 +1188,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                     onPressed: widget.stockCount > 0 ? _buyNow : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
+                      foregroundColor: Colors.black, // Changed to black
+
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       textStyle: const TextStyle(
                         fontSize: 16,
@@ -1134,19 +1229,24 @@ class _ProductDetailsState extends State<ProductDetails> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.cyan, width: 2),
+                                    border: Border.all(
+                                        color: Colors.cyan, width: 2),
                                   ),
                                   child: addedByUserAvatar != null
                                       ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(24),
+                                          borderRadius:
+                                              BorderRadius.circular(24),
                                           child: Image.network(
                                             addedByUserAvatar!,
                                             fit: BoxFit.cover,
                                             errorBuilder: (context, error, _) =>
-                                                const Icon(Icons.person, color: Colors.cyan, size: 32),
+                                                const Icon(Icons.person,
+                                                    color: Colors.cyan,
+                                                    size: 32),
                                           ),
                                         )
-                                      : const Icon(Icons.person, color: Colors.cyan, size: 32),
+                                      : const Icon(Icons.person,
+                                          color: Colors.cyan, size: 32),
                                 ),
                                 const SizedBox(width: 16),
                                 Column(
@@ -1187,7 +1287,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                              icon: const Icon(Icons.chat_bubble_outline,
+                                  color: Colors.white),
                               label: const Text(
                                 "CHAT",
                                 style: TextStyle(
@@ -1198,7 +1299,8 @@ class _ProductDetailsState extends State<ProductDetails> {
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.cyan,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1207,12 +1309,14 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 if (!_isUserLoggedIn) {
                                   MessageService.showGameMessage(
                                     context,
-                                    message: 'Please log in to chat with the seller',
+                                    message:
+                                        'Please log in to chat with the seller',
                                     isSuccess: false,
                                   );
                                   return;
                                 }
-                                startStoreChat(context, widget.sellerId, storeName);
+                                startStoreChat(
+                                    context, widget.sellerId, storeName);
                               },
                             ),
                           ),
@@ -1298,6 +1402,100 @@ class _ProductDetailsState extends State<ProductDetails> {
                                   borderSide:
                                       const BorderSide(color: Colors.cyan),
                                 ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              height: 100,
+                              child: Row(
+                                children: [
+                                  // Add Image Button
+                                  if (_reviewImages.length < 5)
+                                    GestureDetector(
+                                      onTap: _pickImage,
+                                      child: Container(
+                                        width: 100,
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black45,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: Colors.grey[700]!),
+                                        ),
+                                        child: const Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.add_photo_alternate,
+                                                color: Colors.grey, size: 32),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              "Add Image",
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12,
+                                                fontFamily: 'PixelFont',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  
+                                  // Selected Images
+                                  Expanded(
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: _reviewImages.length,
+                                      itemBuilder: (context, index) {
+                                        return Stack(
+                                          children: [
+                                            Container(
+                                              width: 100,
+                                              height: 100,
+                                              margin: const EdgeInsets.only(right: 8),
+                                              decoration: BoxDecoration(
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: Colors.grey[700]!),
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: Image.file(
+                                                  _reviewImages[index],
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 4,
+                                              right: 12,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _reviewImages.removeAt(index);
+                                                  });
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.black54,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.close,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1492,6 +1690,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                                             price:
                                                 product['price']?.toString() ??
                                                     '0.00',
+                                            discountedPrice: product['discountedPrice']?.toString(), // Add this line
                                             description:
                                                 product['description'] ??
                                                     'No description available',
@@ -1830,6 +2029,18 @@ class _ProductDetailsState extends State<ProductDetails> {
       ),
     );
   }
+
+  // Add this method to your _ProductDetailsState class
+  String _calculateDiscountPercentage(String originalPrice, String discountedPrice) {
+    // Remove any currency symbols and convert to double
+    double original = double.parse(originalPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
+    double discounted = double.parse(discountedPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
+    
+    if (original <= 0) return '0';
+    
+    double percentage = ((original - discounted) / original * 100).round().toDouble();
+    return percentage.toStringAsFixed(0);
+  }
 }
 
 // Review Item Widget
@@ -1939,6 +2150,97 @@ class ReviewItem extends StatelessWidget {
               fontSize: 14,
             ),
           ),
+
+          // Review Images
+          if (review.images.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: review.images.map((imageUrl) {
+                return GestureDetector(
+                  onTap: () {
+                    // Show full screen image view with improved UI
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          backgroundColor: Colors.black,
+                          appBar: AppBar(
+                            backgroundColor: Colors.black,
+                            iconTheme: const IconThemeData(color: Colors.white),
+                            title: const Text(
+                              "Review Image",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ),
+                          body: SafeArea(
+                            child: Center(
+                              child: InteractiveViewer(
+                                minScale: 0.5,
+                                maxScale: 4.0,
+                                child: Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.contain,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        value: progress.expectedTotalBytes !=
+                                                null
+                                            ? progress.cumulativeBytesLoaded /
+                                                progress.expectedTotalBytes!
+                                            : null,
+                                        color: Colors.cyan,
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                      size: 48,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[700]!),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -1954,6 +2256,7 @@ class Review {
   final String date;
   final String? userId;
   final String? productId;
+  final List<String> images;
 
   Review({
     required this.username,
@@ -1963,6 +2266,7 @@ class Review {
     required this.date,
     this.userId,
     this.productId,
+    this.images = const [], // Add this
   });
 
   Map<String, dynamic> toMap() {
@@ -1974,6 +2278,7 @@ class Review {
       'date': date,
       'userId': userId,
       'productId': productId,
+      'images': images,
     };
   }
 
@@ -1986,6 +2291,7 @@ class Review {
       date: map['date'] ?? '',
       userId: map['userId'],
       productId: map['productId'],
+      images: List<String>.from(map['images'] ?? []),
     );
   }
 }
@@ -2122,6 +2428,7 @@ class ReviewService {
         rating: (data['rating'] ?? 0).toDouble(),
         avatarUrl: data['avatarUrl'],
         date: data['date'] ?? '',
+        images: List<String>.from(data['images'] ?? []), // Add this line
       );
     }).toList();
   }
@@ -2129,7 +2436,8 @@ class ReviewService {
   Future<void> submitReview(String productId, Review review) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User must be logged in to submit review');
+      if (user == null)
+        throw Exception('User must be logged in to submit review');
 
       final reviewsRef = FirebaseFirestore.instance
           .collection('products')
@@ -2145,6 +2453,7 @@ class ReviewService {
         'date': review.date,
         'userId': user.uid,
         'productId': productId,
+        'images': review.images, // Add this line
       });
 
       // Also store in user's reviews collection for easy access to user's review history
@@ -2160,6 +2469,7 @@ class ReviewService {
         'date': review.date,
         'productId': productId,
         'userId': user.uid,
+        'images': review.images, // Add this line
       });
     } catch (e) {
       print('Error submitting review: $e');
@@ -2183,6 +2493,7 @@ class ReviewService {
           rating: (data['rating'] ?? 0).toDouble(),
           avatarUrl: data['avatarUrl'],
           date: data['date'] ?? '',
+          images: List<String>.from(data['images'] ?? []), // Add this line
         );
       }).toList();
     } catch (e) {

@@ -11,7 +11,106 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  final Map<String, bool> _selectedItems = {}; // Track selected items
+  final Map<String, bool> _selectedItems = {};
+  List<QueryDocumentSnapshot> _cartItems = []; // Store cart items
+  bool _isLoading = true;
+  final Map<String, Map<String, dynamic>> _productCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCartItems();
+  }
+
+  // Load cart items once
+  Future<void> _loadCartItems() async {
+    setState(() => _isLoading = true);
+    _productCache.clear(); // Clear cache when reloading
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('cart')
+            .get();
+
+        setState(() {
+          _cartItems = snapshot.docs;
+          _isLoading = false;
+          
+          // Initialize selected items
+          for (var item in _cartItems) {
+            if (!_selectedItems.containsKey(item.id)) {
+              _selectedItems[item.id] = false;
+            }
+          }
+        });
+      } catch (e) {
+        print('Error loading cart items: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Update quantity locally and in Firestore
+  Future<void> _updateQuantity(String itemId, int newQuantity) async {
+    if (newQuantity < 1) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Update Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('cart')
+          .doc(itemId)
+          .update({'quantity': newQuantity});
+
+      // Update local state without fetching from Firestore again
+      setState(() {
+        final itemIndex = _cartItems.indexWhere((item) => item.id == itemId);
+        if (itemIndex != -1) {
+          // Update the quantity in the local data
+          final currentItem = _cartItems[itemIndex];
+          final updatedData = (currentItem.data() as Map<String, dynamic>)..['quantity'] = newQuantity;
+          
+          // Update the item in the list while maintaining the correct type
+          _cartItems = List.from(_cartItems)
+            ..[itemIndex] = currentItem;
+        }
+      });
+    } catch (e) {
+      print('Error updating quantity: $e');
+    }
+  }
+
+  // Delete item locally and from Firestore
+  Future<void> _deleteItem(String itemId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Delete from Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('cart')
+          .doc(itemId)
+          .delete();
+
+      // Update local state
+      setState(() {
+        _cartItems.removeWhere((item) => item.id == itemId);
+        _selectedItems.remove(itemId);
+      });
+    } catch (e) {
+      print('Error deleting item: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,17 +123,12 @@ class _CartPageState extends State<CartPage> {
             'Please log in to view your cart.',
             style: TextStyle(
               color: Colors.white,
-              fontFamily: 'PixelFont', // Apply PixelFont
+              fontFamily: 'PixelFont',
             ),
           ),
         ),
       );
     }
-
-    final cartRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('cart');
 
     return Scaffold(
       appBar: AppBar(
@@ -43,471 +137,414 @@ class _CartPageState extends State<CartPage> {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            fontFamily: 'PixelFont', // Apply PixelFont
+            fontFamily: 'PixelFont',
           ),
         ),
         backgroundColor: Colors.black,
         centerTitle: true,
+        actions: [
+          // Add refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCartItems,
+          ),
+        ],
       ),
       backgroundColor: Colors.black,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: cartRef.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+      body: _isLoading
+          ? const Center(
               child: CircularProgressIndicator(color: Colors.cyan),
-            );
-          }
+            )
+          : _cartItems.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Your cart is empty.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadCartItems,
+                        color: Colors.cyan,
+                        backgroundColor: Colors.grey.shade900,
+                        child: ListView.builder(
+                          itemCount: _cartItems.length,
+                          itemBuilder: (context, index) {
+                            final item = _cartItems[index];
+                            final itemData = item.data() as Map<String, dynamic>;
+                            final isSelected = _selectedItems[item.id] ?? false;
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Your cart is empty.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PixelFont', // Apply PixelFont
-                ),
-              ),
-            );
-          }
+                            // Get item title/name
+                            final itemTitle = itemData['title'] ?? itemData['name'] ?? 'Unknown Item';
 
-          final items = snapshot.data!.docs;
+                            // Use the price as stored
+                            final priceDisplay = itemData['price']?.toString() ?? '0.00';
 
-          // Initialize selected items for new documents if not already set
-          for (var item in items) {
-            if (!_selectedItems.containsKey(item.id)) {
-              _selectedItems[item.id] = false;
-            }
-          }
+                            final itemQuantity = itemData['quantity'] ?? 1;
+                            final itemImageUrl = itemData['imageUrl'] ?? '';
 
-          // Calculate the total price here based on current selections
-          final totalPrice = _calculateTotalPrice(items);
+                            // Game item card design that matches the image
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                border: Border.all(color: Colors.grey.shade800),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Item image
+                                  Container(
+                                    width: 120,
+                                    height: 80,
+                                    child: Image.network(
+                                      itemImageUrl,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  // Item details
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            itemTitle,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                            ),
+                                          ),
+                                          Text(
+                                            "$priceDisplay",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                            ),
+                                          ),
+                                          
+                                          // Add stock availability message
+                                          FutureBuilder<Map<String, dynamic>>(
+                                            future: _getProductAvailability(itemData['productId'], itemTitle),
+                                            builder: (context, snapshot) {
+                                              if (!snapshot.hasData) {
+                                                return const SizedBox.shrink();
+                                              }
 
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final itemData = item.data() as Map<String, dynamic>;
-                    final isSelected = _selectedItems[item.id] ?? false;
-
-                    // Get item title/name
-                    final itemTitle = itemData['title'] ?? itemData['name'] ?? 'Unknown Item';
-
-                    // Use the price as stored
-                    final priceDisplay = itemData['price']?.toString() ?? '0.00';
-
-                    final itemQuantity = itemData['quantity'] ?? 1;
-                    final itemImageUrl = itemData['imageUrl'] ?? '';
-
-                    // Game item card design that matches the image
-                    return Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        border: Border.all(color: Colors.grey.shade800),
+                                              final productData = snapshot.data!;
+                                              final stockCount = productData['stockCount'] ?? 0;
+                                              final availability = productData['availability'] ?? true;
+                                              final archived = productData['archived'] ?? false;
+                                              
+                                              if (!availability || archived) {
+                                                return const Text(
+                                                  "Not available/Out of Stock",
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontFamily: 'PixelFont',
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                );
+                                              } else if (stockCount <= 3 && stockCount > 0) {
+                                                return const Text(
+                                                  "Hurry, about to stock out!",
+                                                  style: TextStyle(
+                                                    color: Colors.amber,
+                                                    fontFamily: 'PixelFont',
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                );
+                                              } else if (stockCount <= 0) {
+                                                return const Text(
+                                                  "Not available/Out of Stock",
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontFamily: 'PixelFont',
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                );
+                                              }
+                                              
+                                              return const SizedBox.shrink();
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Quantity controls and checkbox
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () async {
+                                              if (itemQuantity > 1) {
+                                                await _updateQuantity(item.id, itemQuantity - 1);
+                                              }
+                                            },
+                                            child: Container(
+                                              width: 24,
+                                              height: 24,
+                                              alignment: Alignment.center,
+                                              child: const Text(
+                                                "-",
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'PixelFont', // Apply PixelFont
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                                            child: Text(
+                                              itemQuantity.toString(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontFamily: 'PixelFont', // Apply PixelFont
+                                              ),
+                                            ),
+                                          ),
+                                          InkWell(
+                                            onTap: () async {
+                                              await _updateQuantity(item.id, itemQuantity + 1);
+                                            },
+                                            child: Container(
+                                              width: 24,
+                                              height: 24,
+                                              alignment: Alignment.center,
+                                              child: const Text(
+                                                "+",
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'PixelFont', // Apply PixelFont
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.white),
+                                            ),
+                                            child: Checkbox(
+                                              value: isSelected,
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _selectedItems[item.id] = value ?? false;
+                                                });
+                                              },
+                                              fillColor: MaterialStateProperty.resolveWith<Color>(
+                                                (Set<MaterialState> states) {
+                                                  if (states.contains(MaterialState.selected)) {
+                                                    return Colors.transparent;
+                                                  }
+                                                  return Colors.transparent;
+                                                },
+                                              ),
+                                              checkColor: Colors.white,
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            "Confirm",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      // Add delete button
+                                      const SizedBox(height: 8),
+                                      InkWell(
+                                        onTap: () => _confirmDelete(context, item.id, itemTitle),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.red),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            "Delete",
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                              fontFamily: 'PixelFont',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 16),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      child: Row(
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.black,
+                      child: Column(
                         children: [
-                          // Item image
-                          Container(
-                            width: 120,
-                            height: 80,
-                            child: Image.network(
-                              itemImageUrl,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          // Item details
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    itemTitle,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'PixelFont', // Apply PixelFont
-                                    ),
-                                  ),
-                                  Text(
-                                    "$priceDisplay",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontFamily: 'PixelFont', // Apply PixelFont
-                                    ),
-                                  ),
-                                  
-                                  // Add stock availability message
-                                  FutureBuilder<DocumentSnapshot>(
-                                    future: itemData['productId'] != null 
-                                        ? FirebaseFirestore.instance
-                                            .collection('products')
-                                            .doc(itemData['productId'])
-                                            .get()
-                                        : null, // Use null instead of _findProductByName for now
-                                    builder: (context, snapshot) {
-                                      // Debug: Print productId to verify it exists
-                                      print('Product ID for ${itemTitle}: ${itemData['productId']}');
-                                      
-                                      if (snapshot.connectionState == ConnectionState.waiting) {
-                                        return const Text(
-                                          "Checking availability...",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontFamily: 'PixelFont',
-                                            fontSize: 12,
-                                          ),
-                                        );
-                                      }
-                                      
-                                      // If we don't have a product ID, try looking up the product by name
-                                      if (itemData['productId'] == null) {
-                                        // Trigger product lookup but don't wait for result in builder
-                                        _findAndUpdateProductId(itemTitle);
-                                        
-                                        return const Text(
-                                          "Product information unavailable",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontFamily: 'PixelFont',
-                                            fontSize: 12,
-                                          ),
-                                        );
-                                      }
-                                      
-                                      if (snapshot.hasError) {
-                                        print('Error loading product: ${snapshot.error}');
-                                        return const Text(
-                                          "Error checking stock",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontFamily: 'PixelFont',
-                                            fontSize: 12,
-                                          ),
-                                        );
-                                      }
-                                      
-                                      if (snapshot.hasData && snapshot.data!.exists) {
-                                        final productData = snapshot.data!.data() as Map<String, dynamic>;
-                                        final stockCount = productData['stockCount'] ?? 0;
-                                        final availability = productData['availability'] ?? true;
-                                        final archived = productData['archived'] ?? false;
-                                        
-                                        if (!availability || archived) {
-                                          return const Text(
-                                            "Not available/Out of Stock",
-                                            style: TextStyle(
-                                              color: Colors.red,
-                                              fontFamily: 'PixelFont',
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          );
-                                        } else if (stockCount <= 3 && stockCount > 0) {
-                                          return const Text(
-                                            "Hurry, about to stock out!",
-                                            style: TextStyle(
-                                              color: Colors.amber,
-                                              fontFamily: 'PixelFont',
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          );
-                                        } else if (stockCount <= 0) {
-                                          return const Text(
-                                            "Not available/Out of Stock",
-                                            style: TextStyle(
-                                              color: Colors.red,
-                                              fontFamily: 'PixelFont',
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                      
-                                      return const SizedBox.shrink();
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Quantity controls and checkbox
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  InkWell(
-                                    onTap: () async {
-                                      if (itemQuantity > 1) {
-                                        await cartRef.doc(item.id).update({
-                                          'quantity': itemQuantity - 1,
-                                        });
-                                      }
-                                    },
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      alignment: Alignment.center,
-                                      child: const Text(
-                                        "-",
-                                        style: TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'PixelFont', // Apply PixelFont
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                    child: Text(
-                                      itemQuantity.toString(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'PixelFont', // Apply PixelFont
-                                      ),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () async {
-                                      await cartRef.doc(item.id).update({
-                                        'quantity': itemQuantity + 1,
-                                      });
-                                    },
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      alignment: Alignment.center,
-                                      child: const Text(
-                                        "+",
-                                        style: TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'PixelFont', // Apply PixelFont
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                "Total",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont', // Apply PixelFont
+                                ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.white),
-                                    ),
-                                    child: Checkbox(
-                                      value: isSelected,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _selectedItems[item.id] = value ?? false;
-                                        });
-                                      },
-                                      fillColor: MaterialStateProperty.resolveWith<Color>(
-                                        (Set<MaterialState> states) {
-                                          if (states.contains(MaterialState.selected)) {
-                                            return Colors.transparent;
-                                          }
-                                          return Colors.transparent;
-                                        },
-                                      ),
-                                      checkColor: Colors.white,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    "Confirm",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontFamily: 'PixelFont', // Apply PixelFont
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Add delete button
-                              const SizedBox(height: 8),
-                              InkWell(
-                                onTap: () => _confirmDelete(context, item.id, itemTitle),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.red),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    "Delete",
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                      fontFamily: 'PixelFont',
-                                    ),
-                                  ),
+                              Text(
+                                'PHP ${_calculateTotalPrice(_cartItems).toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont', // Apply PixelFont
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(width: 16),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.black,
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Total",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'PixelFont', // Apply PixelFont
-                          ),
-                        ),
-                        Text(
-                          'PHP ${totalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'PixelFont', // Apply PixelFont
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _selectedItems.values.contains(true)
-                          ? () async {
-                              // Check stock availability before proceeding to checkout
-                              bool hasOutOfStockItems = false;
-                              List<String> outOfStockItemNames = [];
-                              
-                              // Create a list to store selected items that are in stock
-                              final selectedItems = <Map<String, dynamic>>[];
-                              
-                              for (var item in items) {
-                                if (_selectedItems[item.id] ?? false) {
-                                  final data = item.data() as Map<String, dynamic>;
-                                  final itemName = data['title'] ?? data['name'] ?? 'Unknown Item';
-                                  final productId = data['productId'];
-                                  
-                                  if (productId != null) {
-                                    // Check product availability in Firestore
-                                    final productDoc = await FirebaseFirestore.instance
-                                        .collection('products')
-                                        .doc(productId)
-                                        .get();
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _selectedItems.values.contains(true)
+                                ? () async {
+                                    // Check stock availability before proceeding to checkout
+                                    bool hasOutOfStockItems = false;
+                                    List<String> outOfStockItemNames = [];
                                     
-                                    if (productDoc.exists) {
-                                      final productData = productDoc.data() as Map<String, dynamic>;
-                                      final stockCount = productData['stockCount'] ?? 0;
-                                      final availability = productData['availability'] ?? true;
-                                      final archived = productData['archived'] ?? false;
-                                      
-                                      if (!availability || archived || stockCount <= 0) {
-                                        hasOutOfStockItems = true;
-                                        outOfStockItemNames.add(itemName);
-                                        continue; // Skip this item
+                                    // Create a list to store selected items that are in stock
+                                    final selectedItems = <Map<String, dynamic>>[];
+                                    
+                                    for (var item in _cartItems) {
+                                      if (_selectedItems[item.id] ?? false) {
+                                        final data = item.data() as Map<String, dynamic>;
+                                        final itemName = data['title'] ?? data['name'] ?? 'Unknown Item';
+                                        final productId = data['productId'];
+                                        
+                                        if (productId != null) {
+                                          // Check product availability in Firestore
+                                          final productDoc = await FirebaseFirestore.instance
+                                              .collection('products')
+                                              .doc(productId)
+                                              .get();
+                                          
+                                          if (productDoc.exists) {
+                                            final productData = productDoc.data() as Map<String, dynamic>;
+                                            final stockCount = productData['stockCount'] ?? 0;
+                                            final availability = productData['availability'] ?? true;
+                                            final archived = productData['archived'] ?? false;
+                                            
+                                            if (!availability || archived || stockCount <= 0) {
+                                              hasOutOfStockItems = true;
+                                              outOfStockItemNames.add(itemName);
+                                              continue; // Skip this item
+                                            }
+                                          }
+                                        }
+                                        
+                                        // Only add in-stock items to the selectedItems list
+                                        selectedItems.add({
+                                          'title': itemName,
+                                          'price': data['price'],
+                                          'quantity': data['quantity'] ?? 1,
+                                          'imageUrl': data['imageUrl'] ?? '',
+                                          'productId': productId,
+                                        });
                                       }
                                     }
+                                    
+                                    if (hasOutOfStockItems) {
+                                      // Show error message for out of stock items
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Cannot proceed with checkout. The following items are out of stock: ${outOfStockItemNames.join(", ")}',
+                                            style: const TextStyle(fontFamily: 'PixelFont'),
+                                          ),
+                                          backgroundColor: Colors.red,
+                                          duration: const Duration(seconds: 5),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    if (selectedItems.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'No valid items selected for checkout',
+                                            style: TextStyle(fontFamily: 'PixelFont'),
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    // If we reach here, all selected items are in stock
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CheckoutPage(
+                                          totalPrice: _calculateTotalPrice(_cartItems),
+                                          selectedItems: selectedItems,
+                                        ),
+                                      ),
+                                    );
                                   }
-                                  
-                                  // Only add in-stock items to the selectedItems list
-                                  selectedItems.add({
-                                    'title': itemName,
-                                    'price': data['price'],
-                                    'quantity': data['quantity'] ?? 1,
-                                    'imageUrl': data['imageUrl'] ?? '',
-                                    'productId': productId,
-                                  });
-                                }
-                              }
-                              
-                              if (hasOutOfStockItems) {
-                                // Show error message for out of stock items
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Cannot proceed with checkout. The following items are out of stock: ${outOfStockItemNames.join(", ")}',
-                                      style: const TextStyle(fontFamily: 'PixelFont'),
-                                    ),
-                                    backgroundColor: Colors.red,
-                                    duration: const Duration(seconds: 5),
-                                  ),
-                                );
-                                return;
-                              }
-                              
-                              if (selectedItems.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'No valid items selected for checkout',
-                                      style: TextStyle(fontFamily: 'PixelFont'),
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-                              
-                              // If we reach here, all selected items are in stock
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CheckoutPage(
-                                    totalPrice: totalPrice,
-                                    selectedItems: selectedItems,
-                                  ),
-                                ),
-                              );
-                            }
-                          : null, // Disable button if no items are selected
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pink,
-                        minimumSize: const Size(double.infinity, 50),
-                      ),
-                      child: const Text(
-                        'Check Out',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'PixelFont', // Apply PixelFont
-                        ),
+                                : null, // Disable button if no items are selected
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.pink,
+                              minimumSize: const Size(double.infinity, 50),
+                            ),
+                            child: const Text(
+                              'Check Out',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFamily: 'PixelFont', // Apply PixelFont
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
-      ),
     );
   }
 
@@ -725,5 +762,44 @@ class _CartPageState extends State<CartPage> {
         ],
       ),
     );
+  }
+
+  // Add this helper method to your _CartPageState class
+  Future<Map<String, dynamic>> _getProductAvailability(String? productId, String itemTitle) async {
+    // Check cache first
+    if (productId != null && _productCache.containsKey(productId)) {
+      return _productCache[productId]!;
+    }
+
+    try {
+      if (productId == null) {
+        // Try to find product ID
+        final product = await _findProductByName(itemTitle);
+        if (product != null && product.exists) {
+          final data = product.data() as Map<String, dynamic>;
+          _productCache[product.id] = data;
+          return data;
+        }
+        return {'stockCount': 0, 'availability': false, 'archived': false};
+      }
+
+      // Fetch from Firestore
+      final doc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .get();
+
+      if (!doc.exists) {
+        return {'stockCount': 0, 'availability': false, 'archived': false};
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+      // Cache the result
+      _productCache[productId] = data;
+      return data;
+    } catch (e) {
+      print('Error checking availability: $e');
+      return {'stockCount': 0, 'availability': false, 'archived': false};
+    }
   }
 }

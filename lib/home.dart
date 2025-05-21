@@ -13,6 +13,7 @@ import 'notifications.dart';
 import 'message.dart';
 import 'see_all_recommend.dart';
 import 'services/message_service.dart';
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -24,7 +25,7 @@ class _HomePageState extends State<HomePage> {
   // Add these variables at the top of the class
   final bool _isUserLoggedIn = FirebaseAuth.instance.currentUser != null;
   final ProductService _productService = ProductService();
-  
+
   int _currentPage = 0;
   int _currentNavIndex = 0;
   Timer? _timer;
@@ -381,7 +382,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                 ],
               ),
-              
+
               // Search Bar
               Expanded(
                 child: Container(
@@ -399,16 +400,17 @@ class _HomePageState extends State<HomePage> {
                       hintStyle: pixelFontStyle(color: Colors.grey.shade400),
                       prefixIcon: const Icon(Icons.search, color: Colors.white),
                       suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.white, size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _suggestedProducts = [];
-                              });
-                            },
-                          )
-                        : null,
+                          ? IconButton(
+                              icon: const Icon(Icons.clear,
+                                  color: Colors.white, size: 20),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _suggestedProducts = [];
+                                });
+                              },
+                            )
+                          : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
@@ -418,7 +420,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-              
+
               // Notifications Icon with Counter
               Stack(
                 children: [
@@ -427,7 +429,8 @@ class _HomePageState extends State<HomePage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const NotificationsPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const NotificationsPage()),
                       );
                     },
                   ),
@@ -464,7 +467,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                 ],
               ),
-              
+
               // Wishlist Icon with Counter
               Stack(
                 children: [
@@ -473,7 +476,8 @@ class _HomePageState extends State<HomePage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const WishlistPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const WishlistPage()),
                       );
                     },
                   ),
@@ -724,6 +728,295 @@ class _HomePageState extends State<HomePage> {
 
                         // Add some bottom padding
                         const SizedBox(height: 20),
+
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'JUST FOR YOU',
+                                style: pixelFontStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 270, // Same height as the Recommended section
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: products.length, // Use the same product list
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  itemBuilder: (context, index) {
+                                    final productData = products[index];
+
+                                    // Determine if product has a discount
+                                    final bool hasDiscount =
+                                        index % 3 == 0 || productData['discount'] == true;
+                                    final int discountPercent =
+                                        hasDiscount ? (productData['discountPercent'] ?? 20) : 0;
+
+                                    // Calculate prices for responsive display
+                                    final String currentPrice =
+                                        productData['price']?.toString() ?? '0.00';
+                                    final double originalPriceValue = hasDiscount
+                                        ? double.parse(currentPrice) * (100 / (100 - discountPercent))
+                                        : double.parse(currentPrice);
+                                    final String originalPrice =
+                                        originalPriceValue.toStringAsFixed(2);
+
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => ProductDetails(
+                                              imageUrl: productData['imageUrl'] ?? '',
+                                              title: productData['name'] ?? 'Unknown Product',
+                                              price: currentPrice,
+                                              description: productData['description'] ??
+                                                  'No description available',
+                                              sellerId: productData['sellerId'] ?? 'Unknown Seller',
+                                              productId: productData['id'],
+                                              category: productData['category'] ?? 'Games',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        width: 150, // Same width as the Recommended section
+                                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade900,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.grey.shade800),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.3),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Product Image with Low Stock Indicator
+                                            Stack(
+                                              children: [
+                                                ClipRRect(
+                                                  borderRadius: const BorderRadius.only(
+                                                    topLeft: Radius.circular(8),
+                                                    topRight: Radius.circular(8),
+                                                  ),
+                                                  child: Image.network(
+                                                    productData['imageUrl'] ?? '',
+                                                    height: 140,
+                                                    width: double.infinity,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) =>
+                                                        Container(
+                                                      height: 140,
+                                                      width: double.infinity,
+                                                      color: Colors.grey.shade800,
+                                                      child: const Icon(Icons.error,
+                                                          color: Colors.white),
+                                                    ),
+                                                  ),
+                                                ),
+
+                                                // Add to Cart Button
+                                                Positioned(
+                                                  right: 8,
+                                                  bottom: 8,
+                                                  child: GestureDetector(
+                                                    onTap: () async {
+                                                      if (!_isUserLoggedIn) {
+                                                        MessageService.showGameMessage(
+                                                          context,
+                                                          message:
+                                                              'Please log in to add items to cart',
+                                                          isSuccess: false,
+                                                        );
+                                                        return;
+                                                      }
+
+                                                      try {
+                                                        await _productService.addToCart(
+                                                          productData['name'] ?? 'Unknown Product',
+                                                          productData['imageUrl'] ?? '',
+                                                          productData['price']?.toString() ?? '0.00',
+                                                          1,
+                                                          productData['sellerId'] ?? '',
+                                                        );
+
+                                                        MessageService.showGameMessage(
+                                                          context,
+                                                          message: 'Added to cart!',
+                                                          isSuccess: true,
+                                                        );
+
+                                                        // Refresh cart count
+                                                        _loadCounts();
+                                                      } catch (e) {
+                                                        MessageService.showGameMessage(
+                                                          context,
+                                                          message: 'Failed to add to cart',
+                                                          isSuccess: false,
+                                                        );
+                                                      }
+                                                    },
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(8),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.pink.withOpacity(0.9),
+                                                        shape: BoxShape.circle,
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withOpacity(0.3),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.shopping_cart,
+                                                        color: Colors.white,
+                                                        size: 20,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+
+                                                // Discount Badge
+                                                if (hasDiscount)
+                                                  Positioned(
+                                                    top: 0,
+                                                    left: 0,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red.shade600,
+                                                        borderRadius: const BorderRadius.only(
+                                                          topLeft: Radius.circular(8),
+                                                          bottomRight: Radius.circular(8),
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        '$discountPercent% OFF',
+                                                        style: pixelFontStyle(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            // Product Details
+                                            Padding(
+                                              padding: const EdgeInsets.all(10.0),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    productData['name'] ?? 'Unknown Product',
+                                                    style: pixelFontStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 6),
+
+                                                  // Price section
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      // Price column
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          if (hasDiscount)
+                                                            Text(
+                                                              'PHP $originalPrice',
+                                                              style: pixelFontStyle(
+                                                                color: Colors.grey,
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.normal,
+                                                              ).copyWith(
+                                                                decoration:
+                                                                    TextDecoration.lineThrough,
+                                                              ),
+                                                            ),
+                                                          Text(
+                                                            'PHP $currentPrice',
+                                                            style: pixelFontStyle(
+                                                              color: hasDiscount
+                                                                  ? const Color.fromARGB(
+                                                                      255, 212, 0, 0)
+                                                                  : Colors.white,
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: hasDiscount ? 16 : 14,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+
+                                                      // Rating display
+                                                      if (productData['rating'] != null)
+                                                        Row(
+                                                          children: [
+                                                            const Icon(Icons.star,
+                                                                color: Colors.amber, size: 14),
+                                                            const SizedBox(width: 2),
+                                                            Text(
+                                                              '${(productData['rating'] ?? 0.0).toStringAsFixed(1)}',
+                                                              style: pixelFontStyle(
+                                                                fontSize: 12,
+                                                                color: Colors.grey.shade400,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                    ],
+                                                  ),
+
+                                                  const SizedBox(height: 8),
+                                                  // Category tag
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.cyan.withOpacity(0.2),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Text(
+                                                      productData['category'] ?? 'Games',
+                                                      style: pixelFontStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.cyan,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -854,8 +1147,10 @@ class _HomePageState extends State<HomePage> {
                         price: 'PHP ${product['price'] ?? '0.00'}',
                         description: product['description'] ??
                             'No description available',
-                        sellerId: product['sellerId'] ?? 'Unknown Seller', // <-- FIXED
+                        sellerId: product['sellerId'] ??
+                            'Unknown Seller', // <-- FIXED
                         productId: product['id'],
+                        category: product['category'] ?? 'Unknown Category', // Add this line
                       ),
                     ),
                   );
@@ -1145,7 +1440,8 @@ class _HomePageState extends State<HomePage> {
                         price: currentPrice,
                         description: productData['description'] ??
                             'No description available',
-                        sellerId: productData['sellerId'] ?? 'Unknown Seller', // <-- FIXED
+                        sellerId: productData['sellerId'] ??
+                            'Unknown Seller', // <-- FIXED
                         productId: productData['id'],
                         category: productData['category'] ?? 'Games',
                       ),
@@ -1204,12 +1500,13 @@ class _HomePageState extends State<HomePage> {
                                 if (!_isUserLoggedIn) {
                                   MessageService.showGameMessage(
                                     context,
-                                    message: 'Please log in to add items to cart',
+                                    message:
+                                        'Please log in to add items to cart',
                                     isSuccess: false,
                                   );
                                   return;
                                 }
-                                
+
                                 try {
                                   await _productService.addToCart(
                                     productData['name'] ?? 'Unknown Product',
@@ -1218,13 +1515,13 @@ class _HomePageState extends State<HomePage> {
                                     1,
                                     productData['sellerId'] ?? '',
                                   );
-                                  
+
                                   MessageService.showGameMessage(
                                     context,
                                     message: 'Added to cart!',
                                     isSuccess: true,
                                   );
-                                  
+
                                   // Refresh cart count
                                   _loadCounts();
                                 } catch (e) {
@@ -1625,8 +1922,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               title: product['name'] ?? 'Unknown Product',
               price: 'PHP ${product['price'] ?? '0.00'}',
               description: product['description'] ?? 'No description available',
-              sellerId: product['sellerId'] ?? 'Unknown Seller', // <-- FIXED
+              sellerId: product['sellerId'] ?? 'Unknown Seller',
               productId: product['id'],
+              category: product['category'] ?? 'Unknown Category', // Add this line
             ),
           ),
         );

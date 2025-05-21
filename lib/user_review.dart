@@ -162,8 +162,9 @@ class _UserReviewHistoryState extends State<UserReviewHistory> {
                                 imageUrl: review['productImage'],
                                 title: review['productName'],
                                 price: review['productPrice'].toString(),
-                                description: '',
-                                sellerId: '',
+                                description: review['description'] ?? 'No description available',
+                                sellerId: review['userId'] ?? 'Unknown Seller',
+                                category: review['category'] ?? 'Games', // Add this line
                               ),
                             ),
                           );
