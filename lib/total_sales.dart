@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CategoryPieChart extends StatelessWidget {
   const CategoryPieChart({super.key});
@@ -20,6 +21,8 @@ class CategoryPieChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+    final user = FirebaseAuth.instance.currentUser;
+    final currentUserId = user?.uid ?? '';
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
 
@@ -125,7 +128,9 @@ class CategoryPieChart extends StatelessWidget {
                     if (item is Map<String, dynamic> &&
                         item.containsKey('category') &&
                         item.containsKey('price') &&
-                        item.containsKey('quantity')) {
+                        item.containsKey('quantity') &&
+                        item.containsKey('sellerId') &&
+                        item['sellerId'] == currentUserId) {  // Only process current seller's items
                           
                       final category = item['category'] as String;
                       final price = double.parse(item['price'].toString());

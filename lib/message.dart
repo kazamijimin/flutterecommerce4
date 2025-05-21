@@ -22,6 +22,8 @@ class _ChatPageState extends State<ChatPage> {
   List<Map<String, dynamic>> _conversations = [];
   List<Map<String, dynamic>> _searchResults = [];
   Map<String, Map<String, dynamic>> _userDetails = {};
+  List<Map<String, dynamic>> _stores = [];
+  List<Map<String, dynamic>> _filteredStores = []; // Add this line
   bool _isLoading = true;
   bool _isSearching = false;
 
@@ -31,6 +33,8 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _fetchConversations();
+    _fetchStores();
+    _filteredStores = _stores;
   }
 
   Future<void> _fetchConversations() async {
@@ -99,6 +103,7 @@ class _ChatPageState extends State<ChatPage> {
     if (query.trim().isEmpty) {
       setState(() {
         _searchResults = [];
+        _filteredStores = _stores; // Reset stores to show all
         _isSearching = false;
       });
       return;
@@ -109,8 +114,8 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     try {
+      // Search users
       final querySnapshot = await _firestore.collection('users').get();
-
       final results = querySnapshot.docs
           .map((doc) {
             final data = doc.data();
@@ -122,19 +127,47 @@ class _ChatPageState extends State<ChatPage> {
               (user['displayName'] ?? '').toLowerCase().contains(query.toLowerCase()))
           .toList();
 
+      // Filter stores
+      final filteredStores = _stores.where((store) =>
+          (store['storeName'] ?? '').toLowerCase().contains(query.toLowerCase())).toList();
+
       for (var user in results) {
         _userDetails[user['id']] = user;
       }
 
       setState(() {
         _searchResults = results;
+        _filteredStores = filteredStores;
         _isSearching = false;
       });
     } catch (e) {
       setState(() {
         _isSearching = false;
       });
-      print('Error searching users: $e');
+      print('Error searching: $e');
+    }
+  }
+
+  Future<void> _fetchStores() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('sellerStatus', isEqualTo: 'approved')
+          .get();
+
+      setState(() {
+        _stores = querySnapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            })
+            .where((user) => user['storeName'] != null)
+            .toList();
+        _filteredStores = _stores; // Initialize filteredStores with all stores
+      });
+    } catch (e) {
+      print('Error fetching stores: $e');
     }
   }
 
@@ -204,162 +237,476 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: const Text(
           'Messages',
-          style: TextStyle(fontFamily: 'PixelFont'), // Apply PixelFont
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.black,
+        elevation: 0,
       ),
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
+          // Search Bar with Cyberpunk design
+          Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.cyan.withOpacity(0.3),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.cyan.withOpacity(0.1),
+                  blurRadius: 8,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
               decoration: InputDecoration(
                 hintText: 'Search users...',
-                hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
-                prefixIcon: const Icon(Icons.search, color: Colors.white),
-                filled: true,
-                fillColor: Colors.grey.shade800,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontFamily: 'PixelFont',
                 ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.cyan.withOpacity(0.7),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.all(16),
               ),
               onChanged: (value) => _searchUsers(value),
             ),
           ),
+
+          // Store Slider
+          _buildStoreSlider(),
+
+          // Recent Conversations Header
+          if (!_isSearching && _conversations.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.pink.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.history,
+                      color: Colors.pink,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'RECENT CHATS',
+                    style: TextStyle(
+                      color: Colors.pink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           Expanded(
             child: _isSearching
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.cyan),
+                    child: CircularProgressIndicator(
+                      color: Colors.cyan,
+                    ),
                   )
                 : _searchResults.isNotEmpty
-                    ? ListView.builder(
-                        itemCount: _searchResults.length,
-                        itemBuilder: (context, index) {
-                          final user = _searchResults[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.grey.shade800,
-                              backgroundImage: user['photoURL'] != null
-                                  ? CachedNetworkImageProvider(user['photoURL'])
-                                  : null,
-                              child: user['photoURL'] == null
-                                  ? const Icon(Icons.person, color: Colors.white)
-                                  : null,
-                            ),
-                            title: Text(
-                              user['displayName'] ?? 'Unknown User',
-                              style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'), // Apply PixelFont
-                            ),
-                            subtitle: Text(
-                              user['email'] ?? '',
-                              style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
-                            ),
-                            onTap: () => _startChat(user['id'], user['displayName']),
-                          );
-                        },
-                      )
+                    ? _buildSearchResults()
                     : _isLoading
                         ? const Center(
-                            child: CircularProgressIndicator(color: Colors.cyan),
+                            child: CircularProgressIndicator(
+                              color: Colors.cyan,
+                            ),
                           )
                         : _conversations.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'No conversations found',
-                                  style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'PixelFont'), // Apply PixelFont
-                                ),
-                              )
-                            : ListView.builder(
-                                itemCount: _conversations.length,
-                                itemBuilder: (context, index) {
-                                  final conversation = _conversations[index];
-                                  final participants = conversation['participants'] as List;
-                                  final recipientId = participants.firstWhere(
-                                    (id) => id != _auth.currentUser?.uid,
-                                    orElse: () => '',
-                                  );
-
-                                  final recipientDetails = _userDetails[recipientId];
-                                  final isStore = conversation['type'] == 'store';
-                                  final displayName = isStore
-                                      ? (conversation['storeName'] ?? 'Store')
-                                      : (recipientDetails?['displayName'] ?? 'Unknown User');
-                                  final avatarUrl = isStore
-                                      ? (recipientDetails?['storeAvatar'] ?? null)
-                                      : (recipientDetails?['photoURL'] ?? null);
-
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.grey.shade800,
-                                      backgroundImage: avatarUrl != null
-                                          ? CachedNetworkImageProvider(avatarUrl)
-                                          : null,
-                                      child: avatarUrl == null
-                                          ? Icon(isStore ? Icons.store : Icons.person, color: Colors.white)
-                                          : null,
-                                    ),
-                                    title: Text(
-                                      displayName,
-                                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
-                                    ),
-                                    subtitle: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            conversation['lastMessage'] ?? '',
-                                            style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'), // Apply PixelFont
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Text(
-                                      _formatTimestamp(conversation['timestamp']),
-                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontFamily: 'PixelFont'), // Apply PixelFont
-                                    ),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ChatDetailPage(
-                                          conversationId: conversation['id'],
-                                          recipientId: recipientId,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                            ? _buildEmptyState()
+                            : _buildConversationsList(),
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.black,
-        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
-        unselectedItemColor: Colors.white,
-        currentIndex: _currentNavIndex,
-        onTap: _navigateWithBottomBar,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
-          BottomNavigationBarItem(icon: Icon(Icons.shop), label: 'Shop'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final user = _searchResults[index];
+        return Container(
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.grey.shade800,
+              width: 1,
+            ),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            leading: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.cyan.withOpacity(0.5),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.cyan.withOpacity(0.2),
+                    blurRadius: 8,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.grey.shade800,
+                backgroundImage: user['photoURL'] != null
+                    ? CachedNetworkImageProvider(user['photoURL'])
+                    : null,
+                child: user['photoURL'] == null
+                    ? const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 24,
+                      )
+                    : null,
+              ),
+            ),
+            title: Text(
+              user['displayName'] ?? 'Unknown User',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            subtitle: Text(
+              user['email'] ?? '',
+              style: TextStyle(
+                color: Colors.grey.shade400,
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+              ),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.cyan.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.chat,
+                color: Colors.cyan,
+                size: 20,
+              ),
+            ),
+            onTap: () => _startChat(user['id'], user['displayName']),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConversationsList() {
+    return ListView.builder(
+      itemCount: _conversations.length,
+      itemBuilder: (context, index) {
+        final conversation = _conversations[index];
+        final participants = conversation['participants'] as List;
+        final recipientId = participants.firstWhere(
+          (id) => id != _auth.currentUser?.uid,
+          orElse: () => '',
+        );
+
+        final recipientDetails = _userDetails[recipientId];
+        final isStore = conversation['type'] == 'store';
+        final displayName = isStore
+            ? (conversation['storeName'] ?? 'Store')
+            : (recipientDetails?['displayName'] ?? 'Unknown User');
+        final avatarUrl = isStore
+            ? (recipientDetails?['storeAvatar'] ?? null)
+            : (recipientDetails?['photoURL'] ?? null);
+
+        return Container(
+          margin: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.grey.shade800,
+              width: 1,
+            ),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            leading: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isStore
+                      ? Colors.purple.withOpacity(0.5)
+                      : Colors.cyan.withOpacity(0.5),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isStore
+                        ? Colors.purple.withOpacity(0.2)
+                        : Colors.cyan.withOpacity(0.2),
+                    blurRadius: 8,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.grey.shade800,
+                backgroundImage: avatarUrl != null
+                    ? CachedNetworkImageProvider(avatarUrl)
+                    : null,
+                child: avatarUrl == null
+                    ? Icon(
+                        isStore ? Icons.store : Icons.person,
+                        color: Colors.white,
+                        size: 24,
+                      )
+                    : null,
+              ),
+            ),
+            title: Text(
+              displayName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(
+                  conversation['lastMessage'] ?? '',
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontFamily: 'PixelFont',
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTimestamp(conversation['timestamp']),
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 12,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+              ],
+            ),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatDetailPage(
+                  conversationId: conversation['id'],
+                  recipientId: recipientId,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: Colors.grey.shade700,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No conversations yet',
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 18,
+              fontFamily: 'PixelFont',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Start chatting with other users',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+              fontFamily: 'PixelFont',
+            ),
+          ),
         ],
-        selectedLabelStyle: const TextStyle(
-          fontFamily: 'PixelFont',
-          fontSize: 12,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontFamily: 'PixelFont',
-          fontSize: 12,
-        ),
       ),
+    );
+  }
+
+  Widget _buildStoreSlider() {
+    if (_filteredStores.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Stores Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.store,
+                  color: Colors.purple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'STORES',
+                style: TextStyle(
+                  color: Colors.purple,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'PixelFont',
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Stores Slider
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: _filteredStores.length,
+            itemBuilder: (context, index) {
+              final store = _filteredStores[index];
+              return Container(
+                width: 100,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade900,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.purple.withOpacity(0.3),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withOpacity(0.1),
+                      blurRadius: 8,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () => _startChat(store['id'], store['storeName']),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.purple.withOpacity(0.5),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.purple.withOpacity(0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.grey.shade800,
+                          backgroundImage: store['storeAvatar'] != null
+                              ? CachedNetworkImageProvider(store['storeAvatar'])
+                              : null,
+                          child: store['storeAvatar'] == null
+                              ? const Icon(
+                                  Icons.store,
+                                  color: Colors.white,
+                                  size: 30,
+                                )
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        store['storeName'] ?? 'Unknown Store',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontFamily: 'PixelFont',
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

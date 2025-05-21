@@ -12,7 +12,7 @@ import 'dart:async';
 import 'notifications.dart';
 import 'message.dart';
 import 'see_all_recommend.dart';
-
+import 'services/message_service.dart';
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -21,6 +21,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // Add these variables at the top of the class
+  final bool _isUserLoggedIn = FirebaseAuth.instance.currentUser != null;
+  final ProductService _productService = ProductService();
+  
   int _currentPage = 0;
   int _currentNavIndex = 0;
   Timer? _timer;
@@ -29,6 +33,7 @@ class _HomePageState extends State<HomePage> {
   int cartCount = 0;
   int wishlistCount = 0;
   int notifCount = 0; // <-- Add this line
+  bool isVerified = true; // Default to true for existing accounts
 
   // Search-related variables
   final TextEditingController _searchController = TextEditingController();
@@ -60,6 +65,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _checkAccountVerification();
     _fetchProducts();
     _startAutoScroll();
     _loadCounts();
@@ -280,6 +286,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _checkAccountVerification() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        if (userData != null && userData['isVerified'] == false) {
+          setState(() {
+            isVerified = false;
+          });
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -313,6 +338,7 @@ class _HomePageState extends State<HomePage> {
 
           title: Row(
             children: [
+              // Cart Icon with Counter
               Stack(
                 children: [
                   IconButton(
@@ -324,25 +350,39 @@ class _HomePageState extends State<HomePage> {
                   ),
                   if (cartCount > 0)
                     Positioned(
-                      right: 5,
-                      top: 5,
+                      right: 0,
+                      top: 0,
                       child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        constraints:
-                            const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
                         child: Text(
                           '$cartCount',
-                          style: pixelFontStyle(fontSize: 10),
+                          style: pixelFontStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
                     ),
                 ],
               ),
+              
+              // Search Bar
               Expanded(
                 child: Container(
                   height: 40,
@@ -359,17 +399,16 @@ class _HomePageState extends State<HomePage> {
                       hintStyle: pixelFontStyle(color: Colors.grey.shade400),
                       prefixIcon: const Icon(Icons.search, color: Colors.white),
                       suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear,
-                                  color: Colors.white, size: 20),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _suggestedProducts = [];
-                                });
-                              },
-                            )
-                          : null,
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.white, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _suggestedProducts = [];
+                              });
+                            },
+                          )
+                        : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
@@ -379,64 +418,92 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              
+              // Notifications Icon with Counter
               Stack(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.notifications, color: Colors.white),
                     onPressed: () {
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const NotificationsPage()));
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationsPage()),
+                      );
                     },
                   ),
                   if (notifCount > 0)
                     Positioned(
-                      right: 5,
-                      top: 5,
+                      right: 0,
+                      top: 0,
                       child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        constraints:
-                            const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
                         child: Text(
                           '$notifCount',
-                          style: pixelFontStyle(fontSize: 10),
+                          style: pixelFontStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
                     ),
                 ],
               ),
+              
+              // Wishlist Icon with Counter
               Stack(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.favorite, color: Colors.white),
                     onPressed: () {
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const WishlistPage()));
+                        context,
+                        MaterialPageRoute(builder: (context) => const WishlistPage()),
+                      );
                     },
                   ),
                   if (wishlistCount > 0)
                     Positioned(
-                      right: 5,
-                      top: 5,
+                      right: 0,
+                      top: 0,
                       child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        constraints:
-                            const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
                         child: Text(
                           '$wishlistCount',
-                          style: pixelFontStyle(fontSize: 10),
+                          style: pixelFontStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -448,6 +515,47 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Column(
           children: [
+            // Show verification message if the account is not verified
+            if (!isVerified)
+              Container(
+                color: Colors.red.shade900,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Verify your account in edit profile to access all features.",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Verify Now",
+                        style: TextStyle(
+                          color: Colors.cyan,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Search suggestions overlay
             if (_isSearchFocused)
               Container(
@@ -1087,7 +1195,69 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
 
-                          // Discount badge in the top-left corner
+                          // Add to Cart Button
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: GestureDetector(
+                              onTap: () async {
+                                if (!_isUserLoggedIn) {
+                                  MessageService.showGameMessage(
+                                    context,
+                                    message: 'Please log in to add items to cart',
+                                    isSuccess: false,
+                                  );
+                                  return;
+                                }
+                                
+                                try {
+                                  await _productService.addToCart(
+                                    productData['name'] ?? 'Unknown Product',
+                                    productData['imageUrl'] ?? '',
+                                    productData['price']?.toString() ?? '0.00',
+                                    1,
+                                    productData['sellerId'] ?? '',
+                                  );
+                                  
+                                  MessageService.showGameMessage(
+                                    context,
+                                    message: 'Added to cart!',
+                                    isSuccess: true,
+                                  );
+                                  
+                                  // Refresh cart count
+                                  _loadCounts();
+                                } catch (e) {
+                                  MessageService.showGameMessage(
+                                    context,
+                                    message: 'Failed to add to cart',
+                                    isSuccess: false,
+                                  );
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.pink.withOpacity(0.9),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.shopping_cart,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Keep existing discount badge and low stock indicator
                           if (hasDiscount)
                             Positioned(
                               top: 0,
@@ -1113,7 +1283,6 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
 
-                          // Low stock indicator
                           if ((productData['stockCount'] ?? 0) < 5 &&
                               (productData['stockCount'] ?? 0) > 0)
                             Positioned(

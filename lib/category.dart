@@ -85,9 +85,10 @@ class _CategoryPageState extends State<CategoryPage> {
       appBar: AppBar(
         title: const Text(
           'Categories',
-          style: TextStyle(fontFamily: 'PixelFont'),
+          style: TextStyle(fontFamily: 'PixelFont', color: Colors.white),
         ),
         backgroundColor: Colors.black,
+        elevation: 0,
       ),
       backgroundColor: Colors.black,
       body: Column(
@@ -96,12 +97,13 @@ class _CategoryPageState extends State<CategoryPage> {
           Container(
             margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             decoration: BoxDecoration(
-              color: Colors.grey[800],
+              color: Colors.grey.shade900,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade800),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.3),
-                  blurRadius: 5,
+                  blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -118,7 +120,7 @@ class _CategoryPageState extends State<CategoryPage> {
                       children: [
                         const Icon(
                           Icons.category,
-                          color: Colors.cyan,
+                          color: Color.fromARGB(255, 212, 0, 0), // Changed from cyan to red
                           size: 28,
                         ),
                         const SizedBox(width: 12),
@@ -151,7 +153,7 @@ class _CategoryPageState extends State<CategoryPage> {
                           _showCategories
                               ? Icons.keyboard_arrow_up
                               : Icons.keyboard_arrow_down,
-                          color: Colors.cyan,
+                          color: Color.fromARGB(255, 212, 0, 0), // Changed from cyan to red
                           size: 28,
                         ),
                       ],
@@ -206,10 +208,13 @@ class _CategoryPageState extends State<CategoryPage> {
                           ),
                         ),
                         trailing: _selectedCategory == category
-                            ? const Icon(Icons.check_circle, color: Colors.cyan)
+                            ? const Icon(
+                                Icons.check_circle, 
+                                color: Color.fromARGB(255, 212, 0, 0),
+                              )
                             : null,
                         tileColor: _selectedCategory == category
-                            ? Colors.cyan.withOpacity(0.1)
+                            ? Color.fromARGB(255, 212, 0, 0).withOpacity(0.1)
                             : null,
                         onTap: () {
                           setState(() {
@@ -230,8 +235,8 @@ class _CategoryPageState extends State<CategoryPage> {
                         IconButton(
                           icon: Icon(
                             Icons.arrow_back_ios,
-                            color: _currentPage > 0
-                                ? Colors.cyan
+                            color: _currentPage > 0 
+                                ? Color.fromARGB(255, 212, 0, 0) // Changed from cyan to red
                                 : Colors.grey[700],
                             size: 20,
                           ),
@@ -240,8 +245,8 @@ class _CategoryPageState extends State<CategoryPage> {
                         IconButton(
                           icon: Icon(
                             Icons.arrow_forward_ios,
-                            color: _currentPage < _totalPages - 1
-                                ? Colors.cyan
+                            color: _currentPage < _totalPages - 1 
+                                ? Color.fromARGB(255, 212, 0, 0) // Changed from cyan to red
                                 : Colors.grey[700],
                             size: 20,
                           ),
@@ -276,7 +281,7 @@ class _CategoryPageState extends State<CategoryPage> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12.0, vertical: 6.0),
                   decoration: BoxDecoration(
-                    color: Colors.cyan.withOpacity(0.2),
+                    color: Color.fromARGB(255, 212, 0, 0).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: StreamBuilder<QuerySnapshot>(
@@ -292,7 +297,7 @@ class _CategoryPageState extends State<CategoryPage> {
                       return Text(
                         '$count items',
                         style: const TextStyle(
-                          color: Colors.cyan,
+                          color: Color.fromARGB(255, 212, 0, 0),
                           fontFamily: 'PixelFont',
                           fontSize: 14,
                         ),
@@ -314,7 +319,9 @@ class _CategoryPageState extends State<CategoryPage> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(color: Colors.cyan),
+                    child: CircularProgressIndicator(
+                      color: Color.fromARGB(255, 212, 0, 0), // Changed from cyan to red
+                    ),
                   );
                 }
 
@@ -376,9 +383,9 @@ class _CategoryPageState extends State<CategoryPage> {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey[850],
+                          color: Colors.grey.shade900,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[800]!),
+                          border: Border.all(color: Colors.grey.shade800),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.3),
@@ -465,7 +472,7 @@ class _CategoryPageState extends State<CategoryPage> {
                                       Text(
                                         'PHP ${productData?['price'] ?? '0.00'}',
                                         style: const TextStyle(
-                                          color: Colors.cyan,
+                                          color: Color.fromARGB(255, 212, 0, 0),
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           fontFamily: 'PixelFont',
@@ -475,12 +482,12 @@ class _CategoryPageState extends State<CategoryPage> {
                                       Container(
                                         padding: const EdgeInsets.all(4),
                                         decoration: BoxDecoration(
-                                          color: Colors.cyan.withOpacity(0.2),
+                                          color: Color.fromARGB(255, 212, 0, 0).withOpacity(0.2),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
                                           Icons.arrow_forward,
-                                          color: Colors.cyan,
+                                          color: Color.fromARGB(255, 212, 0, 0),
                                           size: 16,
                                         ),
                                       ),

@@ -122,6 +122,10 @@ class RevenueGraph extends StatelessWidget {
                 );
               }
 
+              // Get current seller ID
+              final user = FirebaseAuth.instance.currentUser;
+              final currentUserId = user?.uid ?? '';
+
               // Process data for the graph
               final orders = snapshot.data!.docs;
               final Map<String, double> revenueByDate = {};
@@ -131,21 +135,38 @@ class RevenueGraph extends StatelessWidget {
 
               for (var order in orders) {
                 final data = order.data() as Map<String, dynamic>;
-                if (data.containsKey('totalPrice') &&
-                    data.containsKey('orderDate')) {
-                  final revenue = double.parse(data['totalPrice'].toString());
-                  totalRevenue += revenue;
+                final items = data['items'] as List<dynamic>? ?? [];
+                
+                // Calculate revenue only for items sold by current seller
+                double orderRevenue = 0;
+                bool hasSellerItems = false;
+
+                for (var item in items) {
+                  if (item is Map<String, dynamic> && 
+                      item['sellerId'] == currentUserId) {
+                    hasSellerItems = true;
+                    if (item.containsKey('price') && item.containsKey('quantity')) {
+                      double price = double.parse(item['price'].toString());
+                      int quantity = int.parse(item['quantity'].toString());
+                      orderRevenue += price * quantity;
+                    }
+                  }
+                }
+
+                // Only process orders that contain items from current seller
+                if (hasSellerItems && data.containsKey('orderDate')) {
+                  totalRevenue += orderRevenue;
                   
                   final orderDate = data['orderDate'] is Timestamp
                       ? (data['orderDate'] as Timestamp).toDate()
                       : DateTime.parse(data['orderDate'].toString());
-                  final dateKey =
-                      '${orderDate.year}-${orderDate.month.toString().padLeft(2, '0')}-${orderDate.day.toString().padLeft(2, '0')}';
+                  
+                  final dateKey = '${orderDate.year}-${orderDate.month.toString().padLeft(2, '0')}-${orderDate.day.toString().padLeft(2, '0')}';
 
                   if (revenueByDate.containsKey(dateKey)) {
-                    revenueByDate[dateKey] = revenueByDate[dateKey]! + revenue;
+                    revenueByDate[dateKey] = revenueByDate[dateKey]! + orderRevenue;
                   } else {
-                    revenueByDate[dateKey] = revenue;
+                    revenueByDate[dateKey] = orderRevenue;
                   }
                   
                   // Track highest daily revenue
@@ -490,14 +511,21 @@ class RevenueGraph extends StatelessWidget {
                             const SizedBox(height: 16),
                             _buildInsightRow(
                               'Total Orders',
-                              orders.length.toString(),
+                              '${orders.where((order) {
+                                final data = order.data() as Map<String, dynamic>;
+                                final items = data['items'] as List<dynamic>? ?? [];
+                                return items.any((item) => 
+                                  item is Map<String, dynamic> && 
+                                  item['sellerId'] == currentUserId
+                                );
+                              }).length}',
                               Icons.shopping_cart,
                               Colors.orange,
                             ),
                             const SizedBox(height: 12),
                             _buildInsightRow(
                               'Average Order Value',
-                              '₱${(totalRevenue / orders.length).toStringAsFixed(2)}',
+                              '₱${totalRevenue > 0 ? (totalRevenue / revenueByDate.length).toStringAsFixed(2) : '0.00'}',
                               Icons.insights,
                               const Color(0xFF00F0FF),
                             ),

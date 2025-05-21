@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Add this imp
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home.dart';
+
 class Signup extends StatefulWidget {
   const Signup({super.key});
 
@@ -18,7 +19,8 @@ class _SignupState extends State<Signup> {
   bool _passwordsMatch = true;
   bool _isLoading = false;
   bool _obscurePassword = true; // Add this for password visibility toggle
-  bool _obscureConfirmPassword = true; // Add this for confirm password visibility toggle
+  bool _obscureConfirmPassword =
+      true; // Add this for confirm password visibility toggle
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   @override
@@ -75,10 +77,31 @@ class _SignupState extends State<Signup> {
         email: emailAddress,
         password: password,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User created successfully')),
+
+      // Add the user to Firestore with isVerified set to false
+      final user = credential.user;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'email': emailAddress,
+          'isVerified': false, // Mark the account as unverified
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Show success dialog
+      showSuccessDialog(
+        context,
+        'Account Created',
+        'Your account has been created successfully. Welcome to the app!',
       );
-      Navigator.pop(context);
+
+      // Navigate to the HomePage after the dialog is dismissed
+      Future.delayed(const Duration(seconds: 2), () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
+      });
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred';
       if (e.code == 'weak-password') {
@@ -156,40 +179,130 @@ class _SignupState extends State<Signup> {
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } catch (e) {
-      showErrorDialog(
-        context,
-        'Google Sign-In Failed',
-        'Failed to sign in with Google: ${e.toString()}'
-      );
+      showErrorDialog(context, 'Google Sign-In Failed',
+          'Failed to sign in with Google: ${e.toString()}');
     }
   }
-void showErrorDialog(BuildContext context, String title, String message) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(
-          title,
-          style: const TextStyle(color: Colors.red),
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text("OK"),
+
+  void showErrorDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            title,
+            style: const TextStyle(color: Colors.red),
           ),
-        ],
-      );
-    },
-  );
-}
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void showSuccessDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            side: BorderSide(color: Colors.green[700]!, width: 2),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green[900],
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.green[400],
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green, width: 1),
+                  ),
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green[400]!, Colors.green[900]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'PixelFont',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0E17),
-      body: SingleChildScrollView( // Wrap the body with SingleChildScrollView
+      body: SingleChildScrollView(
+        // Wrap the body with SingleChildScrollView
         child: Column(
           children: [
             // Cyberpunk city image with back button
@@ -211,7 +324,8 @@ void showErrorDialog(BuildContext context, String title, String message) {
                   left: 16,
                   child: IconButton(
                     onPressed: () {
-                      Navigator.pop(context); // Navigate back to the previous screen
+                      Navigator.pop(
+                          context); // Navigate back to the previous screen
                     },
                     icon: const Icon(
                       Icons.arrow_back,
@@ -222,7 +336,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                 ),
               ],
             ),
-            
+
             // Sign In text
             Container(
               color: Colors.black,
@@ -251,7 +365,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                 ],
               ),
             ),
-            
+
             Container(
               padding: const EdgeInsets.all(20),
               width: double.infinity,
@@ -276,7 +390,8 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         fontSize: 18,
                       ),
                       decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         border: InputBorder.none,
                         hintText: "Email",
                         hintStyle: TextStyle(
@@ -286,7 +401,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                       ),
                     ),
                   ),
-                  
+
                   // Password field - updated with show/hide toggle
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -304,7 +419,8 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         fontSize: 18,
                       ),
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         border: InputBorder.none,
                         hintText: "Password",
                         hintStyle: const TextStyle(
@@ -313,7 +429,9 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: Colors.black54,
                           ),
                           onPressed: () {
@@ -325,7 +443,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                       ),
                     ),
                   ),
-                  
+
                   // Confirm Password field - updated with show/hide toggle
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -346,7 +464,8 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         fontSize: 18,
                       ),
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         border: InputBorder.none,
                         hintText: "Confirm Password",
                         hintStyle: const TextStyle(
@@ -355,19 +474,22 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: Colors.black54,
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
                       ),
                     ),
                   ),
-                  
+
                   // Submit button
                   Container(
                     width: double.infinity,
@@ -381,7 +503,8 @@ void showErrorDialog(BuildContext context, String title, String message) {
                       onPressed: _isLoading ? null : onSubmit,
                       child: _isLoading
                           ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             )
                           : const Text(
                               'SIGN UP',
@@ -395,7 +518,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                             ),
                     ),
                   ),
-                  
+
                   // Error message for password mismatch
                   if (!_passwordsMatch)
                     const Text(
@@ -405,9 +528,9 @@ void showErrorDialog(BuildContext context, String title, String message) {
                         fontSize: 14,
                       ),
                     ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Sign in buttons
                   Row(
                     children: [
@@ -418,11 +541,13 @@ void showErrorDialog(BuildContext context, String title, String message) {
                           height: 48,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFF43E69), width: 1),
+                            border: Border.all(
+                                color: const Color(0xFFF43E69), width: 1),
                           ),
                           child: ElevatedButton.icon(
                             onPressed: signInWithGoogle,
-                            icon: const FaIcon(FontAwesomeIcons.google, color: Colors.white), // Use FontAwesome icon
+                            icon: const FaIcon(FontAwesomeIcons.google,
+                                color: Colors.white), // Use FontAwesome icon
                             label: const Text(
                               "Google",
                               style: TextStyle(
@@ -441,7 +566,7 @@ void showErrorDialog(BuildContext context, String title, String message) {
                           ),
                         ),
                       ),
-                      
+
                       // Apple button
                       Expanded(
                         child: Container(
@@ -449,11 +574,13 @@ void showErrorDialog(BuildContext context, String title, String message) {
                           height: 48,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFF43E69), width: 1),
+                            border: Border.all(
+                                color: const Color(0xFFF43E69), width: 1),
                           ),
                           child: ElevatedButton.icon(
                             onPressed: () {},
-                            icon: const FaIcon(FontAwesomeIcons.apple, color: Colors.white), // Use FontAwesome icon
+                            icon: const FaIcon(FontAwesomeIcons.apple,
+                                color: Colors.white), // Use FontAwesome icon
                             label: const Text(
                               "iOS Apple",
                               style: TextStyle(
@@ -474,9 +601,9 @@ void showErrorDialog(BuildContext context, String title, String message) {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Forgot password text
                   const Text(
                     "Forgot password?",
@@ -489,8 +616,6 @@ void showErrorDialog(BuildContext context, String title, String message) {
                 ],
               ),
             ),
-            
-    
           ],
         ),
       ),

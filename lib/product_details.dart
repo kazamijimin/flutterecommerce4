@@ -7,7 +7,8 @@ import 'package:flutterecommerce4/login.dart'; // Make sure this import exists
 import 'error_messages.dart';
 import 'package:flutterecommerce4/signup.dart'; // Make sure this import exists
 import 'package:flutterecommerce4/message.dart'; // <-- Add this import
-
+import 'store_profile.dart';
+import 'user_review.dart';
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
   final String imageUrl;
@@ -336,8 +337,21 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   Future<void> _fetchReviews() async {
-    _reviews = await _reviewService.fetchReviews(widget.title);
-    setState(() {});
+    try {
+      _reviews = await _reviewService.fetchReviews(widget.productId);
+      setState(() {});
+    } catch (e) {
+      print('Error fetching reviews: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Failed to load reviews',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _increaseQuantity() {
@@ -1099,86 +1113,110 @@ class _ProductDetailsState extends State<ProductDetails> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey[800]!),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.cyan, width: 2),
-                        ),
-                        child: addedByUserAvatar != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: Image.network(
-                                  addedByUserAvatar!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, _) =>
-                                      const Icon(Icons.person,
-                                          color: Colors.cyan, size: 32),
-                                ),
-                              )
-                            : const Icon(Icons.person,
-                                color: Colors.cyan, size: 32),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Store Name",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                            Text(
-                              storeName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'PixelFont',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // --- Add the Chat with Seller button here ---
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.chat_bubble_outline,
-                            color: Colors.white),
-                        label: const Text(
-                          "Chat with Seller",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'PixelFont',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.cyan,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () {
-                          if (!_isUserLoggedIn) {
-                            MessageService.showGameMessage(
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () => Navigator.push(
                               context,
-                              message: 'Please log in to chat with the seller',
-                              isSuccess: false,
-                            );
-                            return;
-                          }
-                          startStoreChat(context, widget.sellerId,
-                              storeName); // Pass storeName
-                        },
+                              MaterialPageRoute(
+                                builder: (context) => StoreProfile(
+                                  sellerId: widget.sellerId,
+                                  storeName: storeName,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.cyan, width: 2),
+                                  ),
+                                  child: addedByUserAvatar != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(24),
+                                          child: Image.network(
+                                            addedByUserAvatar!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, _) =>
+                                                const Icon(Icons.person, color: Colors.cyan, size: 32),
+                                          ),
+                                        )
+                                      : const Icon(Icons.person, color: Colors.cyan, size: 32),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Store Name",
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                        fontFamily: 'PixelFont',
+                                      ),
+                                    ),
+                                    Text(
+                                      storeName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'PixelFont',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.grey[600],
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                              label: const Text(
+                                "CHAT",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'PixelFont',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.cyan,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () {
+                                if (!_isUserLoggedIn) {
+                                  MessageService.showGameMessage(
+                                    context,
+                                    message: 'Please log in to chat with the seller',
+                                    isSuccess: false,
+                                  );
+                                  return;
+                                }
+                                startStoreChat(context, widget.sellerId, storeName);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1819,27 +1857,39 @@ class ReviewItem extends StatelessWidget {
         children: [
           Row(
             children: [
-              // User Avatar
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.cyan, width: 1),
+              // User Avatar - Make it tappable
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserReviewHistory(
+                        username: review.username,
+                        avatarUrl: review.avatarUrl,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.cyan, width: 1),
+                  ),
+                  child: review.avatarUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.network(
+                            review.avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, _) =>
+                                const Icon(Icons.person, color: Colors.cyan),
+                          ),
+                        )
+                      : const Icon(Icons.person, color: Colors.cyan),
                 ),
-                child: review.avatarUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          review.avatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, _) =>
-                              const Icon(Icons.person, color: Colors.cyan),
-                        ),
-                      )
-                    : const Icon(Icons.person, color: Colors.cyan),
               ),
-
               const SizedBox(width: 12),
 
               // Username and Date
@@ -1902,6 +1952,8 @@ class Review {
   final double rating;
   final String? avatarUrl;
   final String date;
+  final String? userId;
+  final String? productId;
 
   Review({
     required this.username,
@@ -1909,7 +1961,33 @@ class Review {
     required this.rating,
     this.avatarUrl,
     required this.date,
+    this.userId,
+    this.productId,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'username': username,
+      'comment': comment,
+      'rating': rating,
+      'avatarUrl': avatarUrl,
+      'date': date,
+      'userId': userId,
+      'productId': productId,
+    };
+  }
+
+  factory Review.fromMap(Map<String, dynamic> map) {
+    return Review(
+      username: map['username'] ?? 'Anonymous',
+      comment: map['comment'] ?? '',
+      rating: (map['rating'] ?? 0).toDouble(),
+      avatarUrl: map['avatarUrl'],
+      date: map['date'] ?? '',
+      userId: map['userId'],
+      productId: map['productId'],
+    );
+  }
 }
 
 // Update your ProductService class with these methods
@@ -2049,17 +2127,67 @@ class ReviewService {
   }
 
   Future<void> submitReview(String productId, Review review) async {
-    final reviewsRef = FirebaseFirestore.instance
-        .collection('products')
-        .doc(productId)
-        .collection('reviews');
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User must be logged in to submit review');
 
-    await reviewsRef.add({
-      'username': review.username,
-      'comment': review.comment,
-      'rating': review.rating,
-      'avatarUrl': review.avatarUrl,
-      'date': review.date,
-    });
+      final reviewsRef = FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .collection('reviews');
+
+      // Add to product's reviews collection
+      await reviewsRef.add({
+        'username': review.username,
+        'comment': review.comment,
+        'rating': review.rating,
+        'avatarUrl': review.avatarUrl,
+        'date': review.date,
+        'userId': user.uid,
+        'productId': productId,
+      });
+
+      // Also store in user's reviews collection for easy access to user's review history
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('reviews')
+          .add({
+        'username': review.username,
+        'comment': review.comment,
+        'rating': review.rating,
+        'avatarUrl': review.avatarUrl,
+        'date': review.date,
+        'productId': productId,
+        'userId': user.uid,
+      });
+    } catch (e) {
+      print('Error submitting review: $e');
+      throw e;
+    }
+  }
+
+  Future<List<Review>> fetchUserReviews(String username) async {
+    try {
+      final reviewsQuery = await FirebaseFirestore.instance
+          .collectionGroup('reviews')
+          .where('username', isEqualTo: username)
+          .orderBy('date', descending: true)
+          .get();
+
+      return reviewsQuery.docs.map((doc) {
+        final data = doc.data();
+        return Review(
+          username: data['username'] ?? 'Anonymous',
+          comment: data['comment'] ?? '',
+          rating: (data['rating'] ?? 0).toDouble(),
+          avatarUrl: data['avatarUrl'],
+          date: data['date'] ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      print('Error fetching user reviews: $e');
+      return [];
+    }
   }
 }

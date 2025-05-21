@@ -161,10 +161,22 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              backgroundColor: Colors.grey[900],
+              backgroundColor: const Color(0xFF1A1A2E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: const Color(0xFF333355),
+                  width: 1.5,
+                ),
+              ),
               title: const Text(
-                'Restrict Account',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                'RESTRICT ACCOUNT',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'PixelFont',
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -294,27 +306,54 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   }
 
   Widget _buildStatCard(String title, int value, IconData icon, Color color) {
-    return Card(
-      color: Colors.grey[850],
-      elevation: 4,
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF333355),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: color.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
+            const SizedBox(height: 12),
             Text(
               title,
               style: const TextStyle(
                 color: Colors.white70,
-                fontWeight: FontWeight.bold,
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                letterSpacing: 1,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
               value.toString(),
               style: TextStyle(
                 color: color,
+                fontFamily: 'PixelFont',
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
               ),
@@ -330,22 +369,32 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Admin Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'ADMIN DASHBOARD',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            color: Colors.white,
+            fontSize: 20,
+          ),
         ),
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0D0D0D),
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Color(0xFFFF0077)),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.cyan,
+          indicatorColor: const Color(0xFFFF0077),
+          labelStyle: const TextStyle(fontFamily: 'PixelFont'),
           tabs: const [
-            Tab(text: 'Overview', icon: Icon(Icons.dashboard)),
-            Tab(text: 'Seller Applications', icon: Icon(Icons.store)),
-            Tab(text: 'Users', icon: Icon(Icons.people)),
+            Tab(text: 'OVERVIEW', icon: Icon(Icons.dashboard)),
+            Tab(text: 'SELLER APPS', icon: Icon(Icons.store)),
+            Tab(text: 'USERS', icon: Icon(Icons.people)),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Color(0xFFFF0077)),
             onPressed: _loadStats,
             tooltip: 'Refresh data',
           ),
@@ -356,7 +405,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         children: [
           // Overview tab
           _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2))
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -404,11 +453,17 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                           Expanded(
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.store),
-                              label: Text('Seller Applications (${_stats['pendingApplications']})'),
+                              label: Text(
+                                'SELLER APPS (${_stats['pendingApplications']})',
+                                style: const TextStyle(fontFamily: 'PixelFont'),
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.cyan,
-                                foregroundColor: Colors.black,
+                                backgroundColor: const Color(0xFFFF0077),
+                                foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                               onPressed: () {
                                 _tabController.animateTo(1);
@@ -443,7 +498,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Colors.cyan));
+                return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -480,10 +535,13 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
-                    color: Colors.grey[900],
+                    color: const Color(0xFF1A1A2E),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: const BorderSide(color: Colors.cyan, width: 1),
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: const Color(0xFF333355),
+                        width: 1.5,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -583,7 +641,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Colors.cyan));
+                return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -628,9 +686,13 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
-                    color: Colors.grey[850],
+                    color: const Color(0xFF1A1A2E),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: const Color(0xFF333355),
+                        width: 1.5,
+                      ),
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
