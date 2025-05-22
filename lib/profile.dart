@@ -11,6 +11,7 @@ import 'home.dart';
 import 'see_all_recommend.dart';
 import 'category.dart';
 import 'message.dart'; // Import the Message screen
+import 'settings.dart'; // Import the SettingsScreen
 
 class AppColors {
   // Primary colors
@@ -469,58 +470,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
             onPressed: () {
-              // Navigate to settings
-              showDialog(
-                context: context,
-                builder: (context) => Dialog(
-                  backgroundColor: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    side: BorderSide(color: AppColors.primary, width: 1),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Coming Soon",
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 18,
-                            fontFamily: 'PixelFont',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "Settings feature will be available in the next update.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
-                            fontFamily: 'PixelFont',
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.black,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text(
-                            "OK",
-                            style: TextStyle(
-                              fontFamily: 'PixelFont',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // Navigate to the SettingsScreen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
               );
             },
           ),

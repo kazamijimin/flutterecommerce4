@@ -5,7 +5,7 @@ import 'login.dart';
 import 'terms_condition.dart'; // Import the Terms and Conditions page
 import 'address.dart';
 import 'faqs.dart';
-
+import 'bank_accounts.dart';
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
@@ -180,10 +180,16 @@ class _SettingsPageState extends State<SettingsPage> {
               colorScheme: colorScheme,
               textSize: textSize,
             ),
+            // In _buildSettingTile for Bank Account/Cards
             _buildSettingTile(
               title: 'Bank Account/Cards',
               onTap: () {
-                // Navigate to Bank Account/Cards
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BankAccountsPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,

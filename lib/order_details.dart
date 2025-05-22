@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'order_history.dart';
 
 class OrderDetailsPage extends StatelessWidget {
   final Map<String, dynamic> order;
@@ -80,12 +81,34 @@ class OrderDetailsPage extends StatelessWidget {
                         iconColor: neonBlue,
                       ),
                       const SizedBox(height: 12),
-                      _buildInfoRow(
-                        icon: Icons.payment,
-                        title: 'Payment Method',
-                        value: order['paymentMethod'] ?? 'N/A',
-                        iconColor: neonBlue,
+
+                      // Enhanced payment method display
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.payment,
+                                color: neonBlue,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Payment Method',
+                                style: TextStyle(
+                                  fontFamily: 'PixelFont',
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPaymentMethodCard(order, neonPink, neonBlue),
+                        ],
                       ),
+
                       const SizedBox(height: 12),
                       _buildInfoRow(
                         icon: Icons.local_shipping,
@@ -147,16 +170,20 @@ class OrderDetailsPage extends StatelessWidget {
                                   color: Colors.grey,
                                   size: 40,
                                 ),
-                                loadingBuilder: (context, child, loadingProgress) {
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
                                   if (loadingProgress == null) return child;
                                   return Center(
                                     child: CircularProgressIndicator(
                                       color: neonPink,
-                                      value: loadingProgress.expectedTotalBytes !=
-                                              null
-                                          ? loadingProgress.cumulativeBytesLoaded /
-                                              loadingProgress.expectedTotalBytes!
-                                          : null,
+                                      value:
+                                          loadingProgress.expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
                                     ),
                                   );
                                 },
@@ -227,7 +254,8 @@ class OrderDetailsPage extends StatelessWidget {
                                 // Add payment method and shipping address here
                                 Row(
                                   children: [
-                                    Icon(Icons.payment, color: neonPink, size: 16),
+                                    Icon(Icons.payment,
+                                        color: neonPink, size: 16),
                                     const SizedBox(width: 4),
                                     Text(
                                       order['paymentMethod'] ?? '',
@@ -243,7 +271,8 @@ class OrderDetailsPage extends StatelessWidget {
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.location_on, color: neonBlue, size: 16),
+                                    Icon(Icons.location_on,
+                                        color: neonBlue, size: 16),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
@@ -311,7 +340,6 @@ class OrderDetailsPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 16),
-                  _buildAdminStatusControls(context, orderStatus),
                 ],
 
                 const SizedBox(height: 24),
@@ -627,9 +655,9 @@ class OrderDetailsPage extends StatelessWidget {
 
     switch (normalizedStatus) {
       case 'to pay':
-        buttonText = 'PROCEED TO PAYMENT';
+        buttonText = 'CONTINUE TO SHOPPING';
         buttonColor = neonPink;
-        buttonIcon = Icons.payment;
+        buttonIcon = Icons.shopping_cart;
         onPressed = () => _proceedToPayment(context, order);
         break;
       case 'to ship':
@@ -917,54 +945,6 @@ class OrderDetailsPage extends StatelessWidget {
   }
 
   // Build status update controls for admin/seller users
-  Widget _buildAdminStatusControls(BuildContext context, String currentStatus) {
-    final neonPink = const Color(0xFFFF0077);
-    final neonBlue = const Color(0xFF00E5FF);
-    final neonGreen = const Color(0xFF00FF66);
-
-    // Normalize current status for comparison
-    final normalizedStatus = currentStatus.toLowerCase();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'UPDATE ORDER STATUS',
-            style: TextStyle(
-              fontFamily: 'PixelFont',
-              fontSize: 14,
-              color: Colors.white70,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.black12,
-            border: Border.all(color: neonPink.withOpacity(0.3)),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildStatusUpdateButton(
-                  context, 'To Ship', normalizedStatus == 'to ship'),
-              _buildStatusUpdateButton(
-                  context, 'To Receive', normalizedStatus == 'to receive'),
-              _buildStatusUpdateButton(
-                  context, 'To Review', normalizedStatus == 'to review'),
-              _buildStatusUpdateButton(
-                  context, 'Delivered', normalizedStatus == 'delivered'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   // Build individual status update button
   Widget _buildStatusUpdateButton(
@@ -1110,16 +1090,18 @@ class OrderDetailsPage extends StatelessWidget {
       if (userId.isNotEmpty) {
         String title = 'Order Status Updated';
         String message = 'Your order has been updated to $newStatus.';
-        
+
         // Customize message based on order status
         switch (newStatus) {
           case 'to ship':
             title = 'Order Confirmed';
-            message = 'Your order #$systemOrderId has been confirmed and is being prepared.';
+            message =
+                'Your order #$systemOrderId has been confirmed and is being prepared.';
             break;
           case 'to receive':
             title = 'Order Shipped';
-            message = 'Your order #$systemOrderId has been shipped and is on its way!';
+            message =
+                'Your order #$systemOrderId has been shipped and is on its way!';
             break;
           case 'delivered':
             title = 'Order Delivered';
@@ -1197,24 +1179,164 @@ class OrderDetailsPage extends StatelessWidget {
 
   // Add this method to handle navigation
   void _navigateToOrderHistory(BuildContext context) {
-    // Navigate to order history page
-    // Replace this with actual navigation to your order history page
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Navigating to order history...',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.blue,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OrderHistory(),
       ),
     );
-    
-    // When you have the actual OrderHistoryPage, use this:
-    // Navigator.of(context).push(
-    //   MaterialPageRoute(
-    //     builder: (context) => OrderHistoryPage(),
-    //   ),
-    // );
+  }
+
+// Replace the problematic line in the _formatPaymentMethod method:
+  String _formatPaymentMethod(String? method, dynamic details) {
+    if (method == null) return 'N/A';
+
+    if (method == 'Card' && details != null) {
+      // Format card payment details - fix the type casting issue
+      final Map<String, dynamic> paymentDetails =
+          details is Map<String, dynamic>
+              ? details
+              : Map<String, dynamic>.from(details as Map);
+
+      if (paymentDetails.containsKey('savedCard') &&
+          paymentDetails['savedCard'] == 'true') {
+        // Display saved card info
+        final String cardNickname =
+            paymentDetails['cardNickname'] ?? 'Saved Card';
+        final String bank = paymentDetails['bank'] ?? '';
+        final String cardNumber = paymentDetails['cardNumber'] ?? '';
+
+        return 'Credit Card - $cardNickname\n$bank ($cardNumber)';
+      } else {
+        // Display new card info
+        final String bank = paymentDetails['bank'] ?? '';
+        final String cardNumber = paymentDetails['cardNumber'] ?? '';
+        final String lastFour = cardNumber.length > 4
+            ? cardNumber.substring(cardNumber.length - 4)
+            : cardNumber;
+
+        return 'Credit Card - $bank\n**** **** **** $lastFour';
+      }
+    } else if (method == 'Wallet') {
+      return 'Digital Wallet';
+    } else if (method == 'Cash on Delivery (COD)') {
+      return 'Cash on Delivery';
+    }
+
+    return method;
+  }
+
+  // Add this new method to create a nicely formatted payment method card
+  Widget _buildPaymentMethodCard(
+      Map<String, dynamic> order, Color neonPink, Color neonBlue) {
+    final paymentMethod = order['paymentMethod'] ?? 'N/A';
+    final paymentDetails = order['paymentDetails'];
+
+    // Default icon and colors
+    IconData paymentIcon = Icons.credit_card;
+    Color cardColor = neonBlue.withOpacity(0.1);
+    Color borderColor = neonBlue.withOpacity(0.3);
+
+    // Set appropriate icon and color based on payment method
+    if (paymentMethod == 'Card') {
+      paymentIcon = Icons.credit_card;
+      cardColor = neonPink.withOpacity(0.1);
+      borderColor = neonPink.withOpacity(0.3);
+    } else if (paymentMethod == 'Wallet') {
+      paymentIcon = Icons.account_balance_wallet;
+      cardColor = neonBlue.withOpacity(0.1);
+      borderColor = neonBlue.withOpacity(0.3);
+    } else if (paymentMethod == 'Cash on Delivery (COD)') {
+      paymentIcon = Icons.money;
+      cardColor = Colors.green.withOpacity(0.1);
+      borderColor = Colors.green.withOpacity(0.3);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Icon(
+              paymentIcon,
+              color: paymentMethod == 'Card' ? neonPink : neonBlue,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: paymentMethod == 'Card' && paymentDetails != null
+                ? _buildCardDetails(paymentDetails)
+                : Text(
+                    paymentMethod,
+                    style: const TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardDetails(dynamic details) {
+    final Map<String, dynamic> paymentDetails = details is Map<String, dynamic>
+        ? details
+        : Map<String, dynamic>.from(details as Map);
+
+    final bool isSavedCard = paymentDetails.containsKey('savedCard') &&
+        paymentDetails['savedCard'] == 'true';
+    final String cardNumber =
+        paymentDetails['cardNumber'] ?? '**** **** **** ****';
+    final String bank = paymentDetails['bank'] ?? 'Unknown Bank';
+    final String cardNickname = paymentDetails['cardNickname'] ?? 'Card';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isSavedCard ? cardNickname : 'Credit/Debit Card',
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          cardNumber,
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          bank,
+          style: const TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.cyan,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
   }
 }
 

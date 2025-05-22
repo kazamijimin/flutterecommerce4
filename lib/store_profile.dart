@@ -33,8 +33,9 @@ class _StoreProfileState extends State<StoreProfile> {
 
   Future<void> _fetchStoreData() async {
     try {
-      final storeDoc = await _firestore.collection('users').doc(widget.sellerId).get();
-      
+      final storeDoc =
+          await _firestore.collection('users').doc(widget.sellerId).get();
+
       if (storeDoc.exists) {
         setState(() {
           _storeData = storeDoc.data();
@@ -49,20 +50,50 @@ class _StoreProfileState extends State<StoreProfile> {
   }
 
   Future<void> _fetchStoreProducts() async {
+    setState(() => _isLoading = true);
+
     try {
+      print('Fetching products for seller ID: ${widget.sellerId}');
+      
+      // Query products by the seller ID with proper field name
       final productsQuery = await _firestore
           .collection('products')
           .where('sellerId', isEqualTo: widget.sellerId)
-          .orderBy('createdAt', descending: true)
           .get();
 
+      if (productsQuery.docs.isEmpty) {
+        print('No products found for seller: ${widget.sellerId}');
+      } else {
+        print('Found ${productsQuery.docs.length} products for seller: ${widget.sellerId}');
+        
+        // Debug information to help troubleshoot
+        for (var doc in productsQuery.docs) {
+          print('Product: ${doc.id} - ${doc.data()['title']} - SellerId: ${doc.data()['sellerId']}');
+        }
+      }
+
       setState(() {
-        _storeProducts = productsQuery.docs
-            .map((doc) => {'id': doc.id, ...doc.data()})
-            .toList();
+        _storeProducts = productsQuery.docs.map((doc) {
+          final data = doc.data();
+          // Make sure we're mapping the correct field names from Firestore
+          return {
+            'id': doc.id,
+            'name': data['title'] ?? 'Unknown Product',
+            'price': data['price'] ?? 0.0,
+            'imageUrl': data['imageUrl'] ?? '',
+            'rating': data['rating'] ?? 0.0,
+            'createdAt': data['createdAt'],
+            'description': data['description'] ?? '',
+            'category': data['category'] ?? 'Uncategorized',
+            'sellerId': data['sellerId'] ?? '',
+            'sold': data['sold'] ?? 0,
+          };
+        }).toList();
+        _isLoading = false;
       });
     } catch (e) {
       print('Error fetching store products: $e');
+      setState(() => _isLoading = false);
     }
   }
 
@@ -119,10 +150,12 @@ class _StoreProfileState extends State<StoreProfile> {
                           radius: 50,
                           backgroundColor: Colors.grey[900],
                           backgroundImage: _storeData?['photoURL'] != null
-                              ? CachedNetworkImageProvider(_storeData!['photoURL'])
+                              ? CachedNetworkImageProvider(
+                                  _storeData!['photoURL'])
                               : null,
                           child: _storeData?['photoURL'] == null
-                              ? const Icon(Icons.store, color: Colors.white, size: 40)
+                              ? const Icon(Icons.store,
+                                  color: Colors.white, size: 40)
                               : null,
                         ),
                       ),
@@ -216,7 +249,8 @@ class _StoreProfileState extends State<StoreProfile> {
     );
   }
 
-  Widget _buildStatItem(String value, String label, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -259,23 +293,56 @@ class _StoreProfileState extends State<StoreProfile> {
 
   Widget _buildProductsGrid() {
     if (_storeProducts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(Icons.store_sharp, size: 48, color: Colors.grey[700]),
-              const SizedBox(height: 16),
-              Text(
-                'No products available',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 16,
-                  fontFamily: 'PixelFont',
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[800]!),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.store_mall_directory_outlined,
+                size: 64, color: Colors.grey[600]),
+            const SizedBox(height: 16),
+            const Text(
+              'No products in this store',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 18,
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This seller hasn\'t added any products yet',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+                fontFamily: 'PixelFont',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text(
+                'REFRESH',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.withOpacity(0.7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
                 ),
               ),
-            ],
-          ),
+              onPressed: _fetchStoreProducts,
+            ),
+          ],
         ),
       );
     }
@@ -299,72 +366,162 @@ class _StoreProfileState extends State<StoreProfile> {
   }
 
   Widget _buildProductCard(Map<String, dynamic> product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[800]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-            child: Image.network(
-              product['imageUrl'] ?? '',
-              height: 140,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 140,
-                color: Colors.grey[800],
-                child: const Icon(Icons.image_not_supported, color: Colors.white),
-              ),
+    return GestureDetector(
+      onTap: () {
+        // Navigate to product detail page
+        Navigator.pushNamed(context, '/product',
+            arguments: {'productId': product['id']});
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[800]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withOpacity(0.1),
+              blurRadius: 8,
+              spreadRadius: 0,
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product image with loading indicator
+            Stack(
               children: [
-                Text(
-                  product['name'] ?? 'Unknown Product',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'PixelFont',
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'PHP ${product['price'] ?? '0.00'}',
-                  style: const TextStyle(
-                    color: Colors.orange,
-                    fontSize: 12,
-                    fontFamily: 'PixelFont',
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 14),
-                    Text(
-                      ' ${(product['rating'] ?? 0.0).toStringAsFixed(1)}',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
-                        fontFamily: 'PixelFont',
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(8)),
+                  child: CachedNetworkImage(
+                    imageUrl: product['imageUrl'] ?? '',
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 140,
+                      color: Colors.grey[850],
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.purple),
+                        ),
                       ),
                     ),
-                  ],
+                    errorWidget: (context, url, error) => Container(
+                      height: 140,
+                      color: Colors.grey[800],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.image_not_supported,
+                              color: Colors.white60),
+                          const SizedBox(height: 4),
+                          Text(
+                            product['name'] ?? 'Product',
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                              fontFamily: 'PixelFont',
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+                // Category badge
+                if (product['category'] != null)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        product['category'],
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
-          ),
-        ],
+
+            // Product details
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['name'] ?? 'Unknown Product',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Price with PHP symbol
+                  Text(
+                    '₱${product['price']?.toStringAsFixed(2) ?? '0.00'}',
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Rating and sales info
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 14),
+                          Text(
+                            ' ${(product['rating'] ?? 0.0).toStringAsFixed(1)}',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${product['sold'] ?? 0} sold',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 11,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,6 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'product_details.dart';
+import 'home.dart';
+import 'category.dart';
+import 'message.dart';
+import 'profile.dart';
 
 class SeeAllProductsScreen extends StatelessWidget {
   const SeeAllProductsScreen({super.key});
@@ -60,112 +64,154 @@ class SeeAllProductsScreen extends StatelessWidget {
 
               return _buildProductCard(
                 context,
-                productData?['imageUrl'] ??
-                    '', // Default to an empty string if imageUrl is missing
-                productData?['name'] ??
-                    'Unknown Product', // Default to 'Unknown Product' if name is missing
-                'PHP ${productData?['price'] ?? '0.00'}', // Default to '0.00' if price is missing
-                productData?['description'] ??
-                    'No description available', // Default to 'No description available'
-                productData?['sellerId'] ??
-                    'Unknown Seller', // Default to 'Unknown Seller' if sellerId is missing
-                product
-                    .id, // Pass the Firestore document ID as the seventh argument
+                productData?['imageUrl'] ?? '',
+                productData?['name'] ?? 'Unknown Product',
+                'PHP ${productData?['price'] ?? '0.00'}',
+                productData?['description'] ?? 'No description available',
+                productData?['sellerId'] ?? 'Unknown Seller',
+                product.id,
               );
             },
           );
         },
       ),
-    );
-  }
-Widget _buildProductCard(BuildContext context, String imageUrl, String title,
-    String price, String description, String sellerId, String productId) {
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProductDetails(
-            productId: productId,
-            imageUrl: imageUrl,
-            title: title,
-            price: price,
-            description: description,
-            sellerId: sellerId, // Use sellerId here
-            rating: 0.0, // Provide a default value for rating
-            stockCount: 0, // Provide a default value for stockCount
-            category: 'Unknown', // Provide a default value for category
-          ),
-        ),
-      );
-    },
-    child: Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey.shade900,
-                    child: const Center(
-                      child: Icon(Icons.error, color: Colors.white),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'PixelFont',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    color: Colors.cyan,
-                    fontSize: 12,
-                    fontFamily: 'PixelFont',
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                    fontFamily: 'PixelFont',
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
+        unselectedItemColor: Colors.white,
+        selectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        currentIndex: 3, // Set to 3 because "Shop" is the fourth item
+        onTap: (index) {
+          switch (index) {
+            case 0: // Home
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+              break;
+            case 1: // Category
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CategoryPage()),
+              );
+              break;
+            case 2: // Message
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatPage()),
+              );
+              break;
+            case 3: // Shop - already here
+              break;
+            case 4: // Profile
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Shop'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
+
+  Widget _buildProductCard(BuildContext context, String imageUrl, String title,
+      String price, String description, String sellerId, String productId) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(
+              productId: productId,
+              imageUrl: imageUrl,
+              title: title,
+              price: price,
+              description: description,
+              sellerId: sellerId, // Use sellerId here
+              rating: 0.0, // Provide a default value for rating
+              stockCount: 0, // Provide a default value for stockCount
+              category: 'Unknown', // Provide a default value for category
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade900,
+                      child: const Center(
+                        child: Icon(Icons.error, color: Colors.white),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: 'PixelFont',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: Colors.cyan,
+                      fontSize: 12,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                      fontFamily: 'PixelFont',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

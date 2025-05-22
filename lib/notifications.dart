@@ -147,7 +147,7 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   Widget _buildNotificationsList(String type) {
     final user = FirebaseAuth.instance.currentUser;
-
+    
     if (user == null) {
       return Center(
         child: Column(
@@ -182,476 +182,519 @@ class _NotificationsPageState extends State<NotificationsPage>
       );
     }
 
-    // Create a more stable query
-    Query query = FirebaseFirestore.instance
-        .collection('notifications')
-        .where('userId', isEqualTo: user.uid);
-        
-    // Only apply the type filter if not "all"
-    if (type != 'all') {
-      query = query.where('type', isEqualTo: type);
-    }
-    
-    // Add filter for unread notifications if enabled
-    if (_showOnlyUnread) {
-      query = query.where('isRead', isEqualTo: false);
-    }
-    
-    // Make sure we have a timestamp to sort by
     try {
-      // Always sort by timestamp, descending
-      query = query.orderBy('timestamp', descending: true);
-    } catch (e) {
-      print('Error setting up timestamp ordering: $e');
-      // If timestamp ordering fails, try to continue without it
-    }
+      // Base query for user's notifications
+      Query query = FirebaseFirestore.instance
+          .collection('notifications')
+          .where('userId', isEqualTo: user!.uid);
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
-      builder: (context, snapshot) {
-        // Debug prints to see what's happening
-        if (snapshot.connectionState == ConnectionState.active) {
+      // For specific tabs, add type filter
+      if (type != 'all') {
+        query = query.where('type', isEqualTo: type);
+      }
+
+      // Add unread filter if enabled
+      if (_showOnlyUnread) {
+        query = query.where('isRead', isEqualTo: false);
+      }
+
+      // Always sort by timestamp
+      query = query.orderBy('timestamp', descending: true);
+
+      return StreamBuilder<QuerySnapshot>(
+        stream: query.snapshots(),
+        builder: (context, snapshot) {
+          // Detailed error handling
+          if (snapshot.hasError) {
+            print('Firestore Error: ${snapshot.error}');
+            print('Firestore Error Stack Trace: ${snapshot.stackTrace}');
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: _neonPink, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading notifications\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontFamily: 'PixelFont',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // Add debug print for data
           if (snapshot.hasData) {
-            print('ACTIVE: Got ${snapshot.data!.docs.length} notifications for tab: $type');
-            
-            // Debug the notification types
-            if (type == 'all' && snapshot.data!.docs.isNotEmpty) {
+            print('Got ${snapshot.data!.docs.length} notifications');
+            if (type == 'all') {
               final types = snapshot.data!.docs.map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 return data['type'] ?? 'unknown';
               }).toList();
-              print('Notification types in "all" tab: $types');
+              print('Types in ALL tab: $types');
             }
-          } else if (snapshot.hasError) {
-            print('Error loading notifications: ${snapshot.error}');
           }
-        }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
-            ),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  type == 'orders'
-                      ? Icons.shopping_bag
-                      : type == 'promotions'
-                          ? Icons.local_offer
-                          : Icons.notifications_off,
-                  color: Colors.grey,
-                  size: 64,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No ${type == 'all' ? '' : type} notifications yet.',
-                  style: const TextStyle(
-                    color: Colors.grey, 
-                    fontFamily: 'PixelFont',
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final notifications = snapshot.data!.docs;
-
-        return ListView.builder(
-          itemCount: notifications.length,
-          itemBuilder: (context, index) {
-            final notification = notifications[index].data() as Map<String, dynamic>;
-
-            // Make sure timestamp is properly handled
-            final DateTime timestamp;
-            if (notification['timestamp'] is Timestamp) {
-              timestamp = (notification['timestamp'] as Timestamp).toDate();
-            } else {
-              timestamp = DateTime.now(); // Fallback
+          // Debug prints to see what's happening
+          if (snapshot.connectionState == ConnectionState.active) {
+            if (snapshot.hasData) {
+              print('ACTIVE: Got ${snapshot.data!.docs.length} notifications for tab: $type');
+              
+              // Debug the notification types
+              if (type == 'all' && snapshot.data!.docs.isNotEmpty) {
+                final types = snapshot.data!.docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return data['type'] ?? 'unknown';
+                }).toList();
+                print('Notification types in "all" tab: $types');
+              }
+            } else if (snapshot.hasError) {
+              print('Error loading notifications: ${snapshot.error}');
             }
+          }
 
-            final String formattedDate = DateFormat('MMM dd, yyyy • HH:mm').format(timestamp);
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
+              ),
+            );
+          }
 
-            // Use ?. and ?? for safe access to 'isRead' field
-            final bool isRead = notification['isRead'] ?? false;
-            
-            return Dismissible(
-              key: Key(notifications[index].id),
-              background: Container(
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 20),
-                color: isRead ? _neonBlue.withOpacity(0.3) : _neonPink.withOpacity(0.3),
-                child: Icon(
-                  isRead ? Icons.mark_email_unread : Icons.mark_email_read,
-                  color: isRead ? _neonBlue : _neonPink,
-                  size: 28,
-                ),
-              ),
-              secondaryBackground: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                color: Colors.red.withOpacity(0.3),
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.red,
-                  size: 28,
-                ),
-              ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.endToStart) {
-                  // Delete action requires confirmation
-                  final bool? result = await showDialog<bool>(
-                    context: context,
-                    builder: (dialogContext) => AlertDialog(
-                      backgroundColor: const Color(0xFF1A1A2E),
-                      title: const Text(
-                        'Delete Notification',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'PixelFont',
-                          fontSize: 18,
-                        ),
-                      ),
-                      content: const Text(
-                        'Are you sure you want to delete this notification?',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontFamily: 'PixelFont',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
-                          child: Text(
-                            'CANCEL',
-                            style: TextStyle(
-                              color: _neonBlue,
-                              fontFamily: 'PixelFont',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, true),
-                          child: const Text(
-                            'DELETE',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontFamily: 'PixelFont',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  return result ?? false;
-                } else {
-                  // For read/unread, no confirmation needed
-                  return true;
-                }
-              },
-              onDismissed: (direction) async {
-                if (direction == DismissDirection.endToStart) {
-                  // Delete notification
-                  await FirebaseFirestore.instance
-                      .collection('notifications')
-                      .doc(notifications[index].id)
-                      .delete();
-                  
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Notification deleted',
-                          style: TextStyle(fontFamily: 'PixelFont'),
-                        ),
-                        backgroundColor: Colors.red,
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  }
-                } else {
-                  // Toggle read status
-                  final newReadStatus = !isRead;
-                  await FirebaseFirestore.instance
-                      .collection('notifications')
-                      .doc(notifications[index].id)
-                      .update({'isRead': newReadStatus});
-                  
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          newReadStatus ? 'Marked as read' : 'Marked as unread',
-                          style: const TextStyle(fontFamily: 'PixelFont'),
-                        ),
-                        backgroundColor: newReadStatus ? _neonPink : _neonBlue,
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  border: Border.all(
-                    color: isRead ? Colors.grey.withOpacity(0.3) : _neonBlue.withOpacity(0.5),
-                    width: 1,
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    type == 'orders'
+                        ? Icons.shopping_bag
+                        : type == 'promotions'
+                            ? Icons.local_offer
+                            : Icons.notifications_off,
+                    color: Colors.grey,
+                    size: 64,
                   ),
-                  boxShadow: [
-                    if (!isRead)
-                      BoxShadow(
-                        color: _neonBlue.withOpacity(0.15),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'No ${type == 'all' ? '' : type} notifications yet.',
+                    style: const TextStyle(
+                      color: Colors.grey, 
+                      fontFamily: 'PixelFont',
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final notifications = snapshot.data!.docs;
+
+          return ListView.builder(
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index].data() as Map<String, dynamic>;
+
+              // Make sure timestamp is properly handled
+              final DateTime timestamp;
+              if (notification['timestamp'] is Timestamp) {
+                timestamp = (notification['timestamp'] as Timestamp).toDate();
+              } else {
+                timestamp = DateTime.now(); // Fallback
+              }
+
+              final String formattedDate = DateFormat('MMM dd, yyyy • HH:mm').format(timestamp);
+
+              // Use ?. and ?? for safe access to 'isRead' field
+              final bool isRead = notification['isRead'] ?? false;
+              
+              return Dismissible(
+                key: Key(notifications[index].id),
+                background: Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 20),
+                  color: isRead ? _neonBlue.withOpacity(0.3) : _neonPink.withOpacity(0.3),
+                  child: Icon(
+                    isRead ? Icons.mark_email_unread : Icons.mark_email_read,
+                    color: isRead ? _neonBlue : _neonPink,
+                    size: 28,
+                  ),
                 ),
-                child: InkWell(
-                  onTap: () async {
-                    // Existing onTap handling
-                    if (!isRead) {
-                      await FirebaseFirestore.instance
-                          .collection('notifications')
-                          .doc(notifications[index].id)
-                          .update({'isRead': true});
-                    }
-                    
-                    // Navigate to order details if it's an order notification
-                    if (type == 'orders' || notification['type'] == 'orders') {
-                      if (notification['orderId'] != null) {
-                        final orderQuery = await FirebaseFirestore.instance
-                            .collection('orders')
-                            .where('orderId', isEqualTo: notification['orderId'])
-                            .limit(1)
-                            .get();
-                            
-                        if (orderQuery.docs.isNotEmpty) {
-                          final orderData = orderQuery.docs.first.data();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrderDetailsPage(
-                                order: orderData,
+                secondaryBackground: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  color: Colors.red.withOpacity(0.3),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: 28,
+                  ),
+                ),
+                confirmDismiss: (direction) async {
+                  if (direction == DismissDirection.endToStart) {
+                    // Delete action requires confirmation
+                    final bool? result = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        backgroundColor: const Color(0xFF1A1A2E),
+                        title: const Text(
+                          'Delete Notification',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                            fontSize: 18,
+                          ),
+                        ),
+                        content: const Text(
+                          'Are you sure you want to delete this notification?',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, false),
+                            child: Text(
+                              'CANCEL',
+                              style: TextStyle(
+                                color: _neonBlue,
+                                fontFamily: 'PixelFont',
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          );
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, true),
+                            child: const Text(
+                              'DELETE',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontFamily: 'PixelFont',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    return result ?? false;
+                  } else {
+                    // For read/unread, no confirmation needed
+                    return true;
+                  }
+                },
+                onDismissed: (direction) async {
+                  if (direction == DismissDirection.endToStart) {
+                    // Delete notification
+                    await FirebaseFirestore.instance
+                        .collection('notifications')
+                        .doc(notifications[index].id)
+                        .delete();
+                    
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Notification deleted',
+                            style: TextStyle(fontFamily: 'PixelFont'),
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  } else {
+                    // Toggle read status
+                    final newReadStatus = !isRead;
+                    await FirebaseFirestore.instance
+                        .collection('notifications')
+                        .doc(notifications[index].id)
+                        .update({'isRead': newReadStatus});
+                    
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            newReadStatus ? 'Marked as read' : 'Marked as unread',
+                            style: const TextStyle(fontFamily: 'PixelFont'),
+                          ),
+                          backgroundColor: newReadStatus ? _neonPink : _neonBlue,
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    border: Border.all(
+                      color: isRead ? Colors.grey.withOpacity(0.3) : _neonBlue.withOpacity(0.5),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      if (!isRead)
+                        BoxShadow(
+                          color: _neonBlue.withOpacity(0.15),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                    ],
+                  ),
+                  child: InkWell(
+                    onTap: () async {
+                      // Existing onTap handling
+                      if (!isRead) {
+                        await FirebaseFirestore.instance
+                            .collection('notifications')
+                            .doc(notifications[index].id)
+                            .update({'isRead': true});
+                      }
+                      
+                      // Navigate to order details if it's an order notification
+                      if (type == 'orders' || notification['type'] == 'orders') {
+                        if (notification['orderId'] != null) {
+                          final orderQuery = await FirebaseFirestore.instance
+                              .collection('orders')
+                              .where('orderId', isEqualTo: notification['orderId'])
+                              .limit(1)
+                              .get();
+                              
+                          if (orderQuery.docs.isNotEmpty) {
+                            final orderData = orderQuery.docs.first.data();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => OrderDetailsPage(
+                                  order: orderData,
+                                ),
+                              ),
+                            );
+                          }
                         }
                       }
-                    }
-                  },
-                  onLongPress: () {
-                    // Show context menu for read/unread options
-                    _showNotificationOptions(context, notifications[index].id, isRead);
-                  },
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(12),
-                    leading: _buildNotificationLeading(notification, type),
-                    title: Text(
-                      notification['title'] ?? 'Notification',
-                      style: TextStyle(
-                        color: isRead ? Colors.white70 : Colors.white,
-                        fontFamily: 'PixelFont',
-                        fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                    },
+                    onLongPress: () {
+                      // Show context menu for read/unread options
+                      _showNotificationOptions(context, notifications[index].id, isRead);
+                    },
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: _buildNotificationLeading(notification, type),
+                      title: Text(
+                        notification['title'] ?? 'Notification',
+                        style: TextStyle(
+                          color: isRead ? Colors.white70 : Colors.white,
+                          fontFamily: 'PixelFont',
+                          fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Your existing subtitle content
-                        const SizedBox(height: 4),
-                        Text(
-                          notification['message'] ?? '',
-                          style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            color: Colors.cyan.withOpacity(0.6),
-                            fontFamily: 'PixelFont',
-                            fontSize: 12,
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Your existing subtitle content
+                          const SizedBox(height: 4),
+                          Text(
+                            notification['message'] ?? '',
+                            style: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'),
                           ),
-                        ),
-                        // Your existing conditional FutureBuilder for order items
-                        if (type == 'orders' && notification['orderId'] != null)
-                          FutureBuilder<DocumentSnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('orders')
-                                .where('orderId', isEqualTo: notification['orderId'])
-                                .limit(1)
-                                .get()
-                                .then((snapshot) => snapshot.docs.first),
-                            builder: (context, orderSnapshot) {
-                              if (orderSnapshot.connectionState == ConnectionState.waiting) {
-                                return const Padding(
-                                  padding: EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    'Loading order details...',
-                                    style: TextStyle(color: Colors.grey, fontFamily: 'PixelFont', fontSize: 12),
+                          const SizedBox(height: 8),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              color: Colors.cyan.withOpacity(0.6),
+                              fontFamily: 'PixelFont',
+                              fontSize: 12,
+                            ),
+                          ),
+                          // Your existing conditional FutureBuilder for order items
+                          if (type == 'orders' && notification['orderId'] != null)
+                            FutureBuilder<DocumentSnapshot>(
+                              future: FirebaseFirestore.instance
+                                  .collection('orders')
+                                  .where('orderId', isEqualTo: notification['orderId'])
+                                  .limit(1)
+                                  .get()
+                                  .then((snapshot) => snapshot.docs.first),
+                              builder: (context, orderSnapshot) {
+                                if (orderSnapshot.connectionState == ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.only(top: 8.0),
+                                    child: Text(
+                                      'Loading order details...',
+                                      style: TextStyle(color: Colors.grey, fontFamily: 'PixelFont', fontSize: 12),
+                                    ),
+                                  );
+                                }
+                              
+                                if (!orderSnapshot.hasData || orderSnapshot.hasError) {
+                                  return const SizedBox.shrink();
+                                }
+                              
+                                final orderData = orderSnapshot.data!.data() as Map<String, dynamic>?;
+                                if (orderData == null) return const SizedBox.shrink();
+                                
+                                final items = (orderData['items'] as List<dynamic>?) ?? [];
+                                if (items.isEmpty) return const SizedBox.shrink();
+                              
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Divider(color: Colors.white24),
+                                    const Text(
+                                      'ORDER ITEMS:',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontFamily: 'PixelFont',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 40,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: items.length > 3 ? 3 : items.length,
+                                        itemBuilder: (context, itemIndex) {
+                                          final item = items[itemIndex];
+                                          return Container(
+                                            width: 40,
+                                            height: 40,
+                                            margin: const EdgeInsets.only(right: 8),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: _neonPink, width: 1),
+                                            ),
+                                            child: item['imageUrl'] != null
+                                                ? Image.network(
+                                                    item['imageUrl'],
+                                                    fit: BoxFit.cover,
+                                                    loadingBuilder: (context, child, loadingProgress) {
+                                                      if (loadingProgress == null) return child;
+                                                      return Center(
+                                                        child: CircularProgressIndicator(
+                                                          value: loadingProgress.expectedTotalBytes != null
+                                                              ? loadingProgress.cumulativeBytesLoaded /
+                                                                  loadingProgress.expectedTotalBytes!
+                                                              : null,
+                                                          strokeWidth: 2,
+                                                          valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : const Icon(Icons.image_not_supported, color: Colors.grey, size: 20),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    if (items.length > 3)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text(
+                                          '+${items.length - 3} more',
+                                          style: TextStyle(
+                                            color: _neonBlue,
+                                            fontFamily: 'PixelFont',
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Read status indicator
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isRead ? Colors.transparent : _neonPink,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Quick action button to toggle read status
+                          IconButton(
+                            icon: Icon(
+                              isRead ? Icons.mark_email_unread : Icons.mark_email_read,
+                              color: isRead ? _neonBlue.withOpacity(0.7) : _neonPink.withOpacity(0.7),
+                              size: 20,
+                            ),
+                            onPressed: () async {
+                              // Toggle read status
+                              await FirebaseFirestore.instance
+                                  .collection('notifications')
+                                  .doc(notifications[index].id)
+                                  .update({'isRead': !isRead});
+                              
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isRead ? 'Marked as unread' : 'Marked as read',
+                                      style: const TextStyle(fontFamily: 'PixelFont'),
+                                    ),
+                                    backgroundColor: isRead ? _neonBlue : _neonPink,
+                                    duration: const Duration(seconds: 1),
                                   ),
                                 );
                               }
-                            
-                              if (!orderSnapshot.hasData || orderSnapshot.hasError) {
-                                return const SizedBox.shrink();
-                              }
-                            
-                              final orderData = orderSnapshot.data!.data() as Map<String, dynamic>?;
-                              if (orderData == null) return const SizedBox.shrink();
-                              
-                              final items = (orderData['items'] as List<dynamic>?) ?? [];
-                              if (items.isEmpty) return const SizedBox.shrink();
-                            
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Divider(color: Colors.white24),
-                                  const Text(
-                                    'ORDER ITEMS:',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontFamily: 'PixelFont',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    height: 40,
-                                    child: ListView.builder(
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: items.length > 3 ? 3 : items.length,
-                                      itemBuilder: (context, itemIndex) {
-                                        final item = items[itemIndex];
-                                        return Container(
-                                          width: 40,
-                                          height: 40,
-                                          margin: const EdgeInsets.only(right: 8),
-                                          decoration: BoxDecoration(
-                                            border: Border.all(color: _neonPink, width: 1),
-                                          ),
-                                          child: item['imageUrl'] != null
-                                              ? Image.network(
-                                                  item['imageUrl'],
-                                                  fit: BoxFit.cover,
-                                                  loadingBuilder: (context, child, loadingProgress) {
-                                                    if (loadingProgress == null) return child;
-                                                    return Center(
-                                                      child: CircularProgressIndicator(
-                                                        value: loadingProgress.expectedTotalBytes != null
-                                                            ? loadingProgress.cumulativeBytesLoaded /
-                                                                loadingProgress.expectedTotalBytes!
-                                                            : null,
-                                                        strokeWidth: 2,
-                                                        valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
-                                                      ),
-                                                    );
-                                                  },
-                                                )
-                                              : const Icon(Icons.image_not_supported, color: Colors.grey, size: 20),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  if (items.length > 3)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
-                                      child: Text(
-                                        '+${items.length - 3} more',
-                                        style: TextStyle(
-                                          color: _neonBlue,
-                                          fontFamily: 'PixelFont',
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
                             },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            splashRadius: 18,
                           ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Read status indicator
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isRead ? Colors.transparent : _neonPink,
+                          const SizedBox(width: 8),
+                          // Menu options button
+                          IconButton(
+                            icon: Icon(
+                              Icons.more_vert,
+                              color: Colors.grey.withOpacity(0.7),
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              _showNotificationOptions(context, notifications[index].id, isRead);
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            splashRadius: 18,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Quick action button to toggle read status
-                        IconButton(
-                          icon: Icon(
-                            isRead ? Icons.mark_email_unread : Icons.mark_email_read,
-                            color: isRead ? _neonBlue.withOpacity(0.7) : _neonPink.withOpacity(0.7),
-                            size: 20,
-                          ),
-                          onPressed: () async {
-                            // Toggle read status
-                            await FirebaseFirestore.instance
-                                .collection('notifications')
-                                .doc(notifications[index].id)
-                                .update({'isRead': !isRead});
-                            
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    isRead ? 'Marked as unread' : 'Marked as read',
-                                    style: const TextStyle(fontFamily: 'PixelFont'),
-                                  ),
-                                  backgroundColor: isRead ? _neonBlue : _neonPink,
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
-                            }
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          splashRadius: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        // Menu options button
-                        IconButton(
-                          icon: Icon(
-                            Icons.more_vert,
-                            color: Colors.grey.withOpacity(0.7),
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            _showNotificationOptions(context, notifications[index].id, isRead);
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          splashRadius: 18,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    } catch (e, stackTrace) {
+      print('Query Building Error: $e');
+      print('Stack Trace: $stackTrace');
+      return Center(
+        child: Text(
+          'Error setting up notifications: $e',
+          style: const TextStyle(
+            color: Colors.red,
+            fontFamily: 'PixelFont',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildNotificationLeading(Map<String, dynamic> notification, String type) {

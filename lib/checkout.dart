@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'order_details.dart';
 import 'dart:math';
+import 'card_payment_dialog.dart';
+import 'wallet.dart';
 
 class CheckoutPage extends StatefulWidget {
   final double totalPrice;
@@ -27,6 +29,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   double _shippingFee = 4.99; // Default shipping fee
   double _totalPayment = 0.0;
   bool _addressesLoading = true;
+  double _walletBalance = 0.0; // Add this for wallet balance
+  bool _isWalletLoading = true; // Add this for wallet loading state
 
   final Color _neonPink = const Color(0xFFFF0077);
   final Color _neonBlue = const Color(0xFF00E5FF);
@@ -44,6 +48,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void initState() {
     super.initState();
     _fetchAddresses();
+    _fetchWalletBalance(); // Add this new method call
     _calculateTotalPayment();
   }
 
@@ -102,6 +107,44 @@ class _CheckoutPageState extends State<CheckoutPage> {
     } finally {
       setState(() {
         _addressesLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchWalletBalance() async {
+    setState(() {
+      _isWalletLoading = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final walletDoc = await FirebaseFirestore.instance
+            .collection('wallets')
+            .doc(user.uid)
+            .get();
+
+        // Check if wallet exists
+        if (walletDoc.exists) {
+          setState(() {
+            _walletBalance = walletDoc.data()?['balance'] ?? 0.0;
+          });
+        } else {
+          // Create wallet if it doesn't exist
+          await FirebaseFirestore.instance
+              .collection('wallets')
+              .doc(user.uid)
+              .set({'balance': 0.0});
+          setState(() {
+            _walletBalance = 0.0;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching wallet balance: $e');
+    } finally {
+      setState(() {
+        _isWalletLoading = false;
       });
     }
   }
@@ -716,22 +759,81 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             },
                           ),
                           RadioListTile<String>(
-                            title: const Text(
-                              'Digital Wallet',
-                              style: TextStyle(
-                                fontFamily: 'PixelFont',
-                                fontSize: 15,
-                                color: Colors.white,
-                              ),
+                            title: Row(
+                              children: [
+                                const Text(
+                                  'GameBox E-Wallet',
+                                  style: TextStyle(
+                                    fontFamily: 'PixelFont',
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                _isWalletLoading
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  _neonPink),
+                                        ),
+                                      )
+                                    : Text(
+                                        '(₱${_walletBalance.toStringAsFixed(2)})',
+                                        style: TextStyle(
+                                          fontFamily: 'PixelFont',
+                                          fontSize: 13,
+                                          color: _walletBalance >= _totalPayment
+                                              ? Colors.green
+                                              : Colors.redAccent,
+                                        ),
+                                      ),
+                                if (_walletBalance < _totalPayment) ...[
+                                  const SizedBox(width: 5),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const WalletPage()),
+                                      ).then((_) {
+                                        // Refresh wallet balance when returning from wallet page
+                                        _fetchWalletBalance();
+                                      });
+                                    },
+                                    child: Icon(
+                                      Icons.add_circle_outline,
+                                      color: _neonPink,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            value: 'Wallet',
+                            subtitle: _walletBalance < _totalPayment
+                                ? Text(
+                                    'Insufficient balance. Tap + to add funds.',
+                                    style: TextStyle(
+                                      fontFamily: 'PixelFont',
+                                      fontSize: 12,
+                                      color: Colors.redAccent,
+                                    ),
+                                  )
+                                : null,
+                            value: 'E-Wallet',
                             groupValue: _selectedPaymentMethod,
                             activeColor: _neonPink,
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedPaymentMethod = value!;
-                              });
-                            },
+                            onChanged: _walletBalance >= _totalPayment
+                                ? (value) {
+                                    setState(() {
+                                      _selectedPaymentMethod = value!;
+                                    });
+                                  }
+                                : null,
                           ),
                           RadioListTile<String>(
                             title: const Text(
@@ -827,7 +929,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     valueColor: AlwaysStoppedAnimation<Color>(_neonPink),
                   )
                 : ElevatedButton(
-                    onPressed: _selectedAddress.isEmpty ? null : _showPaymentConfirmationDialog,
+                    onPressed: _selectedAddress.isEmpty
+                        ? null
+                        : _showPaymentConfirmationDialog,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _neonPink,
                       disabledBackgroundColor: Colors.grey,
@@ -950,305 +1054,519 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  Map<String, dynamic> _paymentDetails = {};
+
   Future<void> _confirmOrder() async {
-  // Validate that an address is selected
-  if (_selectedAddress.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Please select a shipping address to continue',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user != null) {
-      // Generate a 12-digit order ID
-      final random = Random();
-      final orderId = List.generate(12, (_) => random.nextInt(10)).join();
-
-      // You need to know the sellerId for each item.
-      // If each item already has a sellerId, skip this step.
-      // If not, and you know the sellerId (e.g., item['sellerId'] or item['userId'] is the seller), do this:
-      final itemsWithSellerId = await _addSellerIdsToItems(widget.selectedItems);
-
-      // Create the order data
-      final orderData = {
-        'orderId': orderId,
-        'totalPrice': _totalPayment,
-        'paymentMethod': _selectedPaymentMethod,
-        'shippingOption': _selectedShippingOption,
-        'shippingAddress': _selectedAddress,
-        'orderDate': DateTime.now().toIso8601String(),
-        'items': itemsWithSellerId, // <-- use this!
-        'status': 'to pay',
-        'userId': user.uid,
-      };
-
-      // Add the order to the user's orders collection
-      final userOrdersRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('orders');
-      await userOrdersRef.add(orderData);
-
-      // Add the order to the global orders collection
-      final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
-      final docRef = await globalOrdersRef.add(orderData);
-
-      // Create a notification with better formatting and product image
-      String itemsText = "";
-      if (widget.selectedItems.length == 1) {
-        itemsText = widget.selectedItems.first['title'];
-      } else {
-        itemsText = "${widget.selectedItems.first['title']} and ${widget.selectedItems.length - 1} more item(s)";
-      }
-      
-      // Get first item's image for the notification
-      String? mainImageUrl;
-      if (widget.selectedItems.isNotEmpty && widget.selectedItems.first['imageUrl'] != null) {
-        mainImageUrl = widget.selectedItems.first['imageUrl'];
-      }
-
-      final notification = {
-        'userId': user.uid,
-        'type': 'orders',  // Make sure this field is set
-        'title': 'Order #$orderId Placed Successfully',
-        'message': 'Your order for $itemsText has been placed and is awaiting payment.',
-        'orderId': orderId,
-        'timestamp': FieldValue.serverTimestamp(),  // Use serverTimestamp
-        'isRead': false,
-        'imageUrl': mainImageUrl ?? '',  // Provide empty string fallback
-      };
-
-      // Add notification to the notifications collection
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .add(notification);
-
-      // Delete purchased items from the cart
-      final cartRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('cart');
-      final cartSnapshot = await cartRef.get();
-
-      // Remove all purchased items from cart
-      for (var item in widget.selectedItems) {
-        final String purchasedTitle = item['title'] ?? '';
-        
-        for (var cartDoc in cartSnapshot.docs) {
-          final cartData = cartDoc.data();
-          if (cartData['title'] == purchasedTitle) {
-            await cartRef.doc(cartDoc.id).delete();
-            break;
-          }
-        }
-      }
-
+    // Validate that an address is selected
+    if (_selectedAddress.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Order placed successfully!',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Navigate to the OrderDetailsPage
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => OrderDetailsPage(order: orderData),
-          ),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You must be logged in to place an order.',
+            'Please select a shipping address to continue',
             style: TextStyle(fontFamily: 'PixelFont'),
           ),
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Failed to place order: $e',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-  } finally {
+
+    // Add e-wallet validation
+    if (_selectedPaymentMethod == 'E-Wallet') {
+      // Fetch the latest wallet balance to ensure it's still sufficient
+      await _fetchWalletBalance();
+
+      if (_walletBalance < _totalPayment) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Insufficient wallet balance. Please add funds or choose another payment method.',
+              style: TextStyle(fontFamily: 'PixelFont'),
+            ),
+            action: SnackBarAction(
+              label: 'ADD FUNDS',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const WalletPage()),
+                ).then((_) {
+                  _fetchWalletBalance();
+                });
+              },
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
-  }
-}
 
-  void _showPaymentConfirmationDialog() {
-  if (_selectedAddress.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Please select a shipping address to proceed.',
-          style: TextStyle(fontFamily: 'PixelFont'),
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        // Process e-wallet payment if selected
+        if (_selectedPaymentMethod == 'E-Wallet') {
+          await _processWalletPayment(user.uid);
+        }
+
+        // Generate a 12-digit order ID
+        final random = Random();
+        final orderId = List.generate(12, (_) => random.nextInt(10)).join();
+
+        // You need to know the sellerId for each item.
+        // If each item already has a sellerId, skip this step.
+        // If not, and you know the sellerId (e.g., item['sellerId'] or item['userId'] is the seller), do this:
+        final itemsWithSellerId =
+            await _addSellerIdsToItems(widget.selectedItems);
+
+        // Create the order data
+        final orderData = {
+          'orderId': orderId,
+          'totalPrice': _totalPayment,
+          'paymentMethod': _selectedPaymentMethod,
+          'paymentDetails': _paymentDetails, // Add this line to store payment details
+          'shippingOption': _selectedShippingOption,
+          'shippingAddress': _selectedAddress,
+          'orderDate': DateTime.now().toIso8601String(),
+          'items': itemsWithSellerId, // <-- use this!
+          'status': 'to pay',
+          'userId': user.uid,
+        };
+
+        // Add the order to the user's orders collection
+        final userOrdersRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('orders');
+        await userOrdersRef.add(orderData);
+
+        // Add the order to the global orders collection
+        final globalOrdersRef = FirebaseFirestore.instance.collection('orders');
+        final docRef = await globalOrdersRef.add(orderData);
+
+        // Create a notification with better formatting and product image
+        String itemsText = "";
+        if (widget.selectedItems.length == 1) {
+          itemsText = widget.selectedItems.first['title'];
+        } else {
+          itemsText =
+              "${widget.selectedItems.first['title']} and ${widget.selectedItems.length - 1} more item(s)";
+        }
+
+        // Get first item's image for the notification
+        String? mainImageUrl;
+        if (widget.selectedItems.isNotEmpty &&
+            widget.selectedItems.first['imageUrl'] != null) {
+          mainImageUrl = widget.selectedItems.first['imageUrl'];
+        }
+
+        final notification = {
+          'userId': user.uid,
+          'type': 'orders', // Make sure this field is set
+          'title': 'Order #$orderId Placed Successfully',
+          'message':
+              'Your order for $itemsText has been placed and is awaiting payment.',
+          'orderId': orderId,
+          'timestamp': FieldValue.serverTimestamp(), // Use serverTimestamp
+          'isRead': false,
+          'imageUrl': mainImageUrl ?? '', // Provide empty string fallback
+        };
+
+        // Add notification to the notifications collection
+        await FirebaseFirestore.instance
+            .collection('notifications')
+            .add(notification);
+
+        // Delete purchased items from the cart
+        final cartRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('cart');
+        final cartSnapshot = await cartRef.get();
+
+        // Remove all purchased items from cart
+        for (var item in widget.selectedItems) {
+          final String purchasedTitle = item['title'] ?? '';
+
+          for (var cartDoc in cartSnapshot.docs) {
+            final cartData = cartDoc.data();
+            if (cartData['title'] == purchasedTitle) {
+              await cartRef.doc(cartDoc.id).delete();
+              break;
+            }
+          }
+        }
+
+        if (context.mounted) {
+          _showOrderSuccessDialog(orderId);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You must be logged in to place an order.',
+              style: TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to place order: $e',
+            style: const TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
         ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
+  // Add this new method to process wallet payments
+  Future<void> _processWalletPayment(String userId) async {
+    try {
+      final walletRef =
+          FirebaseFirestore.instance.collection('wallets').doc(userId);
+
+      // Use a transaction to ensure the payment process is atomic
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final walletDoc = await transaction.get(walletRef);
+
+        if (!walletDoc.exists) {
+          throw Exception('Wallet not found');
+        }
+
+        final currentBalance = walletDoc.data()?['balance'] ?? 0.0;
+
+        if (currentBalance < _totalPayment) {
+          throw Exception('Insufficient balance');
+        }
+
+        // Deduct the payment amount from wallet
+        transaction.update(walletRef, {'balance': currentBalance - _totalPayment});
+      });
+
+      // Add transaction record
+      await walletRef.collection('transactions').add({
+        'amount': _totalPayment,
+        'type': 'debit',
+        'description': 'Payment for Order',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Update the payment details for the order
+      _paymentDetails = {
+        'method': 'E-Wallet',
+        'amount': _totalPayment,
+        'timestamp': DateTime.now().toIso8601String(),
+        'status': 'completed',
+      };
+
+      // Update local wallet balance
+      setState(() {
+        _walletBalance -= _totalPayment;
+      });
+    } catch (e) {
+      print('Error processing wallet payment: $e');
+      throw e; // Re-throw to be caught by the parent method
+    }
+  }
+
+  // Add this method after _confirmOrder
+  void _showOrderSuccessDialog(String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
         backgroundColor: _surfaceColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Text(
-          'Confirm Payment',
-          style: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: _neonPink,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Column(
           children: [
-            Text(
-              'Shipping Address:',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: _neonBlue,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedAddress,
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white70,
-              ),
+            Icon(
+              Icons.check_circle_outline,
+              color: _neonPink,
+              size: 64,
             ),
             const SizedBox(height: 16),
-            Text(
-              'Payment Method:',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: _neonBlue,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedPaymentMethod,
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Total Payment:',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 14,
-                color: _neonBlue,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '\$${_totalPayment.toStringAsFixed(2)}',
+            const Text(
+              'Order Placed Successfully!',
               style: TextStyle(
                 fontFamily: 'PixelFont',
                 fontSize: 18,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
-                color: _neonPink,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Your order #$orderId has been placed successfully.',
+              style: const TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 14,
+                color: Colors.white70,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Total Amount: \$${_totalPayment.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 16,
+                color: _neonBlue,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                color: Colors.grey,
-              ),
-            ),
-          ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              _confirmOrder();
+              Navigator.pop(context); // Close dialog
+              // Navigate to OrderDetailsPage
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OrderDetailsPage(
+                    order: {
+                      'orderId': orderId,
+                      'totalPrice': _totalPayment,
+                      'paymentMethod': _selectedPaymentMethod,
+                      'shippingOption': _selectedShippingOption,
+                      'shippingAddress': _selectedAddress,
+                      'items': widget.selectedItems,
+                      'status': 'to pay',
+                    },
+                  ),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _neonPink,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              minimumSize: const Size(double.infinity, 45),
             ),
             child: const Text(
-              'Proceed',
+              'VIEW ORDER DETAILS',
               style: TextStyle(
                 fontFamily: 'PixelFont',
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
               ),
             ),
           ),
         ],
-      );
-    },
-  );
-}
-
-Future<List<Map<String, dynamic>>> _addSellerIdsToItems(List<Map<String, dynamic>> items) async {
-  List<Map<String, dynamic>> updatedItems = [];
-  for (var item in items) {
-    if (item.containsKey('sellerId') && item['sellerId'] != null) {
-      updatedItems.add(item);
-    } else {
-      // Fetch the product from Firestore to get the sellerId
-      final productDoc = await FirebaseFirestore.instance
-          .collection('products')
-          .doc(item['productId'])
-          .get();
-      final productData = productDoc.data();
-      updatedItems.add({
-        ...item,
-        'sellerId': productData?['sellerId'] ?? '',
-      });
-    }
+      ),
+    );
   }
-  return updatedItems;
-}
+
+  void _showPaymentConfirmationDialog() {
+    if (_selectedAddress.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select a shipping address to proceed.',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: _surfaceColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Confirm Payment',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: _neonPink,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Shipping Address:',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                  color: _neonBlue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _selectedAddress,
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Payment Method:',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                  color: _neonBlue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _selectedPaymentMethod,
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Total Payment:',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 14,
+                  color: _neonBlue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '\$${_totalPayment.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _neonPink,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                if (_selectedPaymentMethod == 'Card') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => CardPaymentDialog(
+                      neonPink: _neonPink,
+                      neonBlue: _neonBlue,
+                      surfaceColor: _surfaceColor,
+                      onSubmit: (cardData) {
+                        // Store the payment details for order creation
+                        _paymentDetails = Map<String, dynamic>.from(cardData);
+
+                        // Check if using saved card or new card
+                        String paymentDetail;
+                        if (cardData.containsKey('savedCard') &&
+                            cardData['savedCard'] == 'true') {
+                          // Using a saved card
+                          paymentDetail =
+                              'Payment processed using ${cardData['cardNickname']} (${cardData['bank']})';
+                        } else {
+                          // Using a new card
+                          paymentDetail =
+                              'Payment processed with ${cardData['bank']} card';
+                        }
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              paymentDetail,
+                              style: const TextStyle(fontFamily: 'PixelFont'),
+                            ),
+                            backgroundColor: _neonPink,
+                          ),
+                        );
+
+                        // Proceed with order confirmation
+                        _confirmOrder();
+                      },
+                    ),
+                  );
+                  return; // Prevent double dialog
+                }
+                _confirmOrder();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _neonPink,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text(
+                'Proceed',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _addSellerIdsToItems(
+      List<Map<String, dynamic>> items) async {
+    List<Map<String, dynamic>> updatedItems = [];
+    for (var item in items) {
+      if (item.containsKey('sellerId') && item['sellerId'] != null) {
+        updatedItems.add(item);
+      } else {
+        // Fetch the product from Firestore to get the sellerId
+        final productDoc = await FirebaseFirestore.instance
+            .collection('products')
+            .doc(item['productId'])
+            .get();
+        final productData = productDoc.data();
+        updatedItems.add({
+          ...item,
+          'sellerId': productData?['sellerId'] ?? '',
+        });
+      }
+    }
+    return updatedItems;
+  }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
