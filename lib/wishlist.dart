@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'home.dart';
+import 'category.dart';
+import 'message.dart';
+import 'profile.dart';
+import 'cart.dart';
 class WishlistPage extends StatefulWidget {
   const WishlistPage({Key? key}) : super(key: key);
 
@@ -387,6 +391,52 @@ class _WishlistPageState extends State<WishlistPage> {
             ],
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
+        unselectedItemColor: Colors.white,
+        selectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        currentIndex: 1, // Set to 1 because Wishlist is the second item
+        onTap: (index) {
+          switch (index) {
+            case 0: // Home
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+              break;
+            case 1: // Wishlist - already here
+              break;
+            case 2: // Message
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatPage()),
+              );
+              break;
+            case 3: // Cart
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CartPage()),
+              );
+              break;
+            case 4: // Profile
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Wishlist'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Cart'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
       ),
     );
   }

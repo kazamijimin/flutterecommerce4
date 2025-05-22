@@ -347,6 +347,52 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
+        unselectedItemColor: Colors.white,
+        selectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        currentIndex: 2, // Set to 2 because Message is the third item
+        onTap: (index) {
+          switch (index) {
+            case 0: // Home
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+              break;
+            case 1: // Category
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CategoryPage()),
+              );
+              break;
+            case 2: // Message - already here
+              break;
+            case 3: // Cart
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const SeeAllProductsScreen()),
+              );
+              break;
+            case 4: // Profile
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Shop'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
     );
   }
 
