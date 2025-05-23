@@ -78,12 +78,11 @@ class _SignupState extends State<Signup> {
         password: password,
       );
 
-      // Add the user to Firestore with isVerified set to false
+      // Add the user to Firestore with minimal required fields
       final user = credential.user;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'email': emailAddress,
-          'isVerified': false, // Mark the account as unverified
           'createdAt': FieldValue.serverTimestamp(),
         });
       }

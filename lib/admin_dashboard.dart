@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-
+import 'account_deletion_requests.dart';
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -9,7 +9,8 @@ class AdminDashboard extends StatefulWidget {
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProviderStateMixin {
+class _AdminDashboardState extends State<AdminDashboard>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Map<String, int> _stats = {
     'users': 0,
@@ -17,6 +18,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     'products': 0,
     'orders': 0,
     'pendingApplications': 0,
+    'deletionRequests': 0, // Added deletion requests stat
   };
   bool _isLoading = true;
 
@@ -40,20 +42,31 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
     try {
       // Get user count
-      final userSnapshot = await FirebaseFirestore.instance.collection('users').get();
+      final userSnapshot =
+          await FirebaseFirestore.instance.collection('users').get();
       final sellerCount = userSnapshot.docs.where((doc) {
         final data = doc.data();
         return data['sellerStatus'] == 'approved';
       }).length;
 
       // Get product count
-      final productSnapshot = await FirebaseFirestore.instance.collection('products').get();
-      
+      final productSnapshot =
+          await FirebaseFirestore.instance.collection('products').get();
+
       // Get order count
-      final orderSnapshot = await FirebaseFirestore.instance.collection('orders').get();
-      
+      final orderSnapshot =
+          await FirebaseFirestore.instance.collection('orders').get();
+
       // Get pending applications
-      final applicationSnapshot = await FirebaseFirestore.instance.collection('sellerApplications').get();
+      final applicationSnapshot = await FirebaseFirestore.instance
+          .collection('sellerApplications')
+          .get();
+
+      // Get deletion requests
+      final deletionRequestsSnapshot = await FirebaseFirestore.instance
+          .collection('deletion_requests')
+          .where('status', isEqualTo: 'pending')
+          .get();
 
       setState(() {
         _stats = {
@@ -62,6 +75,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           'products': productSnapshot.size,
           'orders': orderSnapshot.size,
           'pendingApplications': applicationSnapshot.size,
+          'deletionRequests':
+              deletionRequestsSnapshot.size, // Add deletion requests count
         };
         _isLoading = false;
       });
@@ -141,6 +156,92 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     }
   }
 
+  // Process account deletion
+  Future<void> _processAccountDeletion(
+      String docId, String userId, bool approve) async {
+    try {
+      if (approve) {
+        // Get user data for notification
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        final userEmail = userDoc.data()?['email'] ?? 'Unknown email';
+
+        // Update deletion request status
+        await FirebaseFirestore.instance
+            .collection('deletion_requests')
+            .doc(docId)
+            .update({
+          'status': 'approved',
+          'processedAt': FieldValue.serverTimestamp(),
+          'processedBy': 'admin', // You might want to store actual admin ID
+        });
+
+        // Add admin notification for tracking
+        await FirebaseFirestore.instance.collection('admin_logs').add({
+          'action': 'account_deletion_approved',
+          'userId': userId,
+          'userEmail': userEmail,
+          'timestamp': FieldValue.serverTimestamp(),
+          'adminId':
+              'admin', // Replace with actual admin ID when you have authentication
+        });
+
+        // You would normally schedule the actual account deletion here
+        // For immediate deletion (example only):
+        // await FirebaseFirestore.instance.collection('users').doc(userId).delete();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Account deletion approved and scheduled for processing'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Reject deletion request
+        await FirebaseFirestore.instance
+            .collection('deletion_requests')
+            .doc(docId)
+            .update({
+          'status': 'rejected',
+          'processedAt': FieldValue.serverTimestamp(),
+          'processedBy': 'admin', // You might want to store actual admin ID
+        });
+
+        // Notify user that their request was denied
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'userId': userId,
+          'title': 'Account Deletion Request',
+          'message':
+              'Your request to delete your account has been rejected. Please contact support for more information.',
+          'type': 'accountDeletionRejected',
+          'isRead': false,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account deletion request rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+
+      _loadStats(); // Refresh stats
+    } catch (e) {
+      debugPrint('Error processing deletion request: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error processing request: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   // Restrict user account
   Future<void> _restrictAccount(BuildContext context, String userId) async {
     String selectedReason = 'Select a reason'; // Default dropdown value
@@ -209,7 +310,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                           setState(() {
                             selectedReason = value!;
                             if (selectedReason != 'Other') {
-                              reasonController.clear(); // Clear custom input if not "Other"
+                              reasonController
+                                  .clear(); // Clear custom input if not "Other"
                             }
                           });
                         },
@@ -243,7 +345,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                  child: const Text('Cancel',
+                      style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -266,12 +369,14 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                           'restrictionReason': reason,
                         });
 
-                        debugPrint('Account restricted for userId: $userId with reason: $reason');
+                        debugPrint(
+                            'Account restricted for userId: $userId with reason: $reason');
                         Navigator.pop(context);
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Account restricted for reason: $reason'),
+                            content:
+                                Text('Account restricted for reason: $reason'),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -289,7 +394,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Please select or provide a valid reason'),
+                          content:
+                              Text('Please select or provide a valid reason'),
                           backgroundColor: Colors.orange,
                         ),
                       );
@@ -364,6 +470,152 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 
+  // Build deletion request card for horizontal slider
+  Widget _buildDeletionRequestCard(String docId, Map<String, dynamic> data) {
+    final userId = data['userId'] ?? 'Unknown';
+    final userEmail = data['userEmail'] ?? 'Unknown Email';
+    final reason = data['reason'] ?? 'No reason provided';
+
+    // Format date
+    String requestDate = 'Unknown date';
+    if (data['requestedAt'] != null) {
+      requestDate = DateFormat('MMM d, y')
+          .format((data['requestedAt'] as Timestamp).toDate());
+    }
+
+    return Container(
+      width: 300,
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFFF0077),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF0077).withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0077).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFFF0077),
+                    ),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: const Text(
+                    'DELETION REQUEST',
+                    style: TextStyle(
+                      color: Color(0xFFFF0077),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  requestDate,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'User Details:',
+              style: TextStyle(
+                color: Color(0xFF00E5FF),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              userEmail,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Reason:',
+              style: TextStyle(
+                color: Color(0xFF00E5FF),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey.withOpacity(0.2),
+                  ),
+                ),
+                child: Text(
+                  reason,
+                  style: const TextStyle(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 3,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        _processAccountDeletion(docId, userId, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.cyan,
+                      side: const BorderSide(color: Colors.cyan),
+                    ),
+                    child: const Text('Reject'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        _processAccountDeletion(docId, userId, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF0077),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Approve'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -405,7 +657,9 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         children: [
           // Overview tab
           _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                      color: Color(0xFFFF0077), strokeWidth: 2))
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -432,13 +686,146 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                         mainAxisSpacing: 16,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _buildStatCard('Total Users', _stats['users']!, Icons.people, Colors.blue),
-                          _buildStatCard('Sellers', _stats['sellers']!, Icons.store, Colors.green),
-                          _buildStatCard('Products', _stats['products']!, Icons.shopping_bag, Colors.orange),
-                          _buildStatCard('Orders', _stats['orders']!, Icons.shopping_cart, Colors.purple),
+                          _buildStatCard('Total Users', _stats['users']!,
+                              Icons.people, Colors.blue),
+                          _buildStatCard('Sellers', _stats['sellers']!,
+                              Icons.store, Colors.green),
+                          _buildStatCard('Products', _stats['products']!,
+                              Icons.shopping_bag, Colors.orange),
+                          _buildStatCard('Orders', _stats['orders']!,
+                              Icons.shopping_cart, Colors.purple),
                         ],
                       ),
-                      const SizedBox(height: 24),
+
+                      // Account Deletion Requests Section
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Account Deletion Requests',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFFFF0077).withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: const Color(0xFFFF0077)),
+                                ),
+                                child: Text(
+                                  '${_stats['deletionRequests']}',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFF0077),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // In admin_dashboard.dart, update the "View All" button:
+                          TextButton.icon(
+                            icon: const Icon(Icons.chevron_right, size: 18),
+                            label: const Text('View All'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF00E5FF),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const AccountDeletionRequestsPage(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Horizontal Slider for Deletion Requests
+                      SizedBox(
+                        height: 220, // Fixed height for the cards
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('deletion_requests')
+                              .where('status', isEqualTo: 'pending')
+                              .orderBy('requestedAt', descending: true)
+                              .limit(10)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFFFF0077),
+                                  strokeWidth: 2,
+                                ),
+                              );
+                            }
+
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return Container(
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A1A2E),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF333355),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.delete_forever,
+                                        size: 48,
+                                        color: Colors.grey[700],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'No pending deletion requests',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final deletionRequests = snapshot.data!.docs;
+
+                            return ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: deletionRequests.length,
+                              itemBuilder: (context, index) {
+                                final doc = deletionRequests[index];
+                                final data = doc.data() as Map<String, dynamic>;
+                                return _buildDeletionRequestCard(doc.id, data);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
                       const Text(
                         'Quick Actions',
                         style: TextStyle(
@@ -460,7 +847,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFF0077),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -478,7 +866,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.pink,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                               ),
                               onPressed: () {
                                 _tabController.animateTo(2);
@@ -498,7 +887,9 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2));
+                return const Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFFF0077), strokeWidth: 2));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -525,12 +916,15 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                 itemBuilder: (context, index) {
                   final application = pendingApplications[index];
                   final userId = application.id;
-                  final applicationData = application.data() as Map<String, dynamic>;
-                  final storeName = applicationData['storeName'] ?? 'Unknown Store';
+                  final applicationData =
+                      application.data() as Map<String, dynamic>;
+                  final storeName =
+                      applicationData['storeName'] ?? 'Unknown Store';
                   final storeDescription =
                       applicationData['storeDescription'] ?? 'No Description';
                   final submittedDate = applicationData['timestamp'] != null
-                      ? DateFormat('MMM d, y').format((applicationData['timestamp'] as Timestamp).toDate())
+                      ? DateFormat('MMM d, y').format(
+                          (applicationData['timestamp'] as Timestamp).toDate())
                       : 'Unknown date';
 
                   return Card(
@@ -555,7 +949,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                                   color: Colors.cyan,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 child: const Text(
                                   'PENDING',
                                   style: TextStyle(
@@ -568,7 +963,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                               const SizedBox(width: 8),
                               Text(
                                 'Submitted: $submittedDate',
-                                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 12),
                               ),
                             ],
                           ),
@@ -601,7 +997,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                                   _rejectSeller(userId);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Rejected seller: $storeName'),
+                                      content:
+                                          Text('Rejected seller: $storeName'),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
@@ -619,7 +1016,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                                   _approveSeller(userId);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Approved seller: $storeName'),
+                                      content:
+                                          Text('Approved seller: $storeName'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -641,7 +1039,9 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFFFF0077), strokeWidth: 2));
+                return const Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFFF0077), strokeWidth: 2));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -666,10 +1066,10 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                   final sellerStatus = userData['sellerStatus'] ?? 'notApplied';
                   final accountStatus = userData['accountStatus'] ?? 'active';
                   final photoURL = userData['photoURL'];
-                  
+
                   Color statusColor;
                   String statusText;
-                  
+
                   if (accountStatus == 'restricted') {
                     statusColor = Colors.red;
                     statusText = 'Restricted';
@@ -695,10 +1095,12 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                       ),
                     ),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       leading: CircleAvatar(
                         backgroundColor: Colors.grey[700],
-                        backgroundImage: photoURL != null ? NetworkImage(photoURL) : null,
+                        backgroundImage:
+                            photoURL != null ? NetworkImage(photoURL) : null,
                         child: photoURL == null
                             ? const Icon(Icons.person, color: Colors.white)
                             : null,
@@ -717,7 +1119,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: statusColor.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
@@ -746,7 +1149,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                             const SizedBox(height: 4),
                             Text(
                               'Reason: ${userData['restrictionReason'] ?? 'Unknown'}',
-                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 12),
                             ),
                           ],
                         ],
@@ -762,10 +1166,11 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                                     'accountStatus': 'active',
                                     'restrictionReason': FieldValue.delete(),
                                   });
-                                  
+
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Account restriction removed'),
+                                      content:
+                                          Text('Account restriction removed'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -786,7 +1191,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                             )
                           : IconButton(
                               icon: const Icon(Icons.block, color: Colors.red),
-                              onPressed: () => _restrictAccount(context, user.id),
+                              onPressed: () =>
+                                  _restrictAccount(context, user.id),
                               tooltip: 'Restrict Account',
                             ),
                     ),

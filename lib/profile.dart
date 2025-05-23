@@ -8,50 +8,50 @@ import 'order_history.dart';
 import 'seller_register.dart';
 import 'login.dart';
 import 'home.dart';
-import 'see_all_recommend.dart';
 import 'category.dart';
 import 'message.dart'; // Import the Message screen
 import 'settings.dart'; // Import the SettingsScreen
 import 'shop.dart'; // Import the Shop screen
+import 'address.dart'; // Import the AddressPage
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
   static final Color surface = Colors.grey.shade900.withOpacity(0.5);
   static final Color border = Colors.grey.shade800;
-  
+
   // Accent colors
   static final Color primary = Colors.pink.shade400;
   static final Color secondary = Colors.cyan;
   static final Color tertiary = Colors.purple.shade700;
-  
+
   // Status colors
   static final Color success = Colors.green.shade500;
   static final Color warning = Colors.amber.shade500;
   static final Color error = Colors.red.shade500;
-  
+
   // Text colors
   static final Color textPrimary = Colors.white;
   static final Color textSecondary = Colors.grey.shade400;
-  
+
   // Gradients
   static final Gradient primaryGradient = LinearGradient(
     colors: [Colors.pink.shade700, Colors.pink.shade900],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static final Gradient secondaryGradient = LinearGradient(
     colors: [Colors.cyan.shade600, Colors.blue.shade800],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static final Gradient tertiaryGradient = LinearGradient(
     colors: [Colors.purple.shade700, Colors.purple.shade900],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static final Gradient destructiveGradient = LinearGradient(
     colors: [Colors.red.shade700, Colors.red.shade900],
     begin: Alignment.topLeft,
@@ -212,7 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Fallback to application data if user document doesn't have status
               sellerStatus = data['sellerStatus'] ?? "pending";
             }
-            
+
             // Debug print the status
             debugPrint("Current seller status: $sellerStatus");
           } else {
@@ -300,9 +300,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _navigateToShippingAddress() {
-    // Navigate to shipping address page
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Shipping Address coming soon')),
+    // Update this to navigate to AddressPage
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddressPage()),
     );
   }
 
@@ -446,11 +447,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        automaticallyImplyLeading: false, // Change this to true if you want default back button
+        automaticallyImplyLeading:
+            false, // Change this to true if you want default back button
         // Add a custom back button at the start of the AppBar
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back_ios_new, 
+            Icons.arrow_back_ios_new,
             color: AppColors.primary,
             size: 22,
           ),
@@ -542,7 +544,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  
+
                   // Username and level
                   Expanded(
                     child: Column(
@@ -559,7 +561,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [AppColors.tertiary, AppColors.primary],
@@ -582,7 +585,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (sellerStatus == "approved")
                           Row(
                             children: [
-                              Icon(Icons.verified, color: AppColors.secondary, size: 16),
+                              Icon(Icons.verified,
+                                  color: AppColors.secondary, size: 16),
                               const SizedBox(width: 4),
                               Text(
                                 'Verified Seller',
@@ -598,7 +602,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                  
+
                   // Edit profile button - improved design
                   Container(
                     decoration: BoxDecoration(
@@ -621,7 +625,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         );
                       },
-                      icon: const Icon(Icons.edit, color: Colors.white, size: 16),
+                      icon:
+                          const Icon(Icons.edit, color: Colors.white, size: 16),
                       label: const Text(
                         'Edit',
                         style: TextStyle(
@@ -657,7 +662,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  
+
                   // Friends Card
                   Expanded(
                     child: _buildStatsCard(
@@ -668,7 +673,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  
+
                   // Order History Card with button
                   Expanded(
                     child: GestureDetector(
@@ -694,7 +699,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.favorite, color: Colors.pink.shade400, size: 20),
+                      Icon(Icons.favorite,
+                          color: Colors.pink.shade400, size: 20),
                       const SizedBox(width: 8),
                       const Text(
                         'FAVOURITES',
@@ -815,7 +821,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Options buttons - with improved styling
                   if (isAdmin)
                     _buildNavButton(
-                      'Admin Dashboard', 
+                      'Admin Dashboard',
                       _navigateToAdminDashboard,
                       icon: Icons.admin_panel_settings,
                       gradient: LinearGradient(
@@ -825,7 +831,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   _buildNavButton(
-                    'My Orders', 
+                    'My Orders',
                     _navigateToMyOrders,
                     icon: Icons.history,
                   ),
@@ -864,9 +870,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   _buildNavButton(
-                    'Logout', 
+                    'Logout',
                     _handleLogout,
-                    isDestructive: true, 
+                    isDestructive: true,
                     icon: Icons.logout,
                     gradient: LinearGradient(
                       colors: [Colors.red.shade700, Colors.red.shade900],
@@ -878,7 +884,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            
+
             // Footer with version info
             Padding(
               padding: const EdgeInsets.all(16),
@@ -941,7 +947,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // Helper method for stats cards
-  Widget _buildStatsCard(String title, String value, IconData icon, Color color, {bool isButton = false}) {
+  Widget _buildStatsCard(String title, String value, IconData icon, Color color,
+      {bool isButton = false}) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -972,7 +979,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           isButton
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -1025,7 +1033,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fit: StackFit.expand,
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                   child: item['imageUrl'] != null && item['imageUrl'].isNotEmpty
                       ? Image.network(
                           item['imageUrl'],
@@ -1046,7 +1055,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.favorite, color: Colors.pink.shade400, size: 16),
+                    child: Icon(Icons.favorite,
+                        color: Colors.pink.shade400, size: 16),
                   ),
                 ),
               ],
@@ -1057,7 +1067,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             decoration: BoxDecoration(
               color: Colors.black,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(12)),
             ),
             child: Text(
               item['title'],
@@ -1088,8 +1099,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: isDestructive 
-                ? Colors.red.withOpacity(0.2) 
+            color: isDestructive
+                ? Colors.red.withOpacity(0.2)
                 : Colors.cyan.withOpacity(0.1),
             blurRadius: 8,
             spreadRadius: 0,
@@ -1100,8 +1111,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: isDestructive 
-                ? Colors.red.withOpacity(0.2) 
+            color: isDestructive
+                ? Colors.red.withOpacity(0.2)
                 : Colors.cyan.withOpacity(0.1),
             borderRadius: BorderRadius.circular(6),
           ),
@@ -1160,7 +1171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _showSellerStatusDialog() async {
     // Get the latest status from Firestore to ensure it's current
     await _checkSellerApplicationStatus();
-    
+
     return showDialog(
       context: context,
       barrierDismissible: true,
@@ -1170,34 +1181,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Color statusColor;
         IconData statusIcon;
         String additionalInfo = "";
-        
+
         switch (sellerStatus) {
           case "pending":
             statusTitle = "Application Pending Approval";
-            statusMessage = "Your seller application is waiting for admin approval. This usually takes 1-2 business days.";
+            statusMessage =
+                "Your seller application is waiting for admin approval. This usually takes 1-2 business days.";
             statusColor = AppColors.warning;
             statusIcon = Icons.hourglass_top;
-            additionalInfo = "You will be notified when your application is approved.";
+            additionalInfo =
+                "You will be notified when your application is approved.";
             break;
           case "approved":
             statusTitle = "Application Approved!";
-            statusMessage = "Congratulations! Your seller account is active. You can now list games and manage your store.";
+            statusMessage =
+                "Congratulations! Your seller account is active. You can now list games and manage your store.";
             statusColor = AppColors.success;
             statusIcon = Icons.check_circle;
             break;
           case "rejected":
             statusTitle = "Application Declined";
-            statusMessage = "Unfortunately, your application was not approved. Please contact customer support for more information.";
+            statusMessage =
+                "Unfortunately, your application was not approved. Please contact customer support for more information.";
             statusColor = AppColors.error;
             statusIcon = Icons.cancel;
             break;
           default:
             statusTitle = "Status Unknown";
-            statusMessage = "We couldn't determine your application status. Please try again later.";
+            statusMessage =
+                "We couldn't determine your application status. Please try again later.";
             statusColor = Colors.grey;
             statusIcon = Icons.help;
         }
-        
+
         return AlertDialog(
           backgroundColor: const Color(0xFF13131A),
           shape: RoundedRectangleBorder(

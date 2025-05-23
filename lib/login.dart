@@ -20,7 +20,7 @@ class _LoginState extends State<Login> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  
+
   bool _obscurePassword = true; // Add this for password visibility toggle
   bool _isLoading = false;
   late bool _isSignUp;
@@ -45,11 +45,8 @@ class _LoginState extends State<Login> {
     final password = _passwordController.text.trim();
 
     if (emailAddress.isEmpty || password.isEmpty) {
-      showErrorDialog(
-        context,
-        'Missing Information',
-        'Please fill in both email and password fields to continue.'
-      );
+      showErrorDialog(context, 'Missing Information',
+          'Please fill in both email and password fields to continue.');
       return;
     }
 
@@ -292,7 +289,8 @@ class _LoginState extends State<Login> {
                             Navigator.of(context).pop();
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const ForgotPassword()),
+                              MaterialPageRoute(
+                                  builder: (context) => const ForgotPassword()),
                             );
                           },
                           child: const Text(
@@ -308,6 +306,112 @@ class _LoginState extends State<Login> {
                       ),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void showAccountDeletionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            side: BorderSide(color: Colors.red[700]!, width: 2),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red[900],
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Account Deletion Pending',
+                  style: TextStyle(
+                    color: Colors.red[400],
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red, width: 1),
+                  ),
+                  child: const Column(
+                    children: [
+                      Text(
+                        'This account has been scheduled for deletion.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'If you believe this is an error, please contact customer support immediately.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontFamily: 'PixelFont',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.grey[800]!, Colors.grey[900]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.grey[600]!),
+                  ),
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontFamily: 'PixelFont',
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -408,14 +512,15 @@ class _LoginState extends State<Login> {
     );
   }
 
-  Future<void> signInWithEmailAndPassword(String emailAddress, String password) async {
+  Future<void> signInWithEmailAndPassword(
+      String emailAddress, String password) async {
     try {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailAddress,
         password: password,
       );
 
-      // Check if the user is restricted
+      // Check if the user is restricted or has an approved deletion request
       final user = credential.user;
       if (user != null) {
         final userDoc = await FirebaseFirestore.instance
@@ -425,21 +530,43 @@ class _LoginState extends State<Login> {
 
         if (userDoc.exists) {
           final userData = userDoc.data();
-          if (userData != null && userData['accountStatus'] == 'restricted') {
-            // Log the user out since they're restricted
-            await FirebaseAuth.instance.signOut();
+          if (userData != null) {
+            // Check for account restriction
+            if (userData['accountStatus'] == 'restricted') {
+              // Log the user out since they're restricted
+              await FirebaseAuth.instance.signOut();
 
-            if (!mounted) return;
+              if (!mounted) return;
 
-            // Show custom restriction dialog with reason
-            final reason = userData['restrictionReason'] ?? 'Violation of terms';
-            showAccountRestrictedDialog(context, reason);
-            return;
+              // Show custom restriction dialog with reason
+              final reason =
+                  userData['restrictionReason'] ?? 'Violation of terms';
+              showAccountRestrictedDialog(context, reason);
+              return;
+            }
+
+            // Check for approved deletion request
+            final deletionRequestQuery = await FirebaseFirestore.instance
+                .collection('deletion_requests')
+                .where('userId', isEqualTo: user.uid)
+                .where('status', isEqualTo: 'approved')
+                .get();
+
+            if (deletionRequestQuery.docs.isNotEmpty) {
+              // Log the user out since their account is pending deletion
+              await FirebaseAuth.instance.signOut();
+
+              if (!mounted) return;
+
+              // Show account deletion dialog
+              showAccountDeletionDialog(context);
+              return;
+            }
           }
         }
       }
 
-      // If not restricted, navigate to the home page
+      // If not restricted or pending deletion, navigate to the home page
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -447,46 +574,29 @@ class _LoginState extends State<Login> {
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } on FirebaseAuthException catch (e) {
+      // Handle other authentication exceptions as before
       if (e.code == 'user-not-found') {
-        showErrorDialog(
-          context, 
-          'User Not Found', 
-          'No user account exists with this email address. Please check your email or create a new account.'
-        );
+        showErrorDialog(context, 'User Not Found',
+            'No user account exists with this email address. Please check your email or create a new account.');
       } else if (e.code == 'wrong-password') {
         // Show the custom password error dialog with "Invalid Password" title
         showPasswordErrorDialog(context);
       } else if (e.code == 'invalid-email') {
-        showErrorDialog(
-          context,
-          'Invalid Email',
-          'The email address format is invalid. Please enter a valid email address.'
-        );
+        showErrorDialog(context, 'Invalid Email',
+            'The email address format is invalid. Please enter a valid email address.');
       } else if (e.code == 'user-disabled') {
-        showErrorDialog(
-          context,
-          'Account Disabled',
-          'This account has been disabled. Please contact support for assistance.'
-        );
+        showErrorDialog(context, 'Account Disabled',
+            'This account has been disabled. Please contact support for assistance.');
       } else if (e.code == 'too-many-requests') {
-        showErrorDialog(
-          context,
-          'Too Many Attempts',
-          'Access to this account has been temporarily disabled due to many failed login attempts. Please try again later.'
-        );
+        showErrorDialog(context, 'Too Many Attempts',
+            'Access to this account has been temporarily disabled due to many failed login attempts. Please try again later.');
       } else {
-        showErrorDialog(
-          context,
-          'Login Error',
-          'An error occurred during login: ${e.message}'
-        );
+        showErrorDialog(context, 'Login Error',
+            'An error occurred during login: ${e.message}');
       }
     } catch (e) {
-      showErrorDialog(
-        context,
-        'Unexpected Error',
-        'An unexpected error occurred. Please try again later.'
-      );
+      showErrorDialog(context, 'Unexpected Error',
+          'An unexpected error occurred. Please try again later.');
     }
   }
 
@@ -517,7 +627,7 @@ class _LoginState extends State<Login> {
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // Check if the user is restricted
+      // Check if the user is restricted or has an approved deletion request
       final user = userCredential.user;
       if (user != null) {
         final userDoc = await FirebaseFirestore.instance
@@ -527,21 +637,43 @@ class _LoginState extends State<Login> {
 
         if (userDoc.exists) {
           final userData = userDoc.data();
-          if (userData != null && userData['accountStatus'] == 'restricted') {
-            // Log the user out since they're restricted
-            await FirebaseAuth.instance.signOut();
+          if (userData != null) {
+            // Check for account restriction
+            if (userData['accountStatus'] == 'restricted') {
+              // Log the user out since they're restricted
+              await FirebaseAuth.instance.signOut();
 
-            if (!mounted) return;
+              if (!mounted) return;
 
-            // Show restriction dialog with reason
-            final reason = userData['restrictionReason'] ?? 'Violation of terms';
-            showAccountRestrictedDialog(context, reason);
-            return;
+              // Show restriction dialog with reason
+              final reason =
+                  userData['restrictionReason'] ?? 'Violation of terms';
+              showAccountRestrictedDialog(context, reason);
+              return;
+            }
+
+            // Check for approved deletion request
+            final deletionRequestQuery = await FirebaseFirestore.instance
+                .collection('deletion_requests')
+                .where('userId', isEqualTo: user.uid)
+                .where('status', isEqualTo: 'approved')
+                .get();
+
+            if (deletionRequestQuery.docs.isNotEmpty) {
+              // Log the user out since their account is pending deletion
+              await FirebaseAuth.instance.signOut();
+
+              if (!mounted) return;
+
+              // Show account deletion dialog
+              showAccountDeletionDialog(context);
+              return;
+            }
           }
         }
       }
 
-      // If not restricted, navigate to the home page
+      // If not restricted or pending deletion, navigate to the home page
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -549,11 +681,8 @@ class _LoginState extends State<Login> {
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } catch (e) {
-      showErrorDialog(
-        context,
-        'Google Sign-In Failed',
-        'Failed to sign in with Google: ${e.toString()}'
-      );
+      showErrorDialog(context, 'Google Sign-In Failed',
+          'Failed to sign in with Google: ${e.toString()}');
     }
   }
 
@@ -570,7 +699,7 @@ class _LoginState extends State<Login> {
         _isSignUp = false;
       });
     } else {
-      // If in login mode, navigate to dedicated signup screen 
+      // If in login mode, navigate to dedicated signup screen
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const Signup()),
@@ -583,7 +712,7 @@ class _LoginState extends State<Login> {
     // Get screen size for responsive design
     final Size screenSize = MediaQuery.of(context).size;
     final bool isSmallScreen = screenSize.width < 380;
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -631,9 +760,9 @@ class _LoginState extends State<Login> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _isSignUp 
-                                ? "Sign up to start your gaming journey" 
-                                : "Log in to continue shopping",
+                              _isSignUp
+                                  ? "Sign up to start your gaming journey"
+                                  : "Log in to continue shopping",
                               style: TextStyle(
                                 fontSize: isSmallScreen ? 12 : 14,
                                 color: Colors.pink[200],
@@ -656,12 +785,8 @@ class _LoginState extends State<Login> {
                           ),
                         ),
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            screenSize.width * 0.05, 
-                            16, 
-                            screenSize.width * 0.05, 
-                            0
-                          ),
+                          padding: EdgeInsets.fromLTRB(screenSize.width * 0.05,
+                              16, screenSize.width * 0.05, 0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -720,13 +845,14 @@ class _LoginState extends State<Login> {
                                     ),
                                     border: InputBorder.none,
                                     contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12, 
-                                      vertical: isSmallScreen ? 12 : 14
-                                    ),
+                                        horizontal: 12,
+                                        vertical: isSmallScreen ? 12 : 14),
                                     suffixIcon: IconButton(
                                       padding: EdgeInsets.zero,
                                       icon: Icon(
-                                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                        _obscurePassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
                                         color: Colors.black54,
                                         size: isSmallScreen ? 20 : 24,
                                       ),
@@ -736,8 +862,10 @@ class _LoginState extends State<Login> {
                                         });
                                       },
                                     ),
-                                    isDense: true, // This helps with vertical alignment
-                                    alignLabelWithHint: true, // This helps align the hint text properly
+                                    isDense:
+                                        true, // This helps with vertical alignment
+                                    alignLabelWithHint:
+                                        true, // This helps align the hint text properly
                                   ),
                                 ),
                               ),
@@ -747,7 +875,8 @@ class _LoginState extends State<Login> {
                               Container(
                                 width: double.infinity,
                                 height: isSmallScreen ? 50 : 56,
-                                margin: EdgeInsets.only(bottom: isSmallScreen ? 20 : 24),
+                                margin: EdgeInsets.only(
+                                    bottom: isSmallScreen ? 20 : 24),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFFF0066),
                                   borderRadius: BorderRadius.circular(4),
@@ -756,8 +885,9 @@ class _LoginState extends State<Login> {
                                   onPressed: _isLoading ? null : onSubmit,
                                   child: _isLoading
                                       ? const CircularProgressIndicator(
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                              Colors.black),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.black),
                                         )
                                       : Text(
                                           'LOG IN',
@@ -786,9 +916,11 @@ class _LoginState extends State<Login> {
                                           foregroundColor: Colors.white,
                                           backgroundColor: Colors.transparent,
                                           side: BorderSide(
-                                              color: Colors.pink[400]!, width: 2),
+                                              color: Colors.pink[400]!,
+                                              width: 2),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                         ),
                                         icon: Icon(
@@ -817,9 +949,11 @@ class _LoginState extends State<Login> {
                                           foregroundColor: Colors.white,
                                           backgroundColor: Colors.transparent,
                                           side: BorderSide(
-                                              color: Colors.pink[400]!, width: 2),
+                                              color: Colors.pink[400]!,
+                                              width: 2),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                         ),
                                         icon: Icon(
@@ -855,7 +989,8 @@ class _LoginState extends State<Login> {
                                     foregroundColor: Colors.pink[400],
                                     padding: EdgeInsets.zero,
                                     minimumSize: const Size(50, 30),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: Text(
                                     "Forgot password?",
@@ -891,7 +1026,7 @@ class _LoginState extends State<Login> {
               ],
             ),
           ),
-          
+
           // Back button overlay with responsive position
           Positioned(
             top: MediaQuery.of(context).padding.top + (isSmallScreen ? 5 : 10),

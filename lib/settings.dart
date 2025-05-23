@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutterecommerce4/shopee_policies.dart';
 import 'login.dart';
 import 'terms_condition.dart'; // Import the Terms and Conditions page
 import 'address.dart';
 import 'faqs.dart';
 import 'bank_accounts.dart';
+import 'about_us.dart';
+import 'team_members.dart';
+import 'help_center.dart';
+import 'rate_us.dart';
+import 'account_deletion.dart';
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
@@ -91,12 +97,8 @@ class _SettingsPageState extends State<SettingsPage> {
       'My Profile': Icons.person,
       'My Addresses': Icons.location_on,
       'Bank Account/Cards': Icons.credit_card,
-      'Chat Settings': Icons.chat,
-      'Notification Settings': Icons.notifications,
-      'Privacy Settings': Icons.privacy_tip,
-      'Blocked users': Icons.block,
-      'Language': Icons.language,
       'ABOUT': Icons.info,
+      'TEAM MEMBERS': Icons.groups, // Add this line
       'FAQS': Icons.help_center,
       'Shopee Policies': Icons.policy,
       'Rate us': Icons.star_rate,
@@ -194,52 +196,31 @@ class _SettingsPageState extends State<SettingsPage> {
               colorScheme: colorScheme,
               textSize: textSize,
             ),
-            _buildSettingCategory('SYSTEM'),
-            _buildSettingTile(
-              title: 'Chat Settings',
-              onTap: () {
-                // Navigate to Chat Settings
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'Notification Settings',
-              onTap: () {
-                // Navigate to Notification Settings
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'Privacy Settings',
-              onTap: () {
-                // Navigate to Privacy Settings
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'Blocked users',
-              onTap: () {
-                // Navigate to Blocked Users
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'Language',
-              onTap: () {
-                // Navigate to Language Settings
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
+
             _buildSettingCategory('Support'),
             _buildSettingTile(
               title: 'ABOUT',
               onTap: () {
-                // Navigate to About
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const AboutUsPage(), // Navigate to About Us page
+                  ),
+                );
+              },
+              colorScheme: colorScheme,
+              textSize: textSize,
+            ),
+            _buildSettingTile(
+              title: 'TEAM MEMBERS',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TeamMembersPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,
@@ -275,23 +256,40 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingTile(
               title: 'Shopee Policies',
               onTap: () {
-                // Navigate to Shopee Policies
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ShopeePoliciesPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,
             ),
+            // In your settings.dart file, update the Rate us tile
             _buildSettingTile(
               title: 'Rate us',
               onTap: () {
-                // Navigate to Rate Us
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RateUsPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,
             ),
+            // In your settings.dart file, update the Help tile
             _buildSettingTile(
               title: 'HELP',
               onTap: () {
-                // Navigate to Help
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HelpCenterPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,
@@ -308,10 +306,16 @@ class _SettingsPageState extends State<SettingsPage> {
               colorScheme: colorScheme,
               textSize: textSize,
             ),
+            // In your settings.dart file, update the Request Account Deletion tile
             _buildSettingTile(
               title: 'Request Account Deletion',
               onTap: () {
-                // Navigate to Request Account Deletion
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AccountDeletionPage(),
+                  ),
+                );
               },
               colorScheme: colorScheme,
               textSize: textSize,

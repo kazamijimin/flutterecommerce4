@@ -15,7 +15,7 @@ import 'see_all_recommend.dart';
 import 'services/message_service.dart';
 import 'wallet.dart';
 import 'shop.dart';
-
+import 'library_page.dart';
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -1295,82 +1295,99 @@ Widget _topNavButton(String title, IconData icon) {
       ),
     );
   }
-
-  void _showMenuDialog() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.7),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          width: 200,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            border: Border.all(color: Colors.pink.shade800, width: 2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
+// In _showMenuDialog method in home.dart
+void _showMenuDialog() {
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.7),
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        width: 200,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: Colors.pink.shade800, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
+              child: Text(
+                'MENU',
+                style: pixelFontStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const Divider(color: Colors.grey, height: 1),
+            InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LibraryPage()),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Text(
-                  'MENU',
+                  'Library',
                   style: pixelFontStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    fontSize: 16,
+                    color: Colors.pink.shade300,
                   ),
                 ),
               ),
-              const Divider(color: Colors.grey, height: 1),
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const SettingsPage()));
-                },
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(
-                    'Library',
-                    style: pixelFontStyle(
-                      fontSize: 16,
-                      color: Colors.pink.shade300,
-                    ),
+            ),
+            InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Settings',
+                  style: pixelFontStyle(
+                    fontSize: 16,
+                    color: Colors.pink.shade300,
                   ),
                 ),
               ),
-              InkWell(
-                onTap: () async {
-                  await FirebaseAuth.instance.signOut();
-                  Navigator.pop(context);
-                  // Navigate to login screen
-                },
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(
-                    'Your store',
-                    style: pixelFontStyle(
-                      fontSize: 16,
-                      color: Colors.pink.shade300,
-                    ),
+            ),
+            InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+                Navigator.pop(context);
+                // Navigate to login screen
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Your store',
+                  style: pixelFontStyle(
+                    fontSize: 16,
+                    color: Colors.pink.shade300,
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showMessageDialog() {
     showDialog(

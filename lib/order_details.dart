@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'order_history.dart';
-
+import 'shop.dart';
 class OrderDetailsPage extends StatelessWidget {
   final Map<String, dynamic> order;
 
@@ -731,18 +731,17 @@ class OrderDetailsPage extends StatelessWidget {
   }
 
   // Action methods
-  void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
-    // Show payment options dialog or navigate to payment page
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Navigating to payment page...',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.orange,
+void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
+  // Navigate to ShopPage instead of showing a snackbar
+  Navigator.pushReplacement(
+    context, 
+    MaterialPageRoute(
+      builder: (context) => const ShopPage(
+        initialCategory: 'All', // You can set any initial category you want
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _trackOrder(BuildContext context, Map<String, dynamic> order) {
     // Navigate to order tracking page
