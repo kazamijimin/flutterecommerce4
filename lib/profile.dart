@@ -12,7 +12,7 @@ import 'see_all_recommend.dart';
 import 'category.dart';
 import 'message.dart'; // Import the Message screen
 import 'settings.dart'; // Import the SettingsScreen
-
+import 'shop.dart'; // Import the Shop screen
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
@@ -328,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         page = const ChatPage(); // Navigate to Message screen
         break;
       case 3:
-        page = const SeeAllProductsScreen(); // Navigate to Shop screen
+        page = const ShopPage(); // Navigate to Shop screen
         break;
       case 4:
         page = const ProfileScreen();

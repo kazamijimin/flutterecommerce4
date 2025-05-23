@@ -5,6 +5,7 @@ import 'home.dart';
 import 'message.dart';
 import 'profile.dart';
 import 'see_all_recommend.dart';
+import 'shop.dart';
 class CategoryPage extends StatefulWidget {
   final String? initialCategory;
   
@@ -537,7 +538,7 @@ class _CategoryPageState extends State<CategoryPage> {
             case 3: // Shop
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const SeeAllProductsScreen()),
+                MaterialPageRoute(builder: (context) => const ShopPage()),
               );
               break;
             case 4: // Profile

@@ -14,6 +14,8 @@ import 'message.dart';
 import 'see_all_recommend.dart';
 import 'services/message_service.dart';
 import 'wallet.dart';
+import 'shop.dart';
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -1080,7 +1082,7 @@ void _executeSearch(String query) {
                 break;
               case 3: // Shop
                 Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const CartPage()));
+                    MaterialPageRoute(builder: (context) => const ShopPage()));
                 break;
               case 4: // Profile
                 Navigator.push(

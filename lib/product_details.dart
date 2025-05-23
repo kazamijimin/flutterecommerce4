@@ -12,7 +12,11 @@ import 'user_review.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
-
+import 'home.dart';
+import 'category.dart';
+import 'profile.dart';
+import 'shop.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 class ProductDetails extends StatefulWidget {
   final String productId; // Firestore document ID
   final String imageUrl;
@@ -74,10 +78,11 @@ class _ProductDetailsState extends State<ProductDetails> {
     _fetchAddedByUserInfo();
     _checkIfCanAddReview();
     _loadProductDetails(); // Add this new method call
+  _saveToRecentlyViewed();
+
   }
 
   bool get _isUserLoggedIn => FirebaseAuth.instance.currentUser != null;
-
   Future<void> _buyNow() async {
     if (!_isUserLoggedIn) {
       // Show message about needing to log in
@@ -88,53 +93,108 @@ class _ProductDetailsState extends State<ProductDetails> {
       );
       return;
     }
-    if (widget.stockCount > 0) {
-      try {
-        // Clean the price string to ensure it's a valid double
-        final cleanedPrice = widget.price.replaceAll(RegExp(r'[^\d.]'), '');
-        final totalPrice = double.parse(cleanedPrice) * quantity;
 
-        Navigator.push(
+    // Check if product is in stock
+    if (_actualStockCount <= 0) {
+      MessageService.showGameMessage(
+        context,
+        message: 'This product is out of stock',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    // Verify that requested quantity is available
+    if (quantity > _actualStockCount) {
+      MessageService.showGameMessage(
+        context,
+        message:
+            'Not enough stock available. Only $_actualStockCount item(s) left',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    try {
+      // Update the stock count in Firestore before proceeding
+      final productRef = FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId);
+
+      final productSnapshot = await productRef.get();
+      if (!productSnapshot.exists) {
+        MessageService.showGameMessage(
           context,
-          MaterialPageRoute(
-            builder: (context) => CheckoutPage(
-              totalPrice: totalPrice,
-              selectedItems: [
-                {
-                  'productId': widget.productId,
-                  'title': widget.title,
-                  'imageUrl': widget.imageUrl,
-                  'price': widget.price,
-                  'quantity': quantity,
-                },
-              ],
-            ),
-          ),
+          message: 'Product not found in database. Please try again.',
+          isSuccess: false,
         );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error: ${e.toString()}',
-              style: const TextStyle(fontFamily: 'PixelFont'),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        return;
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Out of Stock!',
-            style: TextStyle(fontFamily: 'PixelFont'),
+
+      // Decrease the stock count and update totalSold
+      await productRef.update({
+        'stockCount': FieldValue.increment(-quantity),
+        'totalSold': FieldValue.increment(quantity),
+      });
+
+      // Also update the UI to reflect the reduced stock
+      setState(() {
+        _actualStockCount -= quantity;
+      });
+
+      // Clean the price string to ensure it's a valid double
+      final cleanedPrice = widget.discountedPrice != null
+          ? widget.discountedPrice!.replaceAll(RegExp(r'[^\d.]'), '')
+          : widget.price.replaceAll(RegExp(r'[^\d.]'), '');
+      final totalPrice = double.parse(cleanedPrice) * quantity;
+
+      // Create the selected item data with all necessary information
+      final selectedItem = {
+        'productId': widget.productId,
+        'title': widget.title,
+        'imageUrl': widget.imageUrl,
+        'price': cleanedPrice,
+        'quantity': quantity,
+        'sellerId': widget.sellerId,
+      };
+
+      // Navigate to checkout page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckoutPage(
+            totalPrice: totalPrice,
+            selectedItems: [selectedItem],
           ),
-          backgroundColor: Colors.red,
         ),
+      );
+    } catch (e) {
+      MessageService.showGameMessage(
+        context,
+        message: 'Error: ${e.toString()}',
+        isSuccess: false,
       );
     }
   }
-
+Future<void> _saveToRecentlyViewed() async {
+  if (widget.productId == null) return;
+  
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final recentlyViewed = prefs.getStringList('recentlyViewedProducts') ?? [];
+    
+    // Remove if exists and add to beginning (most recent)
+    recentlyViewed.remove(widget.productId);
+    recentlyViewed.insert(0, widget.productId);
+    
+    // Keep only the 10 most recent products
+    final limitedList = recentlyViewed.take(10).toList();
+    
+    await prefs.setStringList('recentlyViewedProducts', limitedList);
+  } catch (e) {
+    print('Error saving viewed product: $e');
+  }
+}
   // Updated method to check if user has completed order for this product
   Future<void> _checkIfCanAddReview() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -205,92 +265,92 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   // Update in your _submitReview method
-void _submitReview() async {
-  // First check if user can add review
-  if (!_canAddReview) {
-    MessageService.showGameMessage(
-      context,
-      message: 'You can only review products from completed orders',
-      isSuccess: false,
-    );
-    return;
-  }
-
-  if (_reviewController.text.trim().isEmpty) {
-    MessageService.showGameMessage(
-      context,
-      message: 'Please write a review before submitting',
-      isSuccess: false,
-    );
-    return;
-  }
-
-  try {
-    // Upload images first
-    List<String> imageUrls = await _uploadReviewImages();
-
-    final review = Review(
-      username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
-      comment: _reviewController.text.trim(),
-      rating: _userRating,
-      avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
-      date: DateTime.now().toIso8601String(),
-      images: imageUrls,
-    );
-
-    // Submit the review
-    await _reviewService.submitReview(widget.productId, review);
-
-    // Update the product document with new rating average
-    final productRef = FirebaseFirestore.instance
-        .collection('products')
-        .doc(widget.productId);
-
-    // Get the current product data
-    final productDoc = await productRef.get();
-    if (productDoc.exists) {
-      final productData = productDoc.data() as Map<String, dynamic>;
-      final int currentReviewCount = productData['reviewCount'] ?? 0;
-      final double currentRating = productData['rating'] ?? 0.0;
-
-      // Calculate new average rating
-      final double totalRatingPoints = currentRating * currentReviewCount;
-      final int newReviewCount = currentReviewCount + 1;
-      final double newAverageRating =
-          (totalRatingPoints + _userRating) / newReviewCount;
-
-      // Update the product with new rating data
-      await productRef.update({
-        'rating': newAverageRating,
-        'reviewCount': newReviewCount,
-        'lastReviewed': FieldValue.serverTimestamp(),
-      });
-
-      // Update local state
-      setState(() {
-        _reviews.add(review);
-        _reviewController.clear();
-        _userRating = 5.0;
-        _averageRating = newAverageRating;
-        _reviewCount = newReviewCount;
-        _reviewImages.clear();
-      });
-
-      // Show success message using MessageService
+  void _submitReview() async {
+    // First check if user can add review
+    if (!_canAddReview) {
       MessageService.showGameMessage(
         context,
-        message: 'Review submitted successfully! Thanks for your feedback!',
-        isSuccess: true,
+        message: 'You can only review products from completed orders',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    if (_reviewController.text.trim().isEmpty) {
+      MessageService.showGameMessage(
+        context,
+        message: 'Please write a review before submitting',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    try {
+      // Upload images first
+      List<String> imageUrls = await _uploadReviewImages();
+
+      final review = Review(
+        username: FirebaseAuth.instance.currentUser?.displayName ?? 'Anonymous',
+        comment: _reviewController.text.trim(),
+        rating: _userRating,
+        avatarUrl: FirebaseAuth.instance.currentUser?.photoURL,
+        date: DateTime.now().toIso8601String(),
+        images: imageUrls,
+      );
+
+      // Submit the review
+      await _reviewService.submitReview(widget.productId, review);
+
+      // Update the product document with new rating average
+      final productRef = FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId);
+
+      // Get the current product data
+      final productDoc = await productRef.get();
+      if (productDoc.exists) {
+        final productData = productDoc.data() as Map<String, dynamic>;
+        final int currentReviewCount = productData['reviewCount'] ?? 0;
+        final double currentRating = productData['rating'] ?? 0.0;
+
+        // Calculate new average rating
+        final double totalRatingPoints = currentRating * currentReviewCount;
+        final int newReviewCount = currentReviewCount + 1;
+        final double newAverageRating =
+            (totalRatingPoints + _userRating) / newReviewCount;
+
+        // Update the product with new rating data
+        await productRef.update({
+          'rating': newAverageRating,
+          'reviewCount': newReviewCount,
+          'lastReviewed': FieldValue.serverTimestamp(),
+        });
+
+        // Update local state
+        setState(() {
+          _reviews.add(review);
+          _reviewController.clear();
+          _userRating = 5.0;
+          _averageRating = newAverageRating;
+          _reviewCount = newReviewCount;
+          _reviewImages.clear();
+        });
+
+        // Show success message using MessageService
+        MessageService.showGameMessage(
+          context,
+          message: 'Review submitted successfully! Thanks for your feedback!',
+          isSuccess: true,
+        );
+      }
+    } catch (e) {
+      MessageService.showGameMessage(
+        context,
+        message: 'Failed to submit review: ${e.toString()}',
+        isSuccess: false,
       );
     }
-  } catch (e) {
-    MessageService.showGameMessage(
-      context,
-      message: 'Failed to submit review: ${e.toString()}',
-      isSuccess: false,
-    );
   }
-}
 
   Future<void> _fetchAddedByUserInfo() async {
     try {
@@ -534,12 +594,13 @@ void _submitReview() async {
 
   Future<List<String>> _uploadReviewImages() async {
     List<String> imageUrls = [];
-    
+
     for (File image in _reviewImages) {
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('review_images')
-          .child('${DateTime.now().millisecondsSinceEpoch}_${imageUrls.length}.jpg');
+          .child(
+              '${DateTime.now().millisecondsSinceEpoch}_${imageUrls.length}.jpg');
 
       await storageRef.putFile(image);
       String downloadUrl = await storageRef.getDownloadURL();
@@ -730,7 +791,8 @@ void _submitReview() async {
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.red[700],
                                     borderRadius: BorderRadius.circular(4),
@@ -1442,7 +1504,7 @@ void _submitReview() async {
                                         ),
                                       ),
                                     ),
-                                  
+
                                   // Selected Images
                                   Expanded(
                                     child: ListView.builder(
@@ -1454,13 +1516,17 @@ void _submitReview() async {
                                             Container(
                                               width: 100,
                                               height: 100,
-                                              margin: const EdgeInsets.only(right: 8),
+                                              margin: const EdgeInsets.only(
+                                                  right: 8),
                                               decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: Colors.grey[700]!),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                    color: Colors.grey[700]!),
                                               ),
                                               child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                                 child: Image.file(
                                                   _reviewImages[index],
                                                   fit: BoxFit.cover,
@@ -1473,12 +1539,15 @@ void _submitReview() async {
                                               child: GestureDetector(
                                                 onTap: () {
                                                   setState(() {
-                                                    _reviewImages.removeAt(index);
+                                                    _reviewImages
+                                                        .removeAt(index);
                                                   });
                                                 },
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(4),
-                                                  decoration: const BoxDecoration(
+                                                  padding:
+                                                      const EdgeInsets.all(4),
+                                                  decoration:
+                                                      const BoxDecoration(
                                                     color: Colors.black54,
                                                     shape: BoxShape.circle,
                                                   ),
@@ -1690,7 +1759,9 @@ void _submitReview() async {
                                             price:
                                                 product['price']?.toString() ??
                                                     '0.00',
-                                            discountedPrice: product['discountedPrice']?.toString(), // Add this line
+                                            discountedPrice: product[
+                                                    'discountedPrice']
+                                                ?.toString(), // Add this line
                                             description:
                                                 product['description'] ??
                                                     'No description available',
@@ -1790,6 +1861,7 @@ void _submitReview() async {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 24),
                 if (!_isUserLoggedIn) const SizedBox(height: 80),
               ],
@@ -1818,6 +1890,61 @@ void _submitReview() async {
               ),
           ],
         ),
+      ),
+      // Add this inside the Scaffold widget in product_details.dart
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
+        unselectedItemColor: Colors.white,
+        selectedLabelStyle:
+            const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        unselectedLabelStyle:
+            const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        currentIndex: 3, // Set the current index to match the "Shop" tab
+        onTap: (index) {
+          switch (index) {
+            case 0: // Home
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+              break;
+            case 1: // Category
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const CategoryPage()),
+              );
+              break;
+            case 2: // Message
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatPage()),
+              );
+              break;
+            case 3: // Shop
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ShopPage()),
+              );
+              break;
+            case 4: // Profile
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.category), label: 'Category'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_bag), label: 'Shop'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
       ),
     );
   }
@@ -2031,14 +2158,18 @@ void _submitReview() async {
   }
 
   // Add this method to your _ProductDetailsState class
-  String _calculateDiscountPercentage(String originalPrice, String discountedPrice) {
+  String _calculateDiscountPercentage(
+      String originalPrice, String discountedPrice) {
     // Remove any currency symbols and convert to double
-    double original = double.parse(originalPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
-    double discounted = double.parse(discountedPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
-    
+    double original =
+        double.parse(originalPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
+    double discounted =
+        double.parse(discountedPrice.replaceAll(RegExp(r'[^0-9.]'), ''));
+
     if (original <= 0) return '0';
-    
-    double percentage = ((original - discounted) / original * 100).round().toDouble();
+
+    double percentage =
+        ((original - discounted) / original * 100).round().toDouble();
     return percentage.toStringAsFixed(0);
   }
 }

@@ -139,7 +139,7 @@ class SeeAllProductsScreen extends StatelessWidget {
               description: description,
               sellerId: sellerId, // Use sellerId here
               rating: 0.0, // Provide a default value for rating
-              stockCount: 0, // Provide a default value for stockCount
+              stockCount: 41, // This is the problem
               category: 'Unknown', // Provide a default value for category
             ),
           ),

@@ -6,7 +6,7 @@ import 'home.dart';
 import 'category.dart';
 import 'message.dart';
 import 'profile.dart';
-
+import 'shop.dart';
 class CartPage extends StatefulWidget {
   const CartPage({Key? key}) : super(key: key);
 
@@ -30,7 +30,7 @@ class _CartPageState extends State<CartPage> {
   Future<void> _loadCartItems() async {
     setState(() => _isLoading = true);
     _productCache.clear(); // Clear cache when reloading
-    
+
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -43,7 +43,7 @@ class _CartPageState extends State<CartPage> {
         setState(() {
           _cartItems = snapshot.docs;
           _isLoading = false;
-          
+
           // Initialize selected items
           for (var item in _cartItems) {
             if (!_selectedItems.containsKey(item.id)) {
@@ -80,11 +80,11 @@ class _CartPageState extends State<CartPage> {
         if (itemIndex != -1) {
           // Update the quantity in the local data
           final currentItem = _cartItems[itemIndex];
-          final updatedData = (currentItem.data() as Map<String, dynamic>)..['quantity'] = newQuantity;
-          
+          final updatedData = (currentItem.data() as Map<String, dynamic>)
+            ..['quantity'] = newQuantity;
+
           // Update the item in the list while maintaining the correct type
-          _cartItems = List.from(_cartItems)
-            ..[itemIndex] = currentItem;
+          _cartItems = List.from(_cartItems)..[itemIndex] = currentItem;
         }
       });
     } catch (e) {
@@ -180,21 +180,26 @@ class _CartPageState extends State<CartPage> {
                           itemCount: _cartItems.length,
                           itemBuilder: (context, index) {
                             final item = _cartItems[index];
-                            final itemData = item.data() as Map<String, dynamic>;
+                            final itemData =
+                                item.data() as Map<String, dynamic>;
                             final isSelected = _selectedItems[item.id] ?? false;
 
                             // Get item title/name
-                            final itemTitle = itemData['title'] ?? itemData['name'] ?? 'Unknown Item';
+                            final itemTitle = itemData['title'] ??
+                                itemData['name'] ??
+                                'Unknown Item';
 
                             // Use the price as stored
-                            final priceDisplay = itemData['price']?.toString() ?? '0.00';
+                            final priceDisplay =
+                                itemData['price']?.toString() ?? '0.00';
 
                             final itemQuantity = itemData['quantity'] ?? 1;
                             final itemImageUrl = itemData['imageUrl'] ?? '';
 
                             // Game item card design that matches the image
                             return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 8, horizontal: 16),
                               decoration: BoxDecoration(
                                 color: Colors.black,
                                 border: Border.all(color: Colors.grey.shade800),
@@ -213,39 +218,52 @@ class _CartPageState extends State<CartPage> {
                                   // Item details
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             itemTitle,
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
-                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                              fontFamily:
+                                                  'PixelFont', // Apply PixelFont
                                             ),
                                           ),
                                           Text(
                                             "$priceDisplay",
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                              fontFamily:
+                                                  'PixelFont', // Apply PixelFont
                                             ),
                                           ),
-                                          
+
                                           // Add stock availability message
                                           FutureBuilder<Map<String, dynamic>>(
-                                            future: _getProductAvailability(itemData['productId'], itemTitle),
+                                            future: _getProductAvailability(
+                                                itemData['productId'],
+                                                itemTitle),
                                             builder: (context, snapshot) {
                                               if (!snapshot.hasData) {
                                                 return const SizedBox.shrink();
                                               }
 
-                                              final productData = snapshot.data!;
-                                              final stockCount = productData['stockCount'] ?? 0;
-                                              final availability = productData['availability'] ?? true;
-                                              final archived = productData['archived'] ?? false;
-                                              
+                                              final productData =
+                                                  snapshot.data!;
+                                              final stockCount =
+                                                  productData['stockCount'] ??
+                                                      0;
+                                              final availability =
+                                                  productData['availability'] ??
+                                                      true;
+                                              final archived =
+                                                  productData['archived'] ??
+                                                      false;
+
                                               if (!availability || archived) {
                                                 return const Text(
                                                   "Not available/Out of Stock",
@@ -256,7 +274,8 @@ class _CartPageState extends State<CartPage> {
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 );
-                                              } else if (stockCount <= 3 && stockCount > 0) {
+                                              } else if (stockCount <= 3 &&
+                                                  stockCount > 0) {
                                                 return const Text(
                                                   "Hurry, about to stock out!",
                                                   style: TextStyle(
@@ -277,7 +296,7 @@ class _CartPageState extends State<CartPage> {
                                                   ),
                                                 );
                                               }
-                                              
+
                                               return const SizedBox.shrink();
                                             },
                                           ),
@@ -294,7 +313,8 @@ class _CartPageState extends State<CartPage> {
                                           InkWell(
                                             onTap: () async {
                                               if (itemQuantity > 1) {
-                                                await _updateQuantity(item.id, itemQuantity - 1);
+                                                await _updateQuantity(
+                                                    item.id, itemQuantity - 1);
                                               }
                                             },
                                             child: Container(
@@ -307,25 +327,29 @@ class _CartPageState extends State<CartPage> {
                                                   color: Colors.red,
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  fontFamily: 'PixelFont', // Apply PixelFont
+                                                  fontFamily:
+                                                      'PixelFont', // Apply PixelFont
                                                 ),
                                               ),
                                             ),
                                           ),
                                           Container(
-                                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                                            margin: const EdgeInsets.symmetric(
+                                                horizontal: 8),
                                             child: Text(
                                               itemQuantity.toString(),
                                               style: const TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.bold,
-                                                fontFamily: 'PixelFont', // Apply PixelFont
+                                                fontFamily:
+                                                    'PixelFont', // Apply PixelFont
                                               ),
                                             ),
                                           ),
                                           InkWell(
                                             onTap: () async {
-                                              await _updateQuantity(item.id, itemQuantity + 1);
+                                              await _updateQuantity(
+                                                  item.id, itemQuantity + 1);
                                             },
                                             child: Container(
                                               width: 24,
@@ -337,7 +361,8 @@ class _CartPageState extends State<CartPage> {
                                                   color: Colors.red,
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  fontFamily: 'PixelFont', // Apply PixelFont
+                                                  fontFamily:
+                                                      'PixelFont', // Apply PixelFont
                                                 ),
                                               ),
                                             ),
@@ -351,25 +376,31 @@ class _CartPageState extends State<CartPage> {
                                             width: 24,
                                             height: 24,
                                             decoration: BoxDecoration(
-                                              border: Border.all(color: Colors.white),
+                                              border: Border.all(
+                                                  color: Colors.white),
                                             ),
                                             child: Checkbox(
                                               value: isSelected,
                                               onChanged: (value) {
                                                 setState(() {
-                                                  _selectedItems[item.id] = value ?? false;
+                                                  _selectedItems[item.id] =
+                                                      value ?? false;
                                                 });
                                               },
-                                              fillColor: MaterialStateProperty.resolveWith<Color>(
+                                              fillColor: MaterialStateProperty
+                                                  .resolveWith<Color>(
                                                 (Set<MaterialState> states) {
-                                                  if (states.contains(MaterialState.selected)) {
+                                                  if (states.contains(
+                                                      MaterialState.selected)) {
                                                     return Colors.transparent;
                                                   }
                                                   return Colors.transparent;
                                                 },
                                               ),
                                               checkColor: Colors.white,
-                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                           ),
                                           const SizedBox(width: 8),
@@ -378,7 +409,8 @@ class _CartPageState extends State<CartPage> {
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontSize: 12,
-                                              fontFamily: 'PixelFont', // Apply PixelFont
+                                              fontFamily:
+                                                  'PixelFont', // Apply PixelFont
                                             ),
                                           ),
                                         ],
@@ -386,12 +418,16 @@ class _CartPageState extends State<CartPage> {
                                       // Add delete button
                                       const SizedBox(height: 8),
                                       InkWell(
-                                        onTap: () => _confirmDelete(context, item.id, itemTitle),
+                                        onTap: () => _confirmDelete(
+                                            context, item.id, itemTitle),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            border: Border.all(color: Colors.red),
-                                            borderRadius: BorderRadius.circular(4),
+                                            border:
+                                                Border.all(color: Colors.red),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                           child: const Text(
                                             "Delete",
@@ -448,37 +484,50 @@ class _CartPageState extends State<CartPage> {
                                     // Check stock availability before proceeding to checkout
                                     bool hasOutOfStockItems = false;
                                     List<String> outOfStockItemNames = [];
-                                    
+
                                     // Create a list to store selected items that are in stock
-                                    final selectedItems = <Map<String, dynamic>>[];
-                                    
+                                    final selectedItems =
+                                        <Map<String, dynamic>>[];
+
                                     for (var item in _cartItems) {
                                       if (_selectedItems[item.id] ?? false) {
-                                        final data = item.data() as Map<String, dynamic>;
-                                        final itemName = data['title'] ?? data['name'] ?? 'Unknown Item';
+                                        final data =
+                                            item.data() as Map<String, dynamic>;
+                                        final itemName = data['title'] ??
+                                            data['name'] ??
+                                            'Unknown Item';
                                         final productId = data['productId'];
-                                        
+
                                         if (productId != null) {
                                           // Check product availability in Firestore
-                                          final productDoc = await FirebaseFirestore.instance
-                                              .collection('products')
-                                              .doc(productId)
-                                              .get();
-                                          
+                                          final productDoc =
+                                              await FirebaseFirestore.instance
+                                                  .collection('products')
+                                                  .doc(productId)
+                                                  .get();
+
                                           if (productDoc.exists) {
-                                            final productData = productDoc.data() as Map<String, dynamic>;
-                                            final stockCount = productData['stockCount'] ?? 0;
-                                            final availability = productData['availability'] ?? true;
-                                            final archived = productData['archived'] ?? false;
-                                            
-                                            if (!availability || archived || stockCount <= 0) {
+                                            final productData = productDoc
+                                                .data() as Map<String, dynamic>;
+                                            final stockCount =
+                                                productData['stockCount'] ?? 0;
+                                            final availability =
+                                                productData['availability'] ??
+                                                    true;
+                                            final archived =
+                                                productData['archived'] ??
+                                                    false;
+
+                                            if (!availability ||
+                                                archived ||
+                                                stockCount <= 0) {
                                               hasOutOfStockItems = true;
                                               outOfStockItemNames.add(itemName);
                                               continue; // Skip this item
                                             }
                                           }
                                         }
-                                        
+
                                         // Only add in-stock items to the selectedItems list
                                         selectedItems.add({
                                           'title': itemName,
@@ -489,14 +538,16 @@ class _CartPageState extends State<CartPage> {
                                         });
                                       }
                                     }
-                                    
+
                                     if (hasOutOfStockItems) {
                                       // Show error message for out of stock items
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             'Cannot proceed with checkout. The following items are out of stock: ${outOfStockItemNames.join(", ")}',
-                                            style: const TextStyle(fontFamily: 'PixelFont'),
+                                            style: const TextStyle(
+                                                fontFamily: 'PixelFont'),
                                           ),
                                           backgroundColor: Colors.red,
                                           duration: const Duration(seconds: 5),
@@ -504,26 +555,29 @@ class _CartPageState extends State<CartPage> {
                                       );
                                       return;
                                     }
-                                    
+
                                     if (selectedItems.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
                                         const SnackBar(
                                           content: Text(
                                             'No valid items selected for checkout',
-                                            style: TextStyle(fontFamily: 'PixelFont'),
+                                            style: TextStyle(
+                                                fontFamily: 'PixelFont'),
                                           ),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
                                       return;
                                     }
-                                    
+
                                     // If we reach here, all selected items are in stock
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => CheckoutPage(
-                                          totalPrice: _calculateTotalPrice(_cartItems),
+                                          totalPrice:
+                                              _calculateTotalPrice(_cartItems),
                                           selectedItems: selectedItems,
                                         ),
                                       ),
@@ -554,8 +608,10 @@ class _CartPageState extends State<CartPage> {
         backgroundColor: Colors.black,
         selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
         unselectedItemColor: Colors.white,
-        selectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        selectedLabelStyle:
+            const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
+        unselectedLabelStyle:
+            const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
         currentIndex: 3, // Set to 3 because Cart is the fourth item
         onTap: (index) {
           switch (index) {
@@ -578,7 +634,10 @@ class _CartPageState extends State<CartPage> {
               );
               break;
             case 3: // Cart - already here
-              break;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ShopPage()),
+              );
             case 4: // Profile
               Navigator.pushReplacement(
                 context,
@@ -589,9 +648,11 @@ class _CartPageState extends State<CartPage> {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.category), label: 'Category'),
           BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Shop'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_bag), label: 'Shop'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -619,9 +680,8 @@ class _CartPageState extends State<CartPage> {
 
         // Get quantity
         final quantity = data['quantity'] ?? 1;
-        final quantityInt = quantity is int
-            ? quantity
-            : int.tryParse(quantity.toString()) ?? 1;
+        final quantityInt =
+            quantity is int ? quantity : int.tryParse(quantity.toString()) ?? 1;
 
         final itemTotal = priceValue * quantityInt;
         total += itemTotal;
@@ -640,13 +700,13 @@ class _CartPageState extends State<CartPage> {
           .where('name', isEqualTo: name)
           .limit(1)
           .get();
-      
+
       if (querySnapshot.docs.isNotEmpty) {
         // If we found a matching product, update the cart item with the product ID
         // This will help for future queries
         final String productId = querySnapshot.docs.first.id;
         final user = FirebaseAuth.instance.currentUser;
-        
+
         if (user != null) {
           // Find this cart item by title and update it with the product ID
           final cartItems = await FirebaseFirestore.instance
@@ -655,7 +715,7 @@ class _CartPageState extends State<CartPage> {
               .collection('cart')
               .where('title', isEqualTo: name)
               .get();
-              
+
           if (cartItems.docs.isNotEmpty) {
             await FirebaseFirestore.instance
                 .collection('users')
@@ -665,7 +725,7 @@ class _CartPageState extends State<CartPage> {
                 .update({'productId': productId});
           }
         }
-        
+
         return querySnapshot.docs.first.reference.get();
       }
       return null;
@@ -684,12 +744,12 @@ class _CartPageState extends State<CartPage> {
           .where('name', isEqualTo: name)
           .limit(1)
           .get();
-      
+
       if (querySnapshot.docs.isNotEmpty) {
         // If we found a matching product, update the cart item with the product ID
         final String productId = querySnapshot.docs.first.id;
         final user = FirebaseAuth.instance.currentUser;
-        
+
         if (user != null) {
           // Find this cart item by title and update it with the product ID
           final cartItems = await FirebaseFirestore.instance
@@ -698,7 +758,7 @@ class _CartPageState extends State<CartPage> {
               .collection('cart')
               .where('title', isEqualTo: name)
               .get();
-              
+
           if (cartItems.docs.isNotEmpty) {
             await FirebaseFirestore.instance
                 .collection('users')
@@ -706,7 +766,7 @@ class _CartPageState extends State<CartPage> {
                 .collection('cart')
                 .doc(cartItems.docs.first.id)
                 .update({'productId': productId});
-                
+
             // Optionally trigger a rebuild after updating
             if (mounted) {
               setState(() {});
@@ -764,12 +824,12 @@ class _CartPageState extends State<CartPage> {
                       .collection('cart')
                       .doc(itemId)
                       .delete();
-                  
+
                   // Update the selection map to remove the deleted item
                   setState(() {
                     _selectedItems.remove(itemId);
                   });
-                  
+
                   if (mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -815,7 +875,8 @@ class _CartPageState extends State<CartPage> {
   }
 
   // Add this helper method to your _CartPageState class
-  Future<Map<String, dynamic>> _getProductAvailability(String? productId, String itemTitle) async {
+  Future<Map<String, dynamic>> _getProductAvailability(
+      String? productId, String itemTitle) async {
     // Check cache first
     if (productId != null && _productCache.containsKey(productId)) {
       return _productCache[productId]!;

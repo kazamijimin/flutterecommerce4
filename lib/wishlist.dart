@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home.dart';
-import 'category.dart';
 import 'message.dart';
 import 'profile.dart';
-import 'cart.dart';
+import 'shop.dart';
 class WishlistPage extends StatefulWidget {
   const WishlistPage({Key? key}) : super(key: key);
 
@@ -419,7 +418,7 @@ class _WishlistPageState extends State<WishlistPage> {
             case 3: // Cart
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const CartPage()),
+                MaterialPageRoute(builder: (context) => const ShopPage()),
               );
               break;
             case 4: // Profile

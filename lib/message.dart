@@ -7,7 +7,7 @@ import 'home.dart';
 import 'category.dart';
 import 'profile.dart';
 import 'see_all_recommend.dart';
-
+import 'shop.dart';
 class ChatPage extends StatefulWidget {
   const ChatPage({Key? key}) : super(key: key);
 
@@ -374,7 +374,7 @@ class _ChatPageState extends State<ChatPage> {
             case 3: // Cart
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const SeeAllProductsScreen()),
+                MaterialPageRoute(builder: (context) => const ShopPage()),
               );
               break;
             case 4: // Profile
