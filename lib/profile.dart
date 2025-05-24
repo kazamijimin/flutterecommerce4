@@ -13,6 +13,7 @@ import 'message.dart'; // Import the Message screen
 import 'settings.dart'; // Import the SettingsScreen
 import 'shop.dart'; // Import the Shop screen
 import 'address.dart'; // Import the AddressPage
+import 'friends.dart'; // Import the FriendsPage
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
@@ -269,6 +270,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  void _navigateToFriends() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FriendsPage()),
+    );
   }
 
   void _navigateToLogin() {
@@ -665,11 +673,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // Friends Card
                   Expanded(
-                    child: _buildStatsCard(
-                      'Friends',
-                      '${userData?['friendCount'] ?? 1}',
-                      Icons.people,
-                      Colors.purple.shade400,
+                    child: GestureDetector(
+                      onTap: _navigateToFriends,
+                      child: _buildStatsCard(
+                        'Friends',
+                        '${userData?['friendCount'] ?? 0}',
+                        Icons.people,
+                        Colors.purple.shade400,
+                        isButton: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -699,8 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.favorite,
-                          color: Colors.pink.shade400, size: 20),
+                      Icon(Icons.star, color: Colors.yellow.shade400, size: 20),
                       const SizedBox(width: 8),
                       const Text(
                         'FAVOURITES',
@@ -752,7 +763,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.favorite_border,
+                          Icon(Icons.star,
                               color: Colors.pink.shade300, size: 48),
                           const SizedBox(height: 16),
                           const Text(
@@ -1055,8 +1066,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.favorite,
-                        color: Colors.pink.shade400, size: 16),
+                    child: Icon(Icons.star,
+                        color: Colors.yellow.shade400, size: 16),
                   ),
                 ),
               ],

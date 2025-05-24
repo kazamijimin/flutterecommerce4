@@ -10,6 +10,10 @@ class OrderDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get device size to help with responsiveness
+    final Size screenSize = MediaQuery.of(context).size;
+    final bool isSmallScreen = screenSize.width < 360;
+    
     final item = order['items'][0]; // Get the single product being checked out
     final neonPink = const Color(0xFFFF0077);
     final neonBlue = const Color(0xFF00E5FF);
@@ -24,11 +28,13 @@ class OrderDetailsPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           _getAppBarTitle(orderStatus),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'PixelFont',
             fontWeight: FontWeight.bold,
-            letterSpacing: 2.0,
+            letterSpacing: isSmallScreen ? 1.0 : 2.0,
+            fontSize: isSmallScreen ? 16.0 : 18.0,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
         backgroundColor: darkBackground,
         elevation: 0,
@@ -47,306 +53,161 @@ class OrderDetailsPage extends StatelessWidget {
           ),
 
           // Main content
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Status tracker card
-                _buildStatusTracker(
-                    orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status tracker card
+                  _buildStatusTracker(
+                      context, // Add context parameter here
+                      orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
 
-                const SizedBox(height: 24),
+                  SizedBox(height: isSmallScreen ? 16 : 24),
 
-                // Order information card
-                _buildSectionCard(
-                  title: 'ORDER INFORMATION',
-                  icon: Icons.info_outline,
-                  neonPink: neonPink,
-                  neonBlue: neonBlue,
-                  surfaceColor: surfaceColor,
-                  child: Column(
-                    children: [
-                      _buildInfoRow(
-                        icon: Icons.confirmation_number,
-                        title: 'Order ID',
-                        value: '#${order['orderId'] ?? 'N/A'}',
-                        iconColor: neonBlue,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoRow(
-                        icon: Icons.calendar_today,
-                        title: 'Date',
-                        value: _formatDate(order['orderDate'] ?? 'N/A'),
-                        iconColor: neonBlue,
-                      ),
-                      const SizedBox(height: 12),
+                  // Order information card
+                  _buildSectionCard(
+                    title: 'ORDER INFORMATION',
+                    icon: Icons.info_outline,
+                    neonPink: neonPink,
+                    neonBlue: neonBlue,
+                    surfaceColor: surfaceColor,
+                    child: Column(
+                      children: [
+                        _buildInfoRow(
+                          icon: Icons.confirmation_number,
+                          title: 'Order ID',
+                          value: '#${order['orderId'] ?? 'N/A'}',
+                          iconColor: neonBlue,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          icon: Icons.calendar_today,
+                          title: 'Date',
+                          value: _formatDate(order['orderDate'] ?? 'N/A'),
+                          iconColor: neonBlue,
+                        ),
+                        const SizedBox(height: 12),
 
-                      // Enhanced payment method display
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.payment,
-                                color: neonBlue,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Payment Method',
-                                style: TextStyle(
-                                  fontFamily: 'PixelFont',
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          _buildPaymentMethodCard(order, neonPink, neonBlue),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-                      _buildInfoRow(
-                        icon: Icons.local_shipping,
-                        title: 'Shipping Option',
-                        value: order['shippingOption'] ?? 'Standard Shipping',
-                        iconColor: neonBlue,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoRow(
-                        icon: Icons.location_on,
-                        title: 'Shipping Address',
-                        value: order['shippingAddress'] ?? 'N/A',
-                        iconColor: neonBlue,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Product card
-                _buildSectionCard(
-                  title: 'YOUR PURCHASE',
-                  icon: Icons.shopping_bag,
-                  neonPink: neonPink,
-                  neonBlue: neonBlue,
-                  surfaceColor: surfaceColor,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Product image with animated border
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.black26,
-                              border: Border.all(
-                                color: neonPink,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: neonPink.withOpacity(0.5),
-                                  blurRadius: 8,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              child: Image.network(
-                                item['imageUrl'] ?? '',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.grey,
-                                  size: 40,
-                                ),
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Center(
-                                    child: CircularProgressIndicator(
-                                      color: neonPink,
-                                      value:
-                                          loadingProgress.expectedTotalBytes !=
-                                                  null
-                                              ? loadingProgress
-                                                      .cumulativeBytesLoaded /
-                                                  loadingProgress
-                                                      .expectedTotalBytes!
-                                              : null,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Product details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        // Enhanced payment method display
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Text(
-                                  item['title'] ?? 'Unknown Item',
-                                  style: const TextStyle(
+                                Icon(
+                                  Icons.payment,
+                                  color: neonBlue,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Payment Method',
+                                  style: TextStyle(
                                     fontFamily: 'PixelFont',
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: Colors.white70,
+                                    fontSize: 12,
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black38,
-                                    border: Border.all(
-                                      color: Colors.grey.shade700,
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'Quantity: ${item['quantity']}',
-                                    style: TextStyle(
-                                      fontFamily: 'PixelFont',
-                                      fontSize: 12,
-                                      color: Colors.white.withOpacity(0.7),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: neonBlue.withOpacity(0.2),
-                                    border: Border.all(
-                                      color: neonBlue.withOpacity(0.5),
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '\$${item['price']}',
-                                    style: TextStyle(
-                                      fontFamily: 'PixelFont',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: neonBlue,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                // Add payment method and shipping address here
-                                Row(
-                                  children: [
-                                    Icon(Icons.payment,
-                                        color: neonPink, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      order['paymentMethod'] ?? '',
-                                      style: const TextStyle(
-                                        fontFamily: 'PixelFont',
-                                        fontSize: 12,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(Icons.location_on,
-                                        color: neonBlue, size: 16),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        order['shippingAddress'] ?? '',
-                                        style: const TextStyle(
-                                          fontFamily: 'PixelFont',
-                                          fontSize: 12,
-                                          color: Colors.white70,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(height: 8),
+                            _buildPaymentMethodCard(order, neonPink, neonBlue),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          icon: Icons.local_shipping,
+                          title: 'Shipping Option',
+                          value: order['shippingOption'] ?? 'Standard Shipping',
+                          iconColor: neonBlue,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          icon: Icons.location_on,
+                          title: 'Shipping Address',
+                          value: order['shippingAddress'] ?? 'N/A',
+                          iconColor: neonBlue,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  SizedBox(height: isSmallScreen ? 16 : 24),
 
-                // Payment summary card
-                _buildSectionCard(
-                  title: 'PAYMENT SUMMARY',
-                  icon: Icons.account_balance_wallet,
-                  neonPink: neonPink,
-                  neonBlue: neonBlue,
-                  surfaceColor: surfaceColor,
-                  child: Column(
-                    children: [
-                      _buildPaymentRow(
-                        title: 'Subtotal',
-                        value:
-                            '\$${(order['totalPrice'] != null ? (order['totalPrice'] - 4.99) : 0).toStringAsFixed(2)}',
-                      ),
-                      _buildPaymentRow(
-                        title: 'Shipping Fee',
-                        value: '\$4.99',
-                      ),
-                      const SizedBox(height: 4),
-                      const Divider(color: Colors.white30),
-                      const SizedBox(height: 4),
-                      _buildPaymentRow(
-                        title: 'Total',
-                        value:
-                            '\$${order['totalPrice']?.toStringAsFixed(2) ?? '0.00'}',
-                        isTotal: true,
-                        neonPink: neonPink,
-                      ),
-                    ],
+                  // Product card
+                  _buildSectionCard(
+                    title: 'YOUR PURCHASE',
+                    icon: Icons.shopping_bag,
+                    neonPink: neonPink,
+                    neonBlue: neonBlue,
+                    surfaceColor: surfaceColor,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildResponsiveProductRow(item, neonPink, neonBlue, isSmallScreen),
+                      ],
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  SizedBox(height: isSmallScreen ? 16 : 24),
 
-                // Action button based on order status
-                _buildActionButton(
-                    context, orderStatus, order, neonPink, neonBlue, neonGreen),
+                  // Payment summary card
+                  _buildSectionCard(
+                    title: 'PAYMENT SUMMARY',
+                    icon: Icons.account_balance_wallet,
+                    neonPink: neonPink,
+                    neonBlue: neonBlue,
+                    surfaceColor: surfaceColor,
+                    child: Column(
+                      children: [
+                        _buildPaymentRow(
+                          title: 'Subtotal',
+                          value:
+                              '\$${(order['totalPrice'] != null ? (order['totalPrice'] - 4.99) : 0).toStringAsFixed(2)}',
+                        ),
+                        _buildPaymentRow(
+                          title: 'Shipping Fee',
+                          value: '\$4.99',
+                        ),
+                        const SizedBox(height: 4),
+                        const Divider(color: Colors.white30),
+                        const SizedBox(height: 4),
+                        _buildPaymentRow(
+                          title: 'Total',
+                          value:
+                              '\$${order['totalPrice']?.toStringAsFixed(2) ?? '0.00'}',
+                          isTotal: true,
+                          neonPink: neonPink,
+                        ),
+                      ],
+                    ),
+                  ),
 
-                // Add this to show admin controls (with divider for visual separation)
-                if (_isSellerOrAdmin()) ...[
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white24),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isSmallScreen ? 16 : 24),
+
+                  // Action button based on order status
+                  _buildActionButton(
+                      context, orderStatus, order, neonPink, neonBlue, neonGreen),
+
+                  // Add this to show admin controls (with divider for visual separation)
+                  if (_isSellerOrAdmin()) ...[
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white24),
+                    const SizedBox(height: 16),
+                  ],
+
+                  SizedBox(height: isSmallScreen ? 16 : 24),
+
+                  // Add this to show order history button
+                  _buildOrderHistoryButton(context, neonBlue),
+                  
+                  // Add bottom padding for better scrolling experience
+                  const SizedBox(height: 40),
                 ],
-
-                const SizedBox(height: 24),
-
-                // Add this to show order history button
-                _buildOrderHistoryButton(context, neonBlue),
-              ],
+              ),
             ),
           ),
         ],
@@ -378,10 +239,270 @@ class OrderDetailsPage extends StatelessWidget {
         return 'ORDER DETAILS';
     }
   }
+// Add this method to the OrderDetailsPage class
 
+Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Color neonBlue, bool isSmallScreen) {
+  if (isSmallScreen) {
+    // Vertical layout for small screens
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Product image centered
+        Center(
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              border: Border.all(
+                color: neonPink,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: neonPink.withOpacity(0.5),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              child: Image.network(
+                item['imageUrl'] ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.grey,
+                  size: 40,
+                ),
+                loadingBuilder:
+                    (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: neonPink,
+                      value:
+                          loadingProgress.expectedTotalBytes !=
+                                  null
+                              ? loadingProgress
+                                      .cumulativeBytesLoaded /
+                                  loadingProgress
+                                      .expectedTotalBytes!
+                              : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Product details
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item['title'] ?? 'Unknown Item',
+              style: const TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black38,
+                    border: Border.all(
+                      color: Colors.grey.shade700,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Quantity: ${item['quantity']}',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: neonBlue.withOpacity(0.2),
+                    border: Border.all(
+                      color: neonBlue.withOpacity(0.5),
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '\$${item['price']}',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: neonBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  } else {
+    // Horizontal layout for larger screens
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Product image
+        Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            border: Border.all(
+              color: neonPink,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: neonPink.withOpacity(0.5),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            child: Image.network(
+              item['imageUrl'] ?? '',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  const Icon(
+                Icons.image_not_supported,
+                color: Colors.grey,
+                size: 40,
+              ),
+              loadingBuilder:
+                  (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    color: neonPink,
+                    value:
+                        loadingProgress.expectedTotalBytes !=
+                                null
+                            ? loadingProgress
+                                    .cumulativeBytesLoaded /
+                                loadingProgress
+                                    .expectedTotalBytes!
+                            : null,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        
+        // Product details
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item['title'] ?? 'Unknown Item',
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black38,
+                      border: Border.all(
+                        color: Colors.grey.shade700,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Quantity: ${item['quantity']}',
+                      style: TextStyle(
+                        fontFamily: 'PixelFont',
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: neonBlue.withOpacity(0.2),
+                      border: Border.all(
+                        color: neonBlue.withOpacity(0.5),
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '\$${item['price']}',
+                      style: TextStyle(
+                        fontFamily: 'PixelFont',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: neonBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
   // Replace your existing _buildStatusTracker method with this one
-  Widget _buildStatusTracker(String status, Color neonPink, Color neonBlue,
+  Widget _buildStatusTracker(
+    BuildContext context, // Add context parameter here
+    String status, Color neonPink, Color neonBlue,
       Color neonGreen, Color surfaceColor) {
+    // Get device width to determine if we need a more compact layout
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isCompactLayout = screenWidth < 360;
+    
     // Normalize the status string for consistent comparison
     final String normalizedStatus = status.toString().toLowerCase();
 
@@ -459,7 +580,6 @@ class OrderDetailsPage extends StatelessWidget {
         statusIcon = Icons.help;
     }
 
-    // The rest of your existing method remains the same...
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -501,14 +621,17 @@ class OrderDetailsPage extends StatelessWidget {
                     size: 24,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    activeStepText,
-                    style: const TextStyle(
-                      fontFamily: 'PixelFont',
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
+                  Flexible(
+                    child: Text(
+                      activeStepText,
+                      style: TextStyle(
+                        fontFamily: 'PixelFont',
+                        color: Colors.white,
+                        fontSize: isCompactLayout ? 14 : 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -516,74 +639,144 @@ class OrderDetailsPage extends StatelessWidget {
             ),
           ),
 
-          // Dynamic status tracker steps with individual colors
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Payment step - active only when on "to pay" or completed
-                _buildStatusStep(
-                    'Payment',
-                    isPaid || normalizedStatus == 'to pay',
-                    normalizedStatus == 'to pay'
-                        ? Colors.orange
-                        : (isPaid ? neonPink : Colors.grey.shade800),
-                    isCurrentStep: normalizedStatus == 'to pay'),
+       Padding(
+            padding: EdgeInsets.all(isCompactLayout ? 12.0 : 20.0),
+            child: isCompactLayout
+                ? _buildCompactStatusTracker(
+                    isPaid, isShipped, isDelivered, isCompleted,
+                    normalizedStatus, neonPink, neonBlue, neonGreen)
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Payment step - active only when on "to pay" or completed
+                      _buildStatusStep(
+                          'Payment',
+                          isPaid || normalizedStatus == 'to pay',
+                          normalizedStatus == 'to pay'
+                              ? Colors.orange
+                              : (isPaid ? neonPink : Colors.grey.shade800),
+                          isCurrentStep: normalizedStatus == 'to pay'),
 
-                _buildStatusLine(
-                    isPaid, isPaid ? neonPink : Colors.grey.shade800),
+                      _buildStatusLine(
+                          isPaid, isPaid ? neonPink : Colors.grey.shade800),
 
-                // Shipping step - active only when on "to ship" or later
-                _buildStatusStep(
-                    'Processing',
-                    isShipped || normalizedStatus == 'to ship',
-                    normalizedStatus == 'to ship'
-                        ? neonPink
-                        : (isShipped ? neonBlue : Colors.grey.shade800),
-                    isCurrentStep: normalizedStatus == 'to ship'),
+                      // Shipping step - active only when on "to ship" or later
+                      _buildStatusStep(
+                          'Processing',
+                          isShipped || normalizedStatus == 'to ship',
+                          normalizedStatus == 'to ship'
+                              ? neonPink
+                              : (isShipped ? neonBlue : Colors.grey.shade800),
+                          isCurrentStep: normalizedStatus == 'to ship'),
 
-                _buildStatusLine(
-                    isShipped, isShipped ? neonBlue : Colors.grey.shade800),
+                      _buildStatusLine(
+                          isShipped, isShipped ? neonBlue : Colors.grey.shade800),
 
-                // Delivery step - active only when on "to receive" or later
-                _buildStatusStep(
-                    'Shipping',
-                    isDelivered || normalizedStatus == 'to receive',
-                    normalizedStatus == 'to receive'
-                        ? neonBlue
-                        : (isDelivered ? neonGreen : Colors.grey.shade800),
-                    isCurrentStep: normalizedStatus == 'to receive'),
+                      // Delivery step - active only when on "to receive" or later
+                      _buildStatusStep(
+                          'Shipping',
+                          isDelivered || normalizedStatus == 'to receive',
+                          normalizedStatus == 'to receive'
+                              ? neonBlue
+                              : (isDelivered ? neonGreen : Colors.grey.shade800),
+                          isCurrentStep: normalizedStatus == 'to receive'),
 
-                _buildStatusLine(isDelivered,
-                    isDelivered ? neonGreen : Colors.grey.shade800),
+                      _buildStatusLine(isDelivered,
+                          isDelivered ? neonGreen : Colors.grey.shade800),
 
-                // Completed step - active only when "completed" or "delivered"
-                _buildStatusStep(
-                    'Delivered',
-                    isCompleted || normalizedStatus == 'to review',
-                    normalizedStatus == 'to review'
-                        ? neonGreen
-                        : (isCompleted ? neonGreen : Colors.grey.shade800),
-                    isCurrentStep: normalizedStatus == 'to review' ||
-                        normalizedStatus == 'delivered' ||
-                        normalizedStatus == 'completed'),
-              ],
-            ),
+                      // Completed step - active only when "completed" or "delivered"
+                      _buildStatusStep(
+                          'Delivered',
+                          isCompleted || normalizedStatus == 'to review',
+                          normalizedStatus == 'to review'
+                              ? neonGreen
+                              : (isCompleted ? neonGreen : Colors.grey.shade800),
+                          isCurrentStep: normalizedStatus == 'to review' ||
+                              normalizedStatus == 'delivered' ||
+                              normalizedStatus == 'completed'),
+                    ],
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // Build a single status step circle with pulsing effect for current step
+  // New method for compact status tracker layout
+  Widget _buildCompactStatusTracker(
+      bool isPaid, bool isShipped, bool isDelivered, bool isCompleted,
+      String normalizedStatus, Color neonPink, Color neonBlue, Color neonGreen) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Payment step
+            _buildStatusStep(
+                'Payment',
+                isPaid || normalizedStatus == 'to pay',
+                normalizedStatus == 'to pay'
+                    ? Colors.orange
+                    : (isPaid ? neonPink : Colors.grey.shade800),
+                isCurrentStep: normalizedStatus == 'to pay',
+                isCompact: true),
+
+            _buildStatusLine(
+                isPaid, isPaid ? neonPink : Colors.grey.shade800, isCompact: true),
+
+            // Shipping step
+            _buildStatusStep(
+                'Processing',
+                isShipped || normalizedStatus == 'to ship',
+                normalizedStatus == 'to ship'
+                    ? neonPink
+                    : (isShipped ? neonBlue : Colors.grey.shade800),
+                isCurrentStep: normalizedStatus == 'to ship',
+                isCompact: true),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Delivery step
+            _buildStatusStep(
+                'Shipping',
+                isDelivered || normalizedStatus == 'to receive',
+                normalizedStatus == 'to receive'
+                    ? neonBlue
+                    : (isDelivered ? neonGreen : Colors.grey.shade800),
+                isCurrentStep: normalizedStatus == 'to receive',
+                isCompact: true),
+
+            _buildStatusLine(
+                isDelivered, isDelivered ? neonGreen : Colors.grey.shade800, isCompact: true),
+
+            // Completed step
+            _buildStatusStep(
+                'Delivered',
+                isCompleted || normalizedStatus == 'to review',
+                normalizedStatus == 'to review'
+                    ? neonGreen
+                    : (isCompleted ? neonGreen : Colors.grey.shade800),
+                isCurrentStep: normalizedStatus == 'to review' ||
+                    normalizedStatus == 'delivered' ||
+                    normalizedStatus == 'completed',
+                isCompact: true),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Update _buildStatusStep to support compact mode
   Widget _buildStatusStep(String label, bool isActive, Color color,
-      {bool isCurrentStep = false}) {
+      {bool isCurrentStep = false, bool isCompact = false}) {
     return Column(
       children: [
         Container(
-          width: 30,
-          height: 30,
+          width: isCompact ? 25 : 30,
+          height: isCompact ? 25 : 30,
           decoration: BoxDecoration(
             color: isActive ? color : Colors.grey.shade800,
             shape: BoxShape.circle,
@@ -607,7 +800,7 @@ class OrderDetailsPage extends StatelessWidget {
                   ? (isCurrentStep ? Icons.circle : Icons.check)
                   : Icons.circle,
               color: Colors.white,
-              size: isActive ? (isCurrentStep ? 10 : 16) : 8,
+              size: isActive ? (isCurrentStep ? 8 : 14) : 7,
             ),
           ),
         ),
@@ -616,7 +809,7 @@ class OrderDetailsPage extends StatelessWidget {
           label,
           style: TextStyle(
             fontFamily: 'PixelFont',
-            fontSize: 10,
+            fontSize: isCompact ? 8 : 10,
             color: isActive ? color : Colors.grey,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
@@ -625,17 +818,17 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  // Build the connecting line between status steps
-  Widget _buildStatusLine(bool isActive, Color activeColor) {
+  // Update _buildStatusLine to support compact mode
+  Widget _buildStatusLine(bool isActive, Color activeColor, {bool isCompact = false}) {
     return Container(
-      width: 40,
+      width: isCompact ? 25 : 40,
       height: 2,
-      margin: const EdgeInsets.only(bottom: 24),
+      margin: EdgeInsets.only(bottom: isCompact ? 20 : 24),
       color: isActive ? activeColor : Colors.grey.shade800,
     );
   }
 
-// Replace your existing _buildActionButton method
+  // Replace your existing _buildActionButton method
   Widget _buildActionButton(
     BuildContext context,
     String status,
@@ -892,6 +1085,8 @@ void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
                   color: Colors.white,
                   fontSize: 14,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: title == 'Shipping Address' ? 3 : 1,
               ),
             ],
           ),

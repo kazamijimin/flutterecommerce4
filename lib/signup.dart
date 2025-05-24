@@ -23,12 +23,30 @@ class _SignupState extends State<Signup> {
       true; // Add this for confirm password visibility toggle
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  // Add password validation variables
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasDigit = false;
+  bool _hasSpecialChar = false;
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // Add this method to check password strength
+  void _checkPassword(String password) {
+    setState(() {
+      _hasMinLength = password.length >= 8;
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasDigit = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    });
   }
 
   void onSubmit() async {
@@ -41,6 +59,17 @@ class _SignupState extends State<Signup> {
     if (emailAddress.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    // Check if password meets all requirements
+    if (!_hasMinLength || !_hasUppercase || !_hasLowercase || !_hasDigit || !_hasSpecialChar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password does not meet security requirements'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -296,6 +325,60 @@ class _SignupState extends State<Signup> {
     );
   }
 
+  // Add a password requirements widget
+  Widget _buildPasswordRequirements() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.3),
+        border: Border.all(color: const Color(0xFFF43E69).withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Password Requirements:',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontFamily: 'PixelFont',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRequirement('At least 8 characters', _hasMinLength),
+          _buildRequirement('One uppercase letter', _hasUppercase),
+          _buildRequirement('One lowercase letter', _hasLowercase),
+          _buildRequirement('One number', _hasDigit),
+          _buildRequirement('One special character', _hasSpecialChar),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirement(String text, bool isMet) {
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.cancel,
+          color: isMet ? Colors.green : Colors.red.withOpacity(0.7),
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            color: isMet ? Colors.green : Colors.white70,
+            fontSize: 12,
+            fontFamily: 'PixelFont',
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -412,6 +495,7 @@ class _SignupState extends State<Signup> {
                     child: TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      onChanged: _checkPassword, // Add this line
                       style: const TextStyle(
                         fontFamily: 'PixelFont', // Use the custom font
                         color: Colors.black,
@@ -442,6 +526,9 @@ class _SignupState extends State<Signup> {
                       ),
                     ),
                   ),
+
+                  // Password requirements widget
+                  _buildPasswordRequirements(),
 
                   // Confirm Password field - updated with show/hide toggle
                   Container(

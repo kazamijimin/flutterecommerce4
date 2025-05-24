@@ -113,252 +113,249 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colorScheme = isDarkMode
-        ? const ColorScheme.dark(
-            primary: Color(0xFFFF0077),
-            secondary: Color(0xFF00E5FF),
-            surface: Color(0xFF1A1A2E),
-            background: Color(0xFF0F0F1B),
-          )
-        : const ColorScheme.light(
-            primary: Color(0xFFFF0077),
-            secondary: Color(0xFF00E5FF),
-            surface: Color(0xFF2E2E44),
-            background: Color(0xFF232339),
-          );
-
-    return Theme(
-      data: ThemeData(
-        colorScheme: colorScheme,
-        textTheme: TextTheme(
-          bodyLarge: TextStyle(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: const Text(
+          'SETTINGS',
+          style: TextStyle(
             fontFamily: 'PixelFont',
-            fontSize: textSize,
-            color: Colors.white,
-          ),
-          titleLarge: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
+            fontSize: 20,
+            letterSpacing: 1.5,
           ),
         ),
+        centerTitle: true,
       ),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'SETTINGS',
-            style: TextStyle(
-              fontFamily: 'PixelFont',
-              letterSpacing: 2.0,
-            ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        children: [
+          _buildSettingCategory('MY ACCOUNT'),
+          _buildSettingTile(
+            title: 'My Profile',
+            onTap: () {
+              // Navigate to My Profile
+            },
           ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: ListView(
-          children: [
-            // SYSTEM Section
-            _buildSettingCategory('MY ACCOUNT'),
-            _buildSettingTile(
-              title: 'My Profile',
-              onTap: () {
-                // Navigate to My Profile
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'My Addresses',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const AddressPage(), // Replace with your account page widget
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            // In _buildSettingTile for Bank Account/Cards
-            _buildSettingTile(
-              title: 'Bank Account/Cards',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BankAccountsPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
+          _buildSettingTile(
+            title: 'My Addresses',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddressPage()),
+              );
+            },
+          ),
+          _buildSettingTile(
+            title: 'Bank Account/Cards',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BankAccountsPage()),
+              );
+            },
+          ),
 
-            _buildSettingCategory('Support'),
-            _buildSettingTile(
-              title: 'ABOUT',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const AboutUsPage(), // Navigate to About Us page
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'TEAM MEMBERS',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TeamMembersPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'FAQS and Help',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const FAQPage(), // Navigate to FAQS page
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'FAQS and Help',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const FAQPage(), // Navigate to FAQS page
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'Shopee Policies',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ShopeePoliciesPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            // In your settings.dart file, update the Rate us tile
-            _buildSettingTile(
-              title: 'Rate us',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RateUsPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            // In your settings.dart file, update the Help tile
-            _buildSettingTile(
-              title: 'HELP',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HelpCenterPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            _buildSettingTile(
-              title: 'TERMS AND CONDITIONS',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const TermsAndConditionsPage()),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-            // In your settings.dart file, update the Request Account Deletion tile
-            _buildSettingTile(
-              title: 'Request Account Deletion',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AccountDeletionPage(),
-                  ),
-                );
-              },
-              colorScheme: colorScheme,
-              textSize: textSize,
-            ),
-          ],
-        ),
+          _buildSettingCategory('SUPPORT'),
+          _buildSettingTile(
+            title: 'ABOUT',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutUsPage()),
+              );
+            },
+          ),
+          _buildSettingTile(
+            title: 'TEAM MEMBERS',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TeamMembersPage(),
+                ),
+              );
+            },
+          ),
+
+          _buildSettingTile(
+            title: 'FAQS and Help',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const FAQPage(), // Navigate to FAQS page
+                ),
+              );
+            },
+          ),
+          _buildSettingTile(
+            title: 'GameBox Policies',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ShopeePoliciesPage(),
+                ),
+              );
+            },
+          ),
+          // In your settings.dart file, update the Rate us tile
+          _buildSettingTile(
+            title: 'Rate us',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RateUsPage(),
+                ),
+              );
+            },
+          ),
+          // In your settings.dart file, update the Help tile
+          _buildSettingTile(
+            title: 'HELP',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HelpCenterPage(),
+                ),
+              );
+            },
+          ),
+          _buildSettingTile(
+            title: 'TERMS AND CONDITIONS',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const TermsAndConditionsPage()),
+              );
+            },
+          ),
+          // In your settings.dart file, update the Request Account Deletion tile
+          _buildSettingTile(
+            title: 'Request Account Deletion',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AccountDeletionPage(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSettingCategory(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontFamily: 'PixelFont',
-          fontSize: 14,
-          color: const Color(0xFF00E5FF),
-          letterSpacing: 2.0,
-          fontWeight: FontWeight.bold,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: 14,
+              color: Color(0xFF00E5FF),
+              letterSpacing: 2.0,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 2,
+            width: 60,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF0077), Color(0xFF00E5FF)],
+              ),
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSettingTile({
     required String title,
-    required ColorScheme colorScheme,
-    required double textSize,
-    VoidCallback? onTap,
+    required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(_getIconForTitle(title), color: colorScheme.primary),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontFamily: 'PixelFont',
-          fontSize: textSize,
-          color: Colors.white,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF333355),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A3E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFF0077),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    _getIconForTitle(title),
+                    color: const Color(0xFFFF0077),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFFF0077),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      onTap: onTap,
     );
   }
+
+  // ...rest of your existing code (IconData mapping, etc.)
 }

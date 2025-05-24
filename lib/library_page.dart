@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'product_details.dart';
-
+import 'dart:math' show max;
 class LibraryPage extends StatefulWidget {
   const LibraryPage({Key? key}) : super(key: key);
 
@@ -474,6 +474,7 @@ class _LibraryPageState extends State<LibraryPage>
     );
   }
 
+  // Update the _buildProductGrid method
   Widget _buildProductGrid(List<Map<String, dynamic>> products) {
     if (products.isEmpty) {
       return Center(
@@ -495,45 +496,40 @@ class _LibraryPageState extends State<LibraryPage>
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.7,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final product = products[index];
-        return _buildLibraryItem(product);
+    // Use LayoutBuilder to make grid responsive
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate number of columns based on screen width
+        final double itemWidth = 180; // Minimum width for each item
+        final int crossAxisCount = max(1, constraints.maxWidth ~/ itemWidth);
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 0.75,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final product = products[index];
+            return _buildLibraryItem(product);
+          },
+        );
       },
     );
   }
 
+  // Update the _buildLibraryItem method
   Widget _buildLibraryItem(Map<String, dynamic> product) {
-    // Format the delivery date
     final deliveryDate = _formatDate(product['orderDate']);
-    // Check if there's playtime data
-    final bool hasPlaytime =
-        product['playTime'] != null && product['playTime'] > 0;
+    final bool hasPlaytime = product['playTime'] != null && product['playTime'] > 0;
     final bool hasLastPlayed = product['lastPlayed'] != null;
-
-    // Check if it's a game
-    final bool isGame =
-        product['category']?.toString().toLowerCase() == 'games';
-
-    // Check if it has activation key or download link
-    final bool hasActivationKey = product['activationKey'] != null &&
-        product['activationKey'].toString().isNotEmpty;
-    final bool hasDownloadLink = product['downloadLink'] != null &&
-        product['downloadLink'].toString().isNotEmpty;
+    final bool isGame = product['category']?.toString().toLowerCase() == 'games';
 
     return GestureDetector(
-      onTap: () {
-        // Show product details with owned product info
-        _showProductActions(product);
-      },
+      onTap: () => _showProductActions(product),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A2E),
@@ -553,189 +549,163 @@ class _LibraryPageState extends State<LibraryPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Game/Software Image
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                  child: Image.network(
-                    product['imageUrl'].toString(),
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 140,
-                      width: double.infinity,
-                      color: Colors.grey[800],
-                      child: const Icon(Icons.image_not_supported,
-                          color: Colors.white),
-                    ),
-                  ),
-                ),
-                // Indicator for "Play" or "Install" button
-                Positioned(
-                  right: 8,
-                  bottom: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      if (isGame) {
-                        _startGame(product);
-                      } else if (hasDownloadLink) {
-                        _launchDownload(product['downloadLink'].toString());
-                      } else {
-                        _showProductActions(product);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF0077),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        isGame ? Icons.play_arrow : Icons.download,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Product Details
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Game/Software Image with fixed aspect ratio
+            Expanded(
+              flex: 3,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  // Title
-                  Text(
-                    product['name'].toString(),
-                    style: const TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontSize: 14,
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Image.network(
+                      product['imageUrl'].toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.image_not_supported, color: Colors.white),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-
-                  // Delivered date
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'Delivered: $deliveryDate',
-                          style: TextStyle(
-                            fontFamily: 'PixelFont',
-                            color: Colors.grey[400],
-                            fontSize: 10,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Play time if available
-                  if (hasPlaytime)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.timer,
-                          color: Colors.cyan,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatPlayTime(product['playTime'] as int),
-                          style: const TextStyle(
-                            fontFamily: 'PixelFont',
-                            color: Colors.cyan,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                  // Last played if available
-                  if (hasLastPlayed)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.access_time,
-                            color: Colors.amber,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Last: ${_formatDate(product['lastPlayed'] as Timestamp?)}',
-                            style: TextStyle(
-                              fontFamily: 'PixelFont',
-                              color: Colors.grey[400],
-                              fontSize: 10,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 8),
-
-                  // Category badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isGame
-                          ? Colors.pink.withOpacity(0.2)
-                          : Colors.blue.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: isGame
-                            ? Colors.pink.withOpacity(0.5)
-                            : Colors.blue.withOpacity(0.5),
-                      ),
-                    ),
-                    child: Text(
-                      product['category']?.toString() ?? 'Games',
-                      style: TextStyle(
-                        fontFamily: 'PixelFont',
-                        color: isGame ? Colors.pink : Colors.blue,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  // Play/Install button
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: _buildActionButton(product, isGame),
                   ),
                 ],
               ),
             ),
+
+            // Product Details
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title with ellipsis
+                    Text(
+                      product['name'].toString(),
+                      style: const TextStyle(
+                        fontFamily: 'PixelFont',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Delivery date
+                    Flexible(
+                      child: _buildInfoRow(
+                        Icons.check_circle,
+                        'Delivered: $deliveryDate',
+                        Colors.green,
+                      ),
+                    ),
+
+                    if (hasPlaytime)
+                      Flexible(
+                        child: _buildInfoRow(
+                          Icons.timer,
+                          _formatPlayTime(product['playTime'] as int),
+                          Colors.cyan,
+                        ),
+                      ),
+
+                    // Category badge
+                    const Spacer(),
+                    _buildCategoryBadge(isGame, product['category']?.toString() ?? 'Games'),
+                  ],
+                ),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method for consistent info rows
+  Widget _buildInfoRow(IconData icon, String text, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 12),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              color: Colors.grey[400],
+              fontSize: 10,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Helper method for category badge
+  Widget _buildCategoryBadge(bool isGame, String category) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isGame ? Colors.pink.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isGame ? Colors.pink.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
+        ),
+      ),
+      child: Text(
+        category,
+        style: TextStyle(
+          fontFamily: 'PixelFont',
+          color: isGame ? Colors.pink : Colors.blue,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // Helper method for action button
+  Widget _buildActionButton(Map<String, dynamic> product, bool isGame) {
+    return GestureDetector(
+      onTap: () {
+        if (isGame) {
+          _startGame(product);
+        } else if (product['downloadLink'] != null) {
+          _launchDownload(product['downloadLink'].toString());
+        } else {
+          _showProductActions(product);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF0077),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          isGame ? Icons.play_arrow : Icons.download,
+          color: Colors.white,
+          size: 16,
         ),
       ),
     );

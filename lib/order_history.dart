@@ -700,9 +700,9 @@ class _OrderHistoryState extends State<OrderHistory>
       case 'to receive':
         return 'SHIPPING';
       case 'to review':
+        return 'TO REVIEW';
+      case 'delivered':
         return 'DELIVERED';
-      case 'delivered':  // Changed from 'completed'
-        return 'DELIVERED';  // Changed from 'COMPLETED'
       case 'return/refund':
         return 'RETURN/REFUND';
       case 'cancellation':
@@ -714,6 +714,67 @@ class _OrderHistoryState extends State<OrderHistory>
 
   // Modify the _buildActionButton method to include a cancel option for "to pay" orders
   Widget _buildActionButton(Map<String, dynamic> order, String status) {
+    final paymentMethod = order['paymentMethod'] as String? ?? '';
+    final isCOD = paymentMethod == 'Cash on Delivery (COD)';
+
+    // For COD orders that are in "to ship" status
+    if (isCOD && status == 'to ship') {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _viewOrderDetails(order),
+              icon: const Icon(Icons.local_shipping, size: 16),
+              label: const Text(
+                'TRACK ORDER',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 1,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF0077),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+          if (order['status'] == 'to ship') ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showCancelConfirmation(order),
+                icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                label: const Text(
+                  'CANCEL ORDER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.red,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
     late String buttonText;
     late Color buttonColor;
     late IconData buttonIcon;
@@ -996,18 +1057,97 @@ class _OrderHistoryState extends State<OrderHistory>
       );
     }
   }
+void _handlePayment(Map<String, dynamic> order) async {
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) => AlertDialog(
+      backgroundColor: const Color(0xFF1A1A2E),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Processing payment...',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontFamily: 'PixelFont',
+              color: Colors.cyan,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
-  // Action handlers
-  void _handlePayment(Map<String, dynamic> order) {
+  try {
+    // Simulate payment processing delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Update order status to 'to ship'
+    final documentId = order['documentId'];
+    await updateOrderStatus(documentId, 'To Ship');
+
+    // Update payment details in Firestore
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders')
+          .doc(documentId)
+          .update({
+        'paymentStatus': 'completed',
+        'paymentDate': DateTime.now().toIso8601String(),
+      });
+    }
+
+    // Dismiss loading dialog
+    Navigator.of(context, rootNavigator: true).pop();
+
+    // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Processing payment...'),
-        backgroundColor: Colors.orange,
+        content: Text(
+          'Payment successful! Your order will be processed shortly.',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.green,
       ),
     );
-    _viewOrderDetails(order);
-  }
 
+    // Navigate to the "To Ship" tab
+    _tabController.animateTo(_tabs.indexOf('To Ship'));
+
+  } catch (e) {
+    // Dismiss loading dialog
+    Navigator.of(context, rootNavigator: true).pop();
+
+    // Show error message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Payment failed: $e',
+          style: const TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
   void _viewOrderDetails(Map<String, dynamic> order) {
     Navigator.push(
       context,
