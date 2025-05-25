@@ -113,6 +113,8 @@ class _SignupState extends State<Signup> {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'email': emailAddress,
           'createdAt': FieldValue.serverTimestamp(),
+          'displayName': user.displayName ?? '',
+          // Add any other fields you want
         });
       }
 

@@ -35,7 +35,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadUser();
-    _fetchUserData();
   }
 
   Future<void> _loadUser() async {
@@ -47,31 +46,6 @@ class _SettingsPageState extends State<SettingsPage> {
         userName = user?.displayName ?? "User_0x7F";
         userPhotoUrl = user?.photoURL;
       });
-    }
-  }
-
-  Future<void> _fetchUserData() async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .get();
-        if (userDoc.exists) {
-          setState(() {
-            userName = userDoc['displayName'] ?? userName;
-            userPhotoUrl = userDoc['photoURL'] ?? userPhotoUrl;
-          });
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to fetch user data: $e'),
-          backgroundColor: const Color(0xFFFF0055),
-        ),
-      );
     }
   }
 

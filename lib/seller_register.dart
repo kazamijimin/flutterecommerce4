@@ -16,6 +16,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
   final TextEditingController _storeDescriptionController =
       TextEditingController();
   bool _isSubmitting = false;
+
   Future<void> _submitSellerApplication() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -26,7 +27,6 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Get the current date in "YYYY-MM-DD" format
         final DateTime now = DateTime.now();
         final String joinDate =
             "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
@@ -35,18 +35,16 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
           'storeName': _storeNameController.text.trim(),
           'storeDescription': _storeDescriptionController.text.trim(),
           'userId': user.uid,
-          'sellerStatus': 'pending', // Default status for new applications
-          'createdAt': FieldValue.serverTimestamp(), // Add timestamp
-          'joinDate': joinDate, // Add join date
+          'sellerStatus': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+          'joinDate': joinDate,
         };
 
-        // Save the application in the sellerApplications collection
         await FirebaseFirestore.instance
             .collection('sellerApplications')
             .doc(user.uid)
             .set(sellerData);
 
-        // Also update the users collection with the same data
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -63,12 +61,11 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
           ),
         );
 
-        // Add slight delay before showing the dialog
         await Future.delayed(const Duration(milliseconds: 500));
 
         if (mounted) {
           await _showApplicationPendingDialog();
-          Navigator.pop(context); // Navigate back after dialog is dismissed
+          Navigator.pop(context);
         }
       }
     } catch (e) {
@@ -88,111 +85,91 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
     }
   }
 
-// Add this new method to show pending status dialog
   Future<void> _showApplicationPendingDialog() async {
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return Dialog(
           backgroundColor: const Color(0xFF13131A),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             side: const BorderSide(color: Colors.pink, width: 2),
           ),
-          title: const Text(
-            'Application Pending Review',
-            style: TextStyle(
-              color: Colors.white,
-              fontFamily: 'PixelFont',
-              fontSize: 22,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black38,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade800),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber,
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: const Icon(
-                        Icons.hourglass_top,
-                        color: Colors.black,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        'Your seller application is pending approval',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'PixelFont',
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Our team will review your application shortly. This usually takes 1-2 business days.',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontFamily: 'PixelFont',
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'You can check your application status in your profile.',
-                style: TextStyle(
-                  color: Colors.cyan,
-                  fontFamily: 'PixelFont',
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.hourglass_top,
+                    color: Colors.black,
+                    size: 40,
                   ),
                 ),
-                child: const Text(
-                  'Got it',
+                const SizedBox(height: 20),
+                const Text(
+                  'Application Pending Review',
                   style: TextStyle(
                     color: Colors.white,
                     fontFamily: 'PixelFont',
-                    fontSize: 16,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Your seller application is pending approval.\nOur team will review your application shortly. This usually takes 1-2 business days.',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontFamily: 'PixelFont',
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'You can check your application status in your profile.',
+                  style: TextStyle(
+                    color: Colors.cyan,
+                    fontFamily: 'PixelFont',
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pink,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'PixelFont',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -200,116 +177,191 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive: use LayoutBuilder for width
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Seller Registration',
-          style: TextStyle(fontFamily: 'PixelFont'),
+          style: TextStyle(fontFamily: 'PixelFont', color: Colors.white),
         ),
         backgroundColor: Colors.black,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       backgroundColor: const Color(0xFF13131A),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Store Name',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _storeNameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.black45,
-                  hintText: 'Enter your store name',
-                  hintStyle: const TextStyle(color: Colors.grey),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          double maxWidth = constraints.maxWidth;
+          double formWidth = maxWidth < 500 ? maxWidth : 420;
+          double horizontalPadding = maxWidth < 500 ? 16 : (maxWidth - formWidth) / 2;
+
+          return SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 32),
+              child: Center(
+                child: Container(
+                  width: formWidth,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.pink.shade800, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.cyan),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Store name is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Store Description',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'PixelFont',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _storeDescriptionController,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.black45,
-                  hintText: 'Describe your store',
-                  hintStyle: const TextStyle(color: Colors.grey),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.cyan),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Store description is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitSellerApplication,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pink,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: _isSubmitting
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
-                      : const Text(
-                          'Submit Application',
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Column(
+                            children: [
+                              Image.asset(
+                                'assets/images/cyberpunk_city.jpg',
+                                height: 90,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Become a Seller',
+                                style: TextStyle(
+                                  color: Color(0xFFFF0077),
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Apply to open your own store and start selling!',
+                                style: TextStyle(
+                                  color: Colors.cyan,
+                                  fontSize: 14,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Store Name',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontFamily: 'PixelFont',
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _storeNameController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.black45,
+                            hintText: 'Enter your store name',
+                            hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[700]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.cyan),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Store name is required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Store Description',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _storeDescriptionController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                          ),
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.black45,
+                            hintText: 'Describe your store',
+                            hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'PixelFont'),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[700]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.cyan),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Store description is required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submitSellerApplication,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF0077),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: _isSubmitting
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : const Text(
+                                    'Submit Application',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontFamily: 'PixelFont',
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

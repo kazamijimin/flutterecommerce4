@@ -14,7 +14,6 @@ import 'settings.dart'; // Import the SettingsScreen
 import 'shop.dart'; // Import the Shop screen
 import 'address.dart'; // Import the AddressPage
 import 'friends.dart'; // Import the FriendsPage
-import 'product_details.dart'; // Import ProductDetails screen
 
 class AppColors {
   // Primary colors
@@ -675,7 +674,7 @@ void _navigateToGamesLibrary() {
                         'Total Games',
                         '$totalPurchases',
                         Icons.games,
-                        Colors.pink.shade400,
+                        Colors.pink.shade700,
                         isButton: true,
                       ),
                     ),
@@ -690,7 +689,7 @@ void _navigateToGamesLibrary() {
                         'Friends',
                         '${userData?['friendCount'] ?? 0}',
                         Icons.people,
-                        Colors.purple.shade400,
+                        Colors.purple.shade100,
                         isButton: true,
                       ),
                     ),
@@ -1113,103 +1112,76 @@ void _navigateToGamesLibrary() {
   }
 
   Widget _buildFavoriteItem(Map<String, dynamic> item) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to the product details page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetails(
-              productId: item['id'], // Pass the product ID
-              imageUrl: item['imageUrl'] ?? '', // Pass the product image URL
-              title:
-                  item['title'] ?? 'Unknown Product', // Pass the product title
-              price: item['price'] ?? '0.00', // Pass the product price
-              description: item['description'] ??
-                  'No description available', // Pass the product description
-              sellerId: item['sellerId'] ?? '', // Pass the seller ID
-              category:
-                  item['category'] ?? 'Unknown', // Pass the product category
-              stockCount: item['stockCount'] ?? 51, // Pass the stock count
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade800),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Favorite item image
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: item['imageUrl'] != null && item['imageUrl'].isNotEmpty
+                      ? Image.network(
+                          item['imageUrl'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _placeholder(item['title']);
+                          },
+                        )
+                      : _placeholder(item['title']),
+                ),
+                // Favorite icon overlay
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.star, color: Colors.yellow.shade400, size: 16),
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade800),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              spreadRadius: 1,
+          // Favorite item title
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Favorite item image
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(12)),
-                    child:
-                        item['imageUrl'] != null && item['imageUrl'].isNotEmpty
-                            ? Image.network(
-                                item['imageUrl'],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _placeholder(item['title']);
-                                },
-                              )
-                            : _placeholder(item['title']),
-                  ),
-                  // Favorite icon overlay
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.star,
-                          color: Colors.yellow.shade400, size: 16),
-                    ),
-                  ),
-                ],
+            child: Text(
+              item['title'],
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
-            // Favorite item title
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(12)),
-              ),
-              child: Text(
-                item['title'],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontFamily: 'PixelFont',
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'category.dart';
 import 'home.dart';
 import 'message.dart';
 import 'profile.dart';
+import 'dart:math'; // <-- Add this import at the top
 class ShopPage extends StatefulWidget {
   final String? initialCategory;
   
@@ -19,6 +20,28 @@ class ShopPage extends StatefulWidget {
 }
 
 class _ShopPageState extends State<ShopPage> with SingleTickerProviderStateMixin {
+  // Color scheme matching library page
+  static const mainColor = Color(0xFFFF0077);
+  static const bgColor = Color(0xFF1A1A2E);
+  static const borderColor = Color(0xFF333355);
+  
+  // Responsive breakpoints
+  bool get isDesktop => MediaQuery.of(context).size.width >= 1200;
+  bool get isTablet => MediaQuery.of(context).size.width >= 600 && MediaQuery.of(context).size.width < 1200;
+  bool get isMobile => MediaQuery.of(context).size.width < 600;
+
+  // Dynamic measurements
+  double get screenWidth => MediaQuery.of(context).size.width;
+  double get screenHeight => MediaQuery.of(context).size.height;
+  double get itemWidth => isDesktop ? 280 : isTablet ? 220 : 160;
+  double get gridSpacing => screenWidth * 0.02;
+
+  // Calculate grid columns based on screen size
+  int get gridColumns {
+    final availableWidth = screenWidth - (gridSpacing * 2);
+    return max(1, availableWidth ~/ (itemWidth + gridSpacing));
+  }
+
   late TabController _tabController;
   bool isLoading = true;
   List<String> categories = [
@@ -509,227 +532,435 @@ class _ShopPageState extends State<ShopPage> with SingleTickerProviderStateMixin
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        toolbarHeight: 42, // Make even shorter to save space
         title: const Text(
           'GAMEBOX SHOP',
           style: TextStyle(
             fontFamily: 'PixelFont',
             fontWeight: FontWeight.bold,
             color: Colors.white,
-            fontSize: 17, // Slightly larger
+            fontSize: 20,
+            letterSpacing: 1.5,
           ),
         ),
-        actions: [
-          // Make actions even more compact
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white, size: 20), 
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => _buildSearchDialog(),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.white, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const WishlistPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart, color: Colors.white, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CartPage()),
-              );
-            },
-          ),
-          const SizedBox(width: 4), // Add small padding at the end
-        ],
-        // Removed TabBar from here
+        actions: _buildAppBarActions(),
       ),
-      
-      // Use a LayoutBuilder to ensure responsive sizing
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SafeArea(
-            bottom: true, // Ensure bottom is respected
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Use min size
-              children: [
-                // Only show category chips to replace the removed TabBar
-                SizedBox(
-                  height: 36, // Make smaller
-                  child: _buildCategoryChipsRow(),
-                ),
-                  
-                // Compact filter bar
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Less padding
-                  color: Colors.grey.shade900,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Results count - more compact
-                      Text(
-                        '${filteredProducts.length} Products',
-                        style: const TextStyle(
-                          fontFamily: 'PixelFont',
-                          color: Colors.white,
-                          fontSize: 12, // Increased from 11 to 12
-                        ),
-                      ),
-                      
-                      // Super compact buttons
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Shuffle button - minimize
-                          IconButton(
-                            icon: const Icon(Icons.shuffle, color: Colors.pink, size: 18),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                            tooltip: 'Shuffle',
-                            onPressed: () {
-                              setState(() {
-                                products.shuffle();
-                                _applyFilters();
-                              });
-                              
-                              MessageService.showGameMessage(
-                                context,
-                                message: 'Products shuffled!',
-                                isSuccess: true,
-                              );
-                            },
-                          ),
-                          
-                          // Filter button - minimize
-                          ElevatedButton(
-                            onPressed: _showFiltersBottomSheet,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.cyan,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              minimumSize: const Size(0, 0),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'FILTER',
-                              style: TextStyle(
-                                fontFamily: 'PixelFont',
-                                fontSize: 11, // Increased from 10 to 11
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildCategoryBar(),
+            _buildFilterBar(),
+            Expanded(
+              child: _buildProductGrid(),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavBar(),
+    );
+  }
+
+  Widget _buildCategoryBar() {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      color: Colors.grey.shade900,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: categories.map((category) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FilterChip(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                visualDensity: VisualDensity.compact,
+                selected: selectedCategory == category,
+                label: Text(
+                  category,
+                  style: TextStyle(
+                    color: selectedCategory == category ? Colors.black : Colors.white,
+                    fontFamily: 'PixelFont',
+                    fontSize: 12,
                   ),
                 ),
-                
-                // Main content with expanded to fill remaining space
-                Expanded(
-                  child: isLoading 
-                      ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
-                      : filteredProducts.isEmpty
-                          ? _buildEmptyState()
-                          : RefreshIndicator(
-                              onRefresh: _fetchProducts,
-                              color: Colors.cyan,
-                              backgroundColor: Colors.grey.shade900,
-                              child: GridView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.all(12), // Less padding
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: 0.65, // Adjust to avoid overflowing cards
-                                  crossAxisSpacing: 12, // Less spacing
-                                  mainAxisSpacing: 12, // Less spacing
-                                ),
-                                itemCount: _hasMoreProducts 
-                                    ? filteredProducts.length + 1 
-                                    : filteredProducts.length,
-                                itemBuilder: (context, index) {
-                                  if (index >= filteredProducts.length) {
-                                    return _isLoadingMore
-                                        ? const Center(
-                                            child: CircularProgressIndicator(
-                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan),
-                                            ),
-                                          )
-                                        : const SizedBox.shrink();
-                                  }
-                                  return _buildProductCard(filteredProducts[index]);
-                                },
-                              ),
-                            ),
-                ),
-              ],
-            ),
-          );
-        },
+                selectedColor: Colors.cyan,
+                backgroundColor: Colors.grey.shade800,
+                onSelected: (bool selected) {
+                  if (selected) {
+                    setState(() {
+                      selectedCategory = category;
+                      // Find the index of the selected category and update tab controller
+                      final index = categories.indexOf(category);
+                      if (index != -1) {
+                        _tabController.animateTo(index);
+                      }
+                      _applyFilters();
+                    });
+                  }
+                },
+              ),
+            );
+          }).toList(),
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.black,
-        selectedItemColor: const Color.fromARGB(255, 212, 0, 0),
-        unselectedItemColor: Colors.white,
-        selectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'PixelFont', fontSize: 12),
-        currentIndex: 3, // Set to 3 because this is the Shop page
-        onTap: (index) {
-          switch (index) {
-            case 0: // Home
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomePage()),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02, vertical: 8),
+      color: Colors.grey.shade900,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Results count
+          Text(
+            '${filteredProducts.length} Products',
+            style: const TextStyle(
+              fontFamily: 'PixelFont',
+              color: Colors.white,
+              fontSize: 12,
+            ),
+          ),
+          
+          // Action buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Shuffle button
+              IconButton(
+                icon: const Icon(Icons.shuffle, color: Colors.pink, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                tooltip: 'Shuffle',
+                onPressed: () {
+                  setState(() {
+                    products.shuffle();
+                    _applyFilters();
+                  });
+                  
+                  MessageService.showGameMessage(
+                    context,
+                    message: 'Products shuffled!',
+                    isSuccess: true,
+                  );
+                },
+              ),
+              
+              // Filter button
+              ElevatedButton(
+                onPressed: _showFiltersBottomSheet,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyan,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'FILTER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductGrid() {
+    return isLoading
+        ? const Center(child: CircularProgressIndicator(color: Colors.cyan))
+        : filteredProducts.isEmpty
+            ? _buildEmptyState()
+            : RefreshIndicator(
+                onRefresh: _fetchProducts,
+                color: Colors.cyan,
+                backgroundColor: Colors.grey.shade900,
+                child: GridView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.all(screenWidth * 0.02),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: gridColumns,
+                    childAspectRatio: isDesktop ? 0.8 : 0.65,
+                    crossAxisSpacing: gridSpacing,
+                    mainAxisSpacing: gridSpacing,
+                  ),
+                  itemCount: _hasMoreProducts
+                      ? filteredProducts.length + 1
+                      : filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    if (index >= filteredProducts.length) {
+                      return _isLoadingMore
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan),
+                              ),
+                            )
+                          : const SizedBox.shrink();
+                    }
+                    return _buildProductCard(
+                      filteredProducts[index],
+                      isTablet: isTablet,
+                      isDesktop: isDesktop,
+                    );
+                  },
+                ),
               );
-              break;
-            case 1: // Category
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const CategoryPage()),
-              );
-              break;
-            case 2: // Message
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ChatPage()),
-              );
-              break;
-            case 3: // Shop
-              // Already on the Shop page
-              break;
-            case 4: // Profile
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Category'),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Message'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Shop'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+  }
+  
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_off, color: Colors.grey, size: 64),
+          const SizedBox(height: 16),
+          Text(
+            _searchController.text.isNotEmpty
+                ? 'No products found for "${_searchController.text}"'
+                : 'No products found in $selectedCategory',
+            style: const TextStyle(
+              fontFamily: 'PixelFont',
+              color: Colors.white,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              _searchController.clear();
+              setState(() {
+                _tabController.index = 0;
+                selectedCategory = 'All';
+                _applyFilters();
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.cyan,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text(
+              'VIEW ALL PRODUCTS',
+              style: TextStyle(fontFamily: 'PixelFont', fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );
   }
   
+  Widget _buildProductCard(
+    Map<String, dynamic> product, {
+    required bool isTablet,
+    required bool isDesktop,
+  }) {
+    final bool hasDiscount = product['discount'] == true;
+    final int discountPercent = hasDiscount ? (product['discountPercent'] ?? 0) : 0;
+    final double originalPrice = double.parse(product['price']?.toString() ?? '0');
+    final double discountedPrice = hasDiscount ? originalPrice * (1 - discountPercent / 100) : originalPrice;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProductDetails(
+                  productId: product['id'],
+                  imageUrl: product['imageUrl'] ?? '',
+                  title: product['name'] ?? '',
+                  price: discountedPrice.toString(),
+                  description: product['description'] ?? '',
+                  sellerId: product['sellerId'] ?? '',
+                  category: product['category'] ?? '',
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product Image
+                Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Image.network(
+                        product['imageUrl'] ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, _) => Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.image_not_supported, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    if (hasDiscount)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: mainColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '-$discountPercent%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Product Details
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(screenWidth * 0.02),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          product['name'] ?? '',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isDesktop ? 16 : 14,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'PixelFont',
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: screenHeight * 0.01),
+
+                        // Price
+                        if (hasDiscount) ...[
+                          Text(
+                            'PHP ${originalPrice.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: isDesktop ? 14 : 12,
+                              decoration: TextDecoration.lineThrough,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                          SizedBox(height: screenHeight * 0.005),
+                        ],
+                        Text(
+                          'PHP ${discountedPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: hasDiscount ? mainColor : Colors.white,
+                            fontSize: isDesktop ? 18 : 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'PixelFont',
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Rating and Sold Count
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${(product['rating'] ?? 0).toStringAsFixed(1)}',
+                              style: TextStyle(
+                                color: Colors.grey[300],
+                                fontSize: isDesktop ? 14 : 12,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${product['soldCount'] ?? 0} sold',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: isDesktop ? 14 : 12,
+                                fontFamily: 'PixelFont',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    return [
+      IconButton(
+        icon: const Icon(Icons.search, color: Colors.white, size: 20), 
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => _buildSearchDialog(),
+          );
+        },
+      ),
+      IconButton(
+        icon: const Icon(Icons.favorite_border, color: Colors.white, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const WishlistPage()),
+          );
+        },
+      ),
+      IconButton(
+        icon: const Icon(Icons.shopping_cart, color: Colors.white, size: 20),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CartPage()),
+          );
+        },
+      ),
+      const SizedBox(width: 4), // Add small padding at the end
+    ];
+  }
+
   Widget _buildSearchDialog() {
     return AlertDialog(
       backgroundColor: Colors.grey.shade900,
@@ -798,275 +1029,76 @@ class _ShopPageState extends State<ShopPage> with SingleTickerProviderStateMixin
       ],
     );
   }
-  
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.search_off, color: Colors.grey, size: 64),
-          const SizedBox(height: 16),
-          Text(
-            _searchController.text.isNotEmpty
-                ? 'No products found for "${_searchController.text}"'
-                : 'No products found in $selectedCategory',
-            style: const TextStyle(
-              fontFamily: 'PixelFont',
-              color: Colors.white,
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              _searchController.clear();
-              setState(() {
-                _tabController.index = 0;
-                selectedCategory = 'All';
-                _applyFilters();
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.cyan,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text(
-              'VIEW ALL PRODUCTS',
-              style: TextStyle(fontFamily: 'PixelFont', fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildProductCard(Map<String, dynamic> product) {
-    final bool hasDiscount = product['discount'] == true;
-    final int discountPercent = hasDiscount ? (product['discountPercent'] ?? 0) : 0;
-    final double originalPrice = double.parse(product['price']?.toString() ?? '0');
-    final double discountedPrice =
-        hasDiscount ? originalPrice * (1 - discountPercent / 100) : originalPrice;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetails(
-              productId: product['id'],
-              imageUrl: product['imageUrl'] ?? '',
-              title: product['name'] ?? '',
-              price: discountedPrice.toString(),
-              description: product['description'] ?? '',
-              sellerId: product['sellerId'] ?? '',
-              category: product['category'] ?? '',
-            ),
-          ),
-        );
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      backgroundColor: Colors.black,
+      selectedItemColor: const Color(0xFFFF0077),
+      unselectedItemColor: Colors.white,
+      currentIndex: 3, // Shop is the 4th item (index 3)
+      onTap: (index) {
+        Widget page;
+        switch (index) {
+          case 0:
+            page = const HomePage();
+            break;
+          case 1:
+            page = const CategoryPage();
+            break;
+          case 2:
+            page = const ChatPage();
+            break;
+          case 3:
+            page = const ShopPage();
+            break;
+          case 4:
+            page = const ProfileScreen();
+            break;
+          default:
+            page = const HomePage();
+        }
+        if (index != 3) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => page),
+          );
+        }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+          tooltip: 'Home',
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product Image
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.network(
-                    product['imageUrl'] ?? '',
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 150,
-                      color: Colors.grey.shade800,
-                      child: const Icon(Icons.image, color: Colors.white),
-                    ),
-                  ),
-                ),
-                if (hasDiscount)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '-$discountPercent%',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13, // Slightly larger
-                          fontFamily: 'PixelFont',
-                        ),
-                      ),
-                    ),
-                  ),
-                // Out of stock overlay
-                if ((product['stockCount'] ?? 0) <= 0)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'OUT OF STOCK',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15, // Slightly larger
-                            fontFamily: 'PixelFont',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-
-            // Product Details
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    product['name'] ?? '',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15, // Increased from 14 to 15
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Price
-                  if (hasDiscount) ...[
-                    Text(
-                      'PHP ${originalPrice.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 13, // Increased from 12 to 13
-                        decoration: TextDecoration.lineThrough,
-                        fontFamily: 'PixelFont',
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                  ],
-                  Text(
-                    'PHP ${discountedPrice.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: hasDiscount ? Colors.red : Colors.white,
-                      fontSize: hasDiscount ? 17 : 15, // Increased from 16/14 to 17/15
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'PixelFont',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Rating and Sold Count
-                  Row(
-                    children: [
-                      // Rating
-                      const Icon(Icons.star, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${(product['rating'] ?? 0).toStringAsFixed(1)}',
-                        style: TextStyle(
-                          color: Colors.grey.shade300,
-                          fontSize: 13, // Increased from 12 to 13
-                          fontFamily: 'PixelFont',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Sold Count
-                      Text(
-                        '${product['soldCount'] ?? 0} sold',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 13, // Increased from 12 to 13
-                          fontFamily: 'PixelFont',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+        BottomNavigationBarItem(
+          icon: Icon(Icons.category),
+          label: 'Category',
+          tooltip: 'Category',
         ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.message),
+          label: 'Message',
+          tooltip: 'Message',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.shop),
+          label: 'Shop',
+          tooltip: 'Shop',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+          tooltip: 'Profile',
+        ),
+      ],
+      selectedLabelStyle: TextStyle(
+        fontFamily: 'PixelFont',
+        fontSize: 12,
       ),
-    );
-  }
-
-  // Add this helper method to the _ShopPageState class
-  Widget _buildCategoryChipsRow() {
-    return Container(
-      height: 36, // Slightly taller for larger text
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      color: Colors.grey.shade900,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(), // Add bouncing physics for better UX
-        child: Row(
-          children: categories.map((category) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2), // Reduce padding
-              child: FilterChip(
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Make chips more compact
-                labelPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0), // More horizontal padding
-                visualDensity: VisualDensity.compact, // Make chips more compact
-                selected: selectedCategory == category,
-                label: Text(
-                  category,
-                  style: TextStyle(
-                    color: selectedCategory == category ? Colors.black : Colors.white,
-                    fontFamily: 'PixelFont',
-                    fontSize: 12, // Increased from 10 to 12
-                  ),
-                ),
-                selectedColor: Colors.cyan,
-                backgroundColor: Colors.grey.shade800,
-                onSelected: (bool selected) {
-                  if (selected) {
-                    setState(() {
-                      selectedCategory = category;
-                      // Find the index of the selected category and update tab controller
-                      final index = categories.indexOf(category);
-                      if (index != -1) {
-                        _tabController.animateTo(index);
-                      }
-                      _applyFilters();
-                    });
-                  }
-                },
-              ),
-            );
-          }).toList(),
-        ),
+      unselectedLabelStyle: TextStyle(
+        fontFamily: 'PixelFont',
+        fontSize: 12,
       ),
     );
   }

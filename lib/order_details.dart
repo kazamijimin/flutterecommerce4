@@ -26,6 +26,11 @@ class OrderDetailsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Back',
+        ),
         title: Text(
           _getAppBarTitle(orderStatus),
           style: TextStyle(
@@ -38,6 +43,13 @@ class OrderDetailsPage extends StatelessWidget {
         ),
         backgroundColor: darkBackground,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home),
+            tooltip: 'Home',
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+        ],
       ),
       backgroundColor: darkBackground,
       body: Stack(
