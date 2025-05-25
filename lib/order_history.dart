@@ -17,8 +17,8 @@ class _OrderHistoryState extends State<OrderHistory>
     'To Pay',
     'To Ship',
     'To Receive',
-    'To Review',
-    'Delivered', // Changed from 'Completed'
+    'Delivered',      // <-- Move Delivered before To Review
+    'To Review',      // <-- Move To Review after Delivered
     'Return/Refund',
     'Cancellation'
   ];
@@ -28,8 +28,8 @@ class _OrderHistoryState extends State<OrderHistory>
     'To Pay': 'to pay',
     'To Ship': 'to ship',
     'To Receive': 'to receive',
-    'To Review': 'to review',
-    'Delivered': 'delivered', // Changed from 'completed'
+    'Delivered': 'delivered',      // <-- Delivered mapping
+    'To Review': 'to review',      // <-- To Review mapping
     'Return/Refund': 'return/refund',
     'Cancellation': 'cancellation'
   };
@@ -40,7 +40,8 @@ class _OrderHistoryState extends State<OrderHistory>
       if (index >= 0 && index < _tabController.length && mounted) {
         _tabController.animateTo(index);
       } else {
-        print('Tab index out of bounds: $index (length: ${_tabController.length})');
+        print(
+            'Tab index out of bounds: $index (length: ${_tabController.length})');
       }
     } catch (e) {
       print('Error navigating to tab: $e');
@@ -561,46 +562,229 @@ class _OrderHistoryState extends State<OrderHistory>
   }
 
 // Replace the _buildOrderTimeline method with this improved version with error handling
-Widget _buildOrderTimeline(String status) {
-  try {
-    // Print debug info
-    print('Building timeline for status: $status');
-    
-    // Define the main steps in the order process
-    final List<Map<String, dynamic>> steps = [
-      {'status': 'to pay', 'label': 'Payment', 'icon': Icons.payment},
-      {'status': 'to ship', 'label': 'Processing', 'icon': Icons.inventory},
-      {'status': 'to receive', 'label': 'Shipping', 'icon': Icons.local_shipping},
-      {'status': 'to review', 'label': 'To Review', 'icon': Icons.rate_review},
-      {'status': 'delivered', 'label': 'Delivered', 'icon': Icons.check_circle},
-    ];
-    
-    print('Steps length: ${steps.length}'); // Should be 5
+  Widget _buildOrderTimeline(String status) {
+    try {
+      // Print debug info
+      print('Building timeline for status: $status');
 
-    // Handle special statuses that don't fit in the timeline
-    if (status == 'return/refund' || status == 'cancellation') {
-      print('Special status detected: $status');
-      // Special handling for these statuses
+      // Define the main steps in the order process
+      final List<Map<String, dynamic>> steps = [
+        {'status': 'to pay', 'label': 'Payment', 'icon': Icons.payment},
+        {'status': 'to ship', 'label': 'Processing', 'icon': Icons.inventory},
+        {
+          'status': 'to receive',
+          'label': 'Shipping',
+          'icon': Icons.local_shipping
+        },
+        {
+          'status': 'to review',
+          'label': 'To Review',
+          'icon': Icons.rate_review
+        },
+        {
+          'status': 'delivered',
+          'label': 'Delivered',
+          'icon': Icons.check_circle
+        },
+      ];
+
+      print('Steps length: ${steps.length}'); // Should be 5
+
+      // Handle special statuses that don't fit in the timeline
+      if (status == 'return/refund' || status == 'cancellation') {
+        print('Special status detected: $status');
+        // Special handling for these statuses
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                status == 'return/refund'
+                    ? Icons.assignment_return
+                    : Icons.cancel,
+                color: Colors.red,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  status == 'return/refund'
+                      ? 'Return/Refund requested'
+                      : 'Order cancelled',
+                  style: const TextStyle(
+                    fontFamily: 'PixelFont',
+                    color: Colors.red,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Find the current step index safely
+      int currentStepIndex =
+          steps.indexWhere((step) => step['status'] == status);
+      print('Current step index for $status: $currentStepIndex');
+
+      if (currentStepIndex == -1) {
+        // If status not found in steps, default to first step
+        print('Status not found in steps, defaulting to first step');
+        currentStepIndex = 0;
+      }
+
+      // Ensure List.generate never exceeds bounds
+      final safeStepsLength = steps.length;
+      print('Safe steps length: $safeStepsLength');
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Order Status',
+            style: TextStyle(
+              fontFamily: 'PixelFont',
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Timeline circles and connecting lines
+          Row(
+            children: List.generate(safeStepsLength, (index) {
+              // Safety check for index
+              if (index >= safeStepsLength) {
+                print(
+                    'WARNING: Index $index exceeds safe length $safeStepsLength');
+                return const SizedBox.shrink(); // Return empty widget
+              }
+
+              // Determine colors based on completed/active/upcoming
+              Color circleColor;
+              Color lineColor;
+
+              if (index < currentStepIndex) {
+                // Completed step
+                circleColor = const Color(0xFF00FF66);
+                lineColor = const Color(0xFF00FF66);
+              } else if (index == currentStepIndex) {
+                // Current step
+                circleColor = _getStatusColor(steps[index]['status'] as String);
+                lineColor = Colors.grey.withOpacity(0.5);
+              } else {
+                // Upcoming step
+                circleColor = Colors.grey.withOpacity(0.3);
+                lineColor = Colors.grey.withOpacity(0.3);
+              }
+
+              return Expanded(
+                child: Row(
+                  children: [
+                    // Status circle
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: circleColor.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: circleColor,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          steps[index]['icon'] as IconData,
+                          color: circleColor,
+                          size: 12,
+                        ),
+                      ),
+                    ),
+
+                    // Connecting line (except for last item)
+                    if (index < safeStepsLength - 1)
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: lineColor,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ),
+
+          // Labels
+          const SizedBox(height: 4),
+          Row(
+            children: List.generate(safeStepsLength, (index) {
+              // Safety check for index
+              if (index >= safeStepsLength) {
+                print(
+                    'WARNING: Index $index exceeds safe length $safeStepsLength in labels');
+                return const SizedBox.shrink(); // Return empty widget
+              }
+
+              Color textColor;
+
+              if (index < currentStepIndex) {
+                textColor = Colors.white60;
+              } else if (index == currentStepIndex) {
+                textColor = _getStatusColor(steps[index]['status'] as String);
+              } else {
+                textColor = Colors.white38;
+              }
+
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    steps[index]['label'] as String,
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      fontSize: 10,
+                      color: textColor,
+                      fontWeight: index == currentStepIndex
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      );
+    } catch (e, stackTrace) {
+      print('Error in _buildOrderTimeline: $e');
+      print('Stack trace: $stackTrace');
+
+      // Fallback UI in case of error
       return Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.1),
+          color: Colors.grey.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.red.withOpacity(0.3)),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            Icon(
-              status == 'return/refund' ? Icons.assignment_return : Icons.cancel,
-              color: Colors.red,
-            ),
-            const SizedBox(width: 10),
+            Icon(Icons.error_outline, color: Colors.amber),
+            SizedBox(width: 10),
             Expanded(
               child: Text(
-                status == 'return/refund' ? 'Return/Refund requested' : 'Order cancelled',
-                style: const TextStyle(
+                'Order status information unavailable',
+                style: TextStyle(
                   fontFamily: 'PixelFont',
-                  color: Colors.red,
+                  color: Colors.amber,
                   fontSize: 14,
                 ),
               ),
@@ -609,169 +793,7 @@ Widget _buildOrderTimeline(String status) {
         ),
       );
     }
-
-    // Find the current step index safely
-    int currentStepIndex = steps.indexWhere((step) => step['status'] == status);
-    print('Current step index for $status: $currentStepIndex');
-    
-    if (currentStepIndex == -1) {
-      // If status not found in steps, default to first step
-      print('Status not found in steps, defaulting to first step');
-      currentStepIndex = 0;
-    }
-
-    // Ensure List.generate never exceeds bounds
-    final safeStepsLength = steps.length;
-    print('Safe steps length: $safeStepsLength');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Order Status',
-          style: TextStyle(
-            fontFamily: 'PixelFont',
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white70,
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Timeline circles and connecting lines
-        Row(
-          children: List.generate(safeStepsLength, (index) {
-            // Safety check for index
-            if (index >= safeStepsLength) {
-              print('WARNING: Index $index exceeds safe length $safeStepsLength');
-              return const SizedBox.shrink(); // Return empty widget
-            }
-            
-            // Determine colors based on completed/active/upcoming
-            Color circleColor;
-            Color lineColor;
-
-            if (index < currentStepIndex) {
-              // Completed step
-              circleColor = const Color(0xFF00FF66);
-              lineColor = const Color(0xFF00FF66);
-            } else if (index == currentStepIndex) {
-              // Current step
-              circleColor = _getStatusColor(steps[index]['status'] as String);
-              lineColor = Colors.grey.withOpacity(0.5);
-            } else {
-              // Upcoming step
-              circleColor = Colors.grey.withOpacity(0.3);
-              lineColor = Colors.grey.withOpacity(0.3);
-            }
-
-            return Expanded(
-              child: Row(
-                children: [
-                  // Status circle
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: circleColor.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: circleColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        steps[index]['icon'] as IconData,
-                        color: circleColor,
-                        size: 12,
-                      ),
-                    ),
-                  ),
-
-                  // Connecting line (except for last item)
-                  if (index < safeStepsLength - 1)
-                    Expanded(
-                      child: Container(
-                        height: 2,
-                        color: lineColor,
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }),
-        ),
-
-        // Labels
-        const SizedBox(height: 4),
-        Row(
-          children: List.generate(safeStepsLength, (index) {
-            // Safety check for index
-            if (index >= safeStepsLength) {
-              print('WARNING: Index $index exceeds safe length $safeStepsLength in labels');
-              return const SizedBox.shrink(); // Return empty widget
-            }
-            
-            Color textColor;
-
-            if (index < currentStepIndex) {
-              textColor = Colors.white60;
-            } else if (index == currentStepIndex) {
-              textColor = _getStatusColor(steps[index]['status'] as String);
-            } else {
-              textColor = Colors.white38;
-            }
-
-            return Expanded(
-              child: Center(
-                child: Text(
-                  steps[index]['label'] as String,
-                  style: TextStyle(
-                    fontFamily: 'PixelFont',
-                    fontSize: 10,
-                    color: textColor,
-                    fontWeight: index == currentStepIndex ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  } catch (e, stackTrace) {
-    print('Error in _buildOrderTimeline: $e');
-    print('Stack trace: $stackTrace');
-    
-    // Fallback UI in case of error
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.amber),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Order status information unavailable',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                color: Colors.amber,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
-}
 
   // Helper to get a user-friendly status label
   String _getStatusLabel(String status) {
@@ -919,29 +941,257 @@ Widget _buildOrderTimeline(String status) {
           ],
         );
       case 'to ship':
-        buttonText = 'VIEW DETAILS';
-        buttonColor = const Color(0xFFFF0077);
-        buttonIcon = Icons.visibility;
-        onPressed = () => _viewOrderDetails(order);
-        break;
+        // Show both View Details and Cancel Order buttons
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _viewOrderDetails(order),
+                icon:
+                    const Icon(Icons.visibility, size: 16, color: Colors.black),
+                label: const Text(
+                  'VIEW DETAILS',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.black,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF0077),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showCancelConfirmation(order),
+                icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                label: const Text(
+                  'CANCEL ORDER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.red,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       case 'to receive':
-        buttonText = 'TRACK ORDER';
-        buttonColor = const Color(0xFF00E5FF);
-        buttonIcon = Icons.local_shipping;
-        onPressed = () => _trackShipment(order);
-        break;
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _trackShipment(order),
+                icon: const Icon(Icons.local_shipping,
+                    size: 16, color: Colors.black),
+                label: const Text(
+                  'TRACK ORDER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.black,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00E5FF),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: null, // Disabled
+                icon: const Icon(Icons.cancel, size: 16, color: Colors.grey),
+                label: const Text(
+                  'CANCEL ORDER',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.grey,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.grey),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'You cannot cancel order at this stage.',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
       case 'to review':
         buttonText = 'WRITE REVIEW';
         buttonColor = const Color(0xFF00FF66);
         buttonIcon = Icons.rate_review;
         onPressed = () => _writeReview(order);
         break;
-      case 'delivered': // Changed from 'completed'
-        buttonText = 'ORDER DETAILS';
-        buttonColor = const Color(0xFF00FF66); // Green
-        buttonIcon = Icons.check_circle;
-        onPressed = () => _viewOrderDetails(order);
-        break;
+      case 'delivered':
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  // Confirm order received
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: const Color(0xFF1A1A2E),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(
+                            color: Color(0xFF00FF66), width: 1),
+                      ),
+                      title: const Text(
+                        'Order Received',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          color: Color(0xFF00FF66),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      content: const Text(
+                        'Have you received your order?',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          color: Colors.white70,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text(
+                            'NO',
+                            style: TextStyle(
+                              fontFamily: 'PixelFont',
+                              color: Colors.cyan,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF66),
+                          ),
+                          child: const Text(
+                            'YES, RECEIVED',
+                            style: TextStyle(
+                              fontFamily: 'PixelFont',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    await updateOrderStatus(order['documentId'], 'To Review');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Order marked as received.',
+                            style: TextStyle(fontFamily: 'PixelFont'),
+                          ),
+                          backgroundColor: Color(0xFF00FF66),
+                        ),
+                      );
+                      safeTabNavigate(_tabs.indexOf('To Review'));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.check_circle,
+                    color: Colors.black, size: 16),
+                label: const Text(
+                  'ORDER RECEIVED',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.black,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF66),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showReturnRefundDialog(order),
+                icon: const Icon(Icons.assignment_return,
+                    color: Colors.redAccent, size: 16),
+                label: const Text(
+                  'RETURN / REFUND',
+                  style: TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.redAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       case 'return/refund':
         buttonText = 'VIEW REQUEST';
         buttonColor = Colors.redAccent;
@@ -965,7 +1215,11 @@ Widget _buildOrderTimeline(String status) {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(buttonIcon, size: 16),
+        icon: Icon(
+          buttonIcon,
+          color: Colors.black,
+          size: 16, // <-- Add this line to make the icon black
+        ),
         label: Text(
           buttonText,
           style: const TextStyle(
@@ -973,6 +1227,7 @@ Widget _buildOrderTimeline(String status) {
             fontWeight: FontWeight.bold,
             fontSize: 14,
             letterSpacing: 1,
+            color: Colors.black,
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -1082,7 +1337,7 @@ Widget _buildOrderTimeline(String status) {
 
       // Show loading indicator
       if (!mounted) return;
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -1168,130 +1423,131 @@ Widget _buildOrderTimeline(String status) {
   }
 
 // Fix the _handlePayment method to properly handle COD orders
-void _handlePayment(Map<String, dynamic> order) async {
-  try {
-    final paymentMethod = order['paymentMethod'] as String? ?? '';
-    final isCOD = paymentMethod.toLowerCase().contains('cod') || 
-                  paymentMethod.toLowerCase().contains('cash on delivery');
-    
-    // Show loading dialog
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Processing payment...',
-              style: TextStyle(
-                fontFamily: 'PixelFont',
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                color: Colors.cyan,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
+  void _handlePayment(Map<String, dynamic> order) async {
     try {
-      // Simulate payment processing delay
-      await Future.delayed(const Duration(seconds: 2));
+      final paymentMethod = order['paymentMethod'] as String? ?? '';
+      final isCOD = paymentMethod.toLowerCase().contains('cod') ||
+          paymentMethod.toLowerCase().contains('cash on delivery');
 
-      // Update order status to 'to ship'
-      final documentId = order['documentId'];
-      await updateOrderStatus(documentId, 'To Ship');
+      // Show loading dialog
+      if (!mounted) return;
 
-      // Update payment details in Firestore
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('orders')
-            .doc(documentId)
-            .update({
-          'paymentStatus': 'completed',
-          'paymentDate': DateTime.now().toIso8601String(),
-          'paymentMethod': isCOD ? 'Cash on Delivery (COD)' : 'Online Payment',
-        });
-      }
-
-      // Dismiss loading dialog
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Payment successful! Your order will be processed shortly.',
-              style: TextStyle(fontFamily: 'PixelFont'),
-            ),
-            backgroundColor: Colors.green,
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Processing payment...',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.cyan,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-        );
-      }
+        ),
+      );
 
-      // Safely navigate to the "To Ship" tab
-      if (mounted) {
-        int toShipIndex = -1;
-        try {
-          toShipIndex = _tabs.indexOf('To Ship');
-        } catch (e) {
-          print('Error finding To Ship tab: $e');
-          toShipIndex = -1;
+      try {
+        // Simulate payment processing delay
+        await Future.delayed(const Duration(seconds: 2));
+
+        // Update order status to 'to ship'
+        final documentId = order['documentId'];
+        await updateOrderStatus(documentId, 'To Ship');
+
+        // Update payment details in Firestore
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('orders')
+              .doc(documentId)
+              .update({
+            'paymentStatus': 'completed',
+            'paymentDate': DateTime.now().toIso8601String(),
+            'paymentMethod':
+                isCOD ? 'Cash on Delivery (COD)' : 'Online Payment',
+          });
         }
-        
-        safeTabNavigate(toShipIndex);
+
+        // Dismiss loading dialog
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Payment successful! Your order will be processed shortly.',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // Safely navigate to the "To Ship" tab
+        if (mounted) {
+          int toShipIndex = -1;
+          try {
+            toShipIndex = _tabs.indexOf('To Ship');
+          } catch (e) {
+            print('Error finding To Ship tab: $e');
+            toShipIndex = -1;
+          }
+
+          safeTabNavigate(toShipIndex);
+        }
+      } catch (e) {
+        print('Error in payment processing: $e');
+        // Dismiss loading dialog
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Payment failed: $e',
+                style: const TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error in payment processing: $e');
-      // Dismiss loading dialog
+      print('Error in _handlePayment: $e');
+      // Make sure dialog is dismissed if something went wrong
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Payment failed: $e',
-              style: const TextStyle(fontFamily: 'PixelFont'),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  } catch (e) {
-    print('Error in _handlePayment: $e');
-    // Make sure dialog is dismissed if something went wrong
-    if (mounted && Navigator.canPop(context)) {
-      Navigator.of(context, rootNavigator: true).pop();
     }
   }
-}
 
 // Fix the updateOrderStatus method to handle special COD case
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
@@ -1402,6 +1658,108 @@ void _handlePayment(Map<String, dynamic> order) async {
     _viewOrderDetails(order);
   }
 
+  void _showReturnRefundDialog(Map<String, dynamic> order) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.redAccent, width: 1),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.assignment_return, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text(
+              'Return / Refund Request',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to request a return or refund for this order?\n\n'
+          'This action will move your order to the Return/Refund tab and notify the seller.',
+          style: TextStyle(
+            fontFamily: 'PixelFont',
+            color: Colors.white70,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'NO, KEEP ORDER',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.cyan,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Show loading dialog while updating
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const AlertDialog(
+                  backgroundColor: Color(0xFF1A1A2E),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Submitting your request...',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+              await updateOrderStatus(order['documentId'], 'Return/Refund');
+              if (mounted && Navigator.canPop(context)) {
+                Navigator.of(context, rootNavigator: true).pop();
+              }
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Return/Refund requested.',
+                      style: TextStyle(fontFamily: 'PixelFont'),
+                    ),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                safeTabNavigate(_tabs.indexOf('Return/Refund'));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+            ),
+            child: const Text(
+              'YES, REQUEST',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _writeReview(Map<String, dynamic> order) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1415,7 +1773,7 @@ void _handlePayment(Map<String, dynamic> order) async {
   void _viewReturnRequest(Map<String, dynamic> order) {
     try {
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Viewing return/refund request...'),

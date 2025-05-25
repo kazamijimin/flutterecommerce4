@@ -1097,9 +1097,9 @@ Future<void> _confirmOrder() async {
       // Determine initial order status based on payment method
       String initialStatus;
       if (_selectedPaymentMethod == 'Cash on Delivery (COD)') {
-        initialStatus = 'to ship'; // COD orders go directly to shipping
+        initialStatus = 'to pay'; // COD orders go directly to shipping
       } else {
-        initialStatus = 'to pay'; // Card and E-wallet need payment first
+        initialStatus = 'to ship'; // Card and E-wallet need payment first
       }
 
       // Create the order data

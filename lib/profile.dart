@@ -14,6 +14,8 @@ import 'settings.dart'; // Import the SettingsScreen
 import 'shop.dart'; // Import the Shop screen
 import 'address.dart'; // Import the AddressPage
 import 'friends.dart'; // Import the FriendsPage
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'widgets/no_internet_widget.dart';
 
 class AppColors {
   // Primary colors
@@ -80,13 +82,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Current index for bottom navigation
   int _currentNavIndex = 4; // Profile is the 5th item (index 4)
 
+  bool _hasInternet = true;
+  late final Connectivity _connectivity;
+  late final Stream<ConnectivityResult> _connectivityStream;
+
   @override
   void initState() {
     super.initState();
+    _connectivity = Connectivity();
+    _connectivityStream = _connectivity.onConnectivityChanged;
+    _checkInternet();
+    _connectivityStream.listen((result) {
+      setState(() {
+        _hasInternet = result != ConnectivityResult.none;
+      });
+    });
     _loadUser();
-    _fetchFavorites(); // Ensure this is called
+    _fetchFavorites();
     _loadPurchases();
     _checkSellerApplicationStatus(); // Check seller application status
+  }
+
+  Future<void> _checkInternet() async {
+    final result = await _connectivity.checkConnectivity();
+    setState(() {
+      _hasInternet = result != ConnectivityResult.none;
+    });
   }
 
   Future<void> _fetchFavorites() async {
@@ -447,6 +468,12 @@ void _navigateToGamesLibrary() {
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasInternet) {
+      return NoInternetWidget(
+        onRetry: _checkInternet,
+      );
+    }
+
     // Check if user is logged in
     if (user == null) {
       return _buildSignInPrompt(context);

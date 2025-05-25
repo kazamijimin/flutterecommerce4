@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'order_history.dart';
 import 'shop.dart';
+
 class OrderDetailsPage extends StatelessWidget {
   final Map<String, dynamic> order;
 
@@ -13,7 +14,7 @@ class OrderDetailsPage extends StatelessWidget {
     // Get device size to help with responsiveness
     final Size screenSize = MediaQuery.of(context).size;
     final bool isSmallScreen = screenSize.width < 360;
-    
+
     final item = order['items'][0]; // Get the single product being checked out
     final neonPink = const Color(0xFFFF0077);
     final neonBlue = const Color(0xFF00E5FF);
@@ -47,7 +48,8 @@ class OrderDetailsPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.home),
             tooltip: 'Home',
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
           ),
         ],
       ),
@@ -74,7 +76,11 @@ class OrderDetailsPage extends StatelessWidget {
                   // Status tracker card
                   _buildStatusTracker(
                       context, // Add context parameter here
-                      orderStatus, neonPink, neonBlue, neonGreen, surfaceColor),
+                      orderStatus,
+                      neonPink,
+                      neonBlue,
+                      neonGreen,
+                      surfaceColor),
 
                   SizedBox(height: isSmallScreen ? 16 : 24),
 
@@ -159,7 +165,8 @@ class OrderDetailsPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildResponsiveProductRow(item, neonPink, neonBlue, isSmallScreen),
+                        _buildResponsiveProductRow(
+                            item, neonPink, neonBlue, isSmallScreen),
                       ],
                     ),
                   ),
@@ -201,8 +208,8 @@ class OrderDetailsPage extends StatelessWidget {
                   SizedBox(height: isSmallScreen ? 16 : 24),
 
                   // Action button based on order status
-                  _buildActionButton(
-                      context, orderStatus, order, neonPink, neonBlue, neonGreen),
+                  _buildActionButton(context, orderStatus, order, neonPink,
+                      neonBlue, neonGreen),
 
                   // Add this to show admin controls (with divider for visual separation)
                   if (_isSellerOrAdmin()) ...[
@@ -215,7 +222,7 @@ class OrderDetailsPage extends StatelessWidget {
 
                   // Add this to show order history button
                   _buildOrderHistoryButton(context, neonBlue),
-                  
+
                   // Add bottom padding for better scrolling experience
                   const SizedBox(height: 40),
                 ],
@@ -253,190 +260,61 @@ class OrderDetailsPage extends StatelessWidget {
   }
 // Add this method to the OrderDetailsPage class
 
-Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Color neonBlue, bool isSmallScreen) {
-  if (isSmallScreen) {
-    // Vertical layout for small screens
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Product image centered
-        Center(
-          child: Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              border: Border.all(
-                color: neonPink,
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: neonPink.withOpacity(0.5),
-                  blurRadius: 8,
-                  spreadRadius: 1,
+  Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink,
+      Color neonBlue, bool isSmallScreen) {
+    if (isSmallScreen) {
+      // Vertical layout for small screens
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product image centered
+          Center(
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                border: Border.all(
+                  color: neonPink,
+                  width: 2,
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              child: Image.network(
-                item['imageUrl'] ?? '',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(
-                  Icons.image_not_supported,
-                  color: Colors.grey,
-                  size: 40,
-                ),
-                loadingBuilder:
-                    (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      color: neonPink,
-                      value:
-                          loadingProgress.expectedTotalBytes !=
-                                  null
-                              ? loadingProgress
-                                      .cumulativeBytesLoaded /
-                                  loadingProgress
-                                      .expectedTotalBytes!
-                              : null,
-                    ),
-                  );
-                },
+                boxShadow: [
+                  BoxShadow(
+                    color: neonPink.withOpacity(0.5),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Product details
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item['title'] ?? 'Unknown Item',
-              style: const TextStyle(
-                fontFamily: 'PixelFont',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+              child: ClipRRect(
+                child: Image.network(
+                  item['imageUrl'] ?? '',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey,
+                    size: 40,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.black38,
-                    border: Border.all(
-                      color: Colors.grey.shade700,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Quantity: ${item['quantity']}',
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: neonBlue.withOpacity(0.2),
-                    border: Border.all(
-                      color: neonBlue.withOpacity(0.5),
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '\$${item['price']}',
-                    style: TextStyle(
-                      fontFamily: 'PixelFont',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: neonBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  } else {
-    // Horizontal layout for larger screens
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Product image
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: Colors.black26,
-            border: Border.all(
-              color: neonPink,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: neonPink.withOpacity(0.5),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            child: Image.network(
-              item['imageUrl'] ?? '',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(
-                Icons.image_not_supported,
-                color: Colors.grey,
-                size: 40,
-              ),
-              loadingBuilder:
-                  (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    color: neonPink,
-                    value:
-                        loadingProgress.expectedTotalBytes !=
-                                null
-                            ? loadingProgress
-                                    .cumulativeBytesLoaded /
-                                loadingProgress
-                                    .expectedTotalBytes!
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: neonPink,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
                             : null,
-                  ),
-                );
-              },
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        
-        // Product details
-        Expanded(
-          child: Column(
+          const SizedBox(height: 16),
+
+          // Product details
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -501,20 +379,142 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
               ),
             ],
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    } else {
+      // Horizontal layout for larger screens
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product image
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              border: Border.all(
+                color: neonPink,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: neonPink.withOpacity(0.5),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              child: Image.network(
+                item['imageUrl'] ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.grey,
+                  size: 40,
+                ),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: neonPink,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // Product details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['title'] ?? 'Unknown Item',
+                  style: const TextStyle(
+                    fontFamily: 'PixelFont',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        border: Border.all(
+                          color: Colors.grey.shade700,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Quantity: ${item['quantity']}',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: neonBlue.withOpacity(0.2),
+                        border: Border.all(
+                          color: neonBlue.withOpacity(0.5),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '\$${item['price']}',
+                        style: TextStyle(
+                          fontFamily: 'PixelFont',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: neonBlue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
   }
-}
+
   // Replace your existing _buildStatusTracker method with this one
   Widget _buildStatusTracker(
-    BuildContext context, // Add context parameter here
-    String status, Color neonPink, Color neonBlue,
-      Color neonGreen, Color surfaceColor) {
+      BuildContext context, // Add context parameter here
+      String status,
+      Color neonPink,
+      Color neonBlue,
+      Color neonGreen,
+      Color surfaceColor) {
     // Get device width to determine if we need a more compact layout
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isCompactLayout = screenWidth < 360;
-    
+
     // Normalize the status string for consistent comparison
     final String normalizedStatus = status.toString().toLowerCase();
 
@@ -651,12 +651,18 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
             ),
           ),
 
-       Padding(
+          Padding(
             padding: EdgeInsets.all(isCompactLayout ? 12.0 : 20.0),
             child: isCompactLayout
                 ? _buildCompactStatusTracker(
-                    isPaid, isShipped, isDelivered, isCompleted,
-                    normalizedStatus, neonPink, neonBlue, neonGreen)
+                    isPaid,
+                    isShipped,
+                    isDelivered,
+                    isCompleted,
+                    normalizedStatus,
+                    neonPink,
+                    neonBlue,
+                    neonGreen)
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -681,8 +687,8 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
                               : (isShipped ? neonBlue : Colors.grey.shade800),
                           isCurrentStep: normalizedStatus == 'to ship'),
 
-                      _buildStatusLine(
-                          isShipped, isShipped ? neonBlue : Colors.grey.shade800),
+                      _buildStatusLine(isShipped,
+                          isShipped ? neonBlue : Colors.grey.shade800),
 
                       // Delivery step - active only when on "to receive" or later
                       _buildStatusStep(
@@ -690,7 +696,9 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
                           isDelivered || normalizedStatus == 'to receive',
                           normalizedStatus == 'to receive'
                               ? neonBlue
-                              : (isDelivered ? neonGreen : Colors.grey.shade800),
+                              : (isDelivered
+                                  ? neonGreen
+                                  : Colors.grey.shade800),
                           isCurrentStep: normalizedStatus == 'to receive'),
 
                       _buildStatusLine(isDelivered,
@@ -702,7 +710,9 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
                           isCompleted || normalizedStatus == 'to review',
                           normalizedStatus == 'to review'
                               ? neonGreen
-                              : (isCompleted ? neonGreen : Colors.grey.shade800),
+                              : (isCompleted
+                                  ? neonGreen
+                                  : Colors.grey.shade800),
                           isCurrentStep: normalizedStatus == 'to review' ||
                               normalizedStatus == 'delivered' ||
                               normalizedStatus == 'completed'),
@@ -716,8 +726,14 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
 
   // New method for compact status tracker layout
   Widget _buildCompactStatusTracker(
-      bool isPaid, bool isShipped, bool isDelivered, bool isCompleted,
-      String normalizedStatus, Color neonPink, Color neonBlue, Color neonGreen) {
+      bool isPaid,
+      bool isShipped,
+      bool isDelivered,
+      bool isCompleted,
+      String normalizedStatus,
+      Color neonPink,
+      Color neonBlue,
+      Color neonGreen) {
     return Column(
       children: [
         Row(
@@ -733,8 +749,8 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
                 isCurrentStep: normalizedStatus == 'to pay',
                 isCompact: true),
 
-            _buildStatusLine(
-                isPaid, isPaid ? neonPink : Colors.grey.shade800, isCompact: true),
+            _buildStatusLine(isPaid, isPaid ? neonPink : Colors.grey.shade800,
+                isCompact: true),
 
             // Shipping step
             _buildStatusStep(
@@ -762,7 +778,8 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
                 isCompact: true),
 
             _buildStatusLine(
-                isDelivered, isDelivered ? neonGreen : Colors.grey.shade800, isCompact: true),
+                isDelivered, isDelivered ? neonGreen : Colors.grey.shade800,
+                isCompact: true),
 
             // Completed step
             _buildStatusStep(
@@ -831,7 +848,8 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
   }
 
   // Update _buildStatusLine to support compact mode
-  Widget _buildStatusLine(bool isActive, Color activeColor, {bool isCompact = false}) {
+  Widget _buildStatusLine(bool isActive, Color activeColor,
+      {bool isCompact = false}) {
     return Container(
       width: isCompact ? 25 : 40,
       height: 2,
@@ -915,13 +933,17 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(buttonIcon),
+        icon: Icon(
+          buttonIcon,
+          color: Colors.black, // <-- Add this line to make the icon black
+        ),
         label: Text(
           buttonText,
           style: const TextStyle(
             fontFamily: 'PixelFont',
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
+            color: Colors.black, // <-- Add this line
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -936,17 +958,17 @@ Widget _buildResponsiveProductRow(Map<String, dynamic> item, Color neonPink, Col
   }
 
   // Action methods
-void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
-  // Navigate to ShopPage instead of showing a snackbar
-  Navigator.pushReplacement(
-    context, 
-    MaterialPageRoute(
-      builder: (context) => const ShopPage(
-        initialCategory: 'All', // You can set any initial category you want
+  void _proceedToPayment(BuildContext context, Map<String, dynamic> order) {
+    // Navigate to ShopPage instead of showing a snackbar
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ShopPage(
+          initialCategory: 'All', // You can set any initial category you want
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _trackOrder(BuildContext context, Map<String, dynamic> order) {
     // Navigate to order tracking page
