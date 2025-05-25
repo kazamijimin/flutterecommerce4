@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'add_product.dart';
 import 'order_status.dart';
 import 'your_products.dart';
+import 'home.dart'; // <-- Add this import if not already present
 
 class SellerDashboard extends StatefulWidget {
   const SellerDashboard({super.key});
@@ -349,6 +350,17 @@ class _SellerDashboardState extends State<SellerDashboard> {
         ),
         iconTheme: const IconThemeData(color: Colors.pink),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.home), // <-- Home button
+            color: Colors.cyan,
+            tooltip: 'Go to Home',
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications),
             color: Colors.pink,

@@ -975,7 +975,7 @@ void _navigateToGamesLibrary() {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                  if (sellerStatus == "notApplied")
+                  if (sellerStatus == "")
                     _buildNavButton(
                       'Become a Seller',
                       _navigateToSeller,
