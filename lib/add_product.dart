@@ -1030,7 +1030,7 @@ class _AddProductState extends State<AddProduct> {
               children: [
                 Row(
                   children: const [
-                    Icon(Icons.attach_money, color: Colors.pink, size: 20),
+                    Icon(Icons.php, color: Colors.pink, size: 20),
                     SizedBox(width: 8),
                     Text(
                       'Pricing',
@@ -1072,7 +1072,7 @@ class _AddProductState extends State<AddProduct> {
                         decoration: const InputDecoration(
                           hintText: '0.00',
                           hintStyle: TextStyle(color: Colors.grey),
-                          prefixText: '\$ ',
+                          prefixText: '\PHP ',
                           prefixStyle: TextStyle(color: Colors.green),
                           border: InputBorder.none,
                         ),

@@ -18,27 +18,51 @@ class _OrderHistoryState extends State<OrderHistory>
     'To Ship',
     'To Receive',
     'To Review',
-    'Delivered',  // Changed from 'Completed'
+    'Delivered', // Changed from 'Completed'
     'Return/Refund',
     'Cancellation'
   ];
-  
+
   // Map for converting tab names to Firestore status values
   final Map<String, String> _tabToStatusMap = {
     'To Pay': 'to pay',
     'To Ship': 'to ship',
     'To Receive': 'to receive',
     'To Review': 'to review',
-    'Delivered': 'delivered',  // Changed from 'completed'
+    'Delivered': 'delivered', // Changed from 'completed'
     'Return/Refund': 'return/refund',
     'Cancellation': 'cancellation'
   };
 
+  // Add this near the top of your _OrderHistoryState class
+  void safeTabNavigate(int index) {
+    try {
+      if (index >= 0 && index < _tabController.length && mounted) {
+        _tabController.animateTo(index);
+      } else {
+        print('Tab index out of bounds: $index (length: ${_tabController.length})');
+      }
+    } catch (e) {
+      print('Error navigating to tab: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    // Initialize the TabController
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    try {
+      // Make sure _tabs is not empty before initializing TabController
+      if (_tabs.isEmpty) {
+        print('Warning: _tabs is empty during TabController initialization');
+        _tabController = TabController(length: 1, vsync: this);
+      } else {
+        _tabController = TabController(length: _tabs.length, vsync: this);
+      }
+    } catch (e) {
+      print('Error initializing TabController: $e');
+      // Fallback to a single tab if there's an error
+      _tabController = TabController(length: 1, vsync: this);
+    }
   }
 
   @override
@@ -196,7 +220,7 @@ class _OrderHistoryState extends State<OrderHistory>
         return Icons.assignment_return;
       case 'cancellation':
         return Icons.cancel;
-      case 'delivered':  // Changed from 'completed'
+      case 'delivered': // Changed from 'completed'
         return Icons.check_circle;
       default:
         return Icons.shopping_bag;
@@ -212,7 +236,7 @@ class _OrderHistoryState extends State<OrderHistory>
         tabStatus = key;
       }
     });
-    
+
     switch (tabStatus) {
       case 'To Pay':
         return Colors.orange;
@@ -222,7 +246,7 @@ class _OrderHistoryState extends State<OrderHistory>
         return const Color(0xFF00E5FF); // Cyan
       case 'To Review':
         return const Color(0xFFFFCC00); // Yellow
-      case 'Delivered':  // Changed from 'Completed'
+      case 'Delivered': // Changed from 'Completed'
         return const Color(0xFF00FF66); // Green
       case 'Return/Refund':
         return Colors.redAccent;
@@ -244,8 +268,8 @@ class _OrderHistoryState extends State<OrderHistory>
         return 'You have no orders in transit';
       case 'to review':
         return 'You have no orders waiting for review';
-      case 'delivered':  // Changed from 'completed'
-        return 'You have no delivered orders';  // Updated message
+      case 'delivered': // Changed from 'completed'
+        return 'You have no delivered orders'; // Updated message
       case 'return/refund':
         return 'You have no return or refund requests';
       case 'cancellation':
@@ -420,7 +444,8 @@ class _OrderHistoryState extends State<OrderHistory>
                                     child: Image.network(
                                       item['imageUrl'],
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return const Icon(
                                           Icons.broken_image,
                                           color: Colors.grey,
@@ -430,11 +455,12 @@ class _OrderHistoryState extends State<OrderHistory>
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                
+
                                 // Product details with status indicator
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         item['title'],
@@ -449,7 +475,8 @@ class _OrderHistoryState extends State<OrderHistory>
                                       ),
                                       const SizedBox(height: 4),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
                                             '${item['price']} × ${item['quantity']}',
@@ -462,14 +489,15 @@ class _OrderHistoryState extends State<OrderHistory>
                                           // Status indicator for item
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, 
-                                              vertical: 3
-                                            ),
+                                                horizontal: 8, vertical: 3),
                                             decoration: BoxDecoration(
-                                              color: statusColor.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(12),
+                                              color:
+                                                  statusColor.withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                               border: Border.all(
-                                                color: statusColor.withOpacity(0.3),
+                                                color: statusColor
+                                                    .withOpacity(0.3),
                                               ),
                                             ),
                                             child: Row(
@@ -519,7 +547,7 @@ class _OrderHistoryState extends State<OrderHistory>
                   // Order tracking timeline
                   const SizedBox(height: 16),
                   _buildOrderTimeline(status),
-                  
+
                   // Action button based on status
                   const SizedBox(height: 16),
                   _buildActionButton(order, status),
@@ -532,8 +560,13 @@ class _OrderHistoryState extends State<OrderHistory>
     );
   }
 
-  // Add order timeline visualization
-  Widget _buildOrderTimeline(String status) {
+// Replace the _buildOrderTimeline method with this improved version with error handling
+Widget _buildOrderTimeline(String status) {
+  try {
+    // Print debug info
+    print('Building timeline for status: $status');
+    
+    // Define the main steps in the order process
     final List<Map<String, dynamic>> steps = [
       {'status': 'to pay', 'label': 'Payment', 'icon': Icons.payment},
       {'status': 'to ship', 'label': 'Processing', 'icon': Icons.inventory},
@@ -542,46 +575,55 @@ class _OrderHistoryState extends State<OrderHistory>
       {'status': 'delivered', 'label': 'Delivered', 'icon': Icons.check_circle},
     ];
     
-    // Find the current step index
-    int currentStepIndex = steps.indexWhere((step) => step['status'] == status);
-    if (currentStepIndex == -1) {
-      if (status == 'return/refund' || status == 'cancellation') {
-        // Special handling for these statuses
-        return Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                status == 'return/refund' 
-                    ? Icons.assignment_return 
-                    : Icons.cancel,
-                color: Colors.red,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  status == 'return/refund'
-                      ? 'Return/Refund requested'
-                      : 'Order cancelled',
-                  style: const TextStyle(
-                    fontFamily: 'PixelFont',
-                    color: Colors.red,
-                    fontSize: 14,
-                  ),
+    print('Steps length: ${steps.length}'); // Should be 5
+
+    // Handle special statuses that don't fit in the timeline
+    if (status == 'return/refund' || status == 'cancellation') {
+      print('Special status detected: $status');
+      // Special handling for these statuses
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              status == 'return/refund' ? Icons.assignment_return : Icons.cancel,
+              color: Colors.red,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                status == 'return/refund' ? 'Return/Refund requested' : 'Order cancelled',
+                style: const TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.red,
+                  fontSize: 14,
                 ),
               ),
-            ],
-          ),
-        );
-      }
-      currentStepIndex = 0; // Default to first step if status not found
+            ),
+          ],
+        ),
+      );
     }
+
+    // Find the current step index safely
+    int currentStepIndex = steps.indexWhere((step) => step['status'] == status);
+    print('Current step index for $status: $currentStepIndex');
     
+    if (currentStepIndex == -1) {
+      // If status not found in steps, default to first step
+      print('Status not found in steps, defaulting to first step');
+      currentStepIndex = 0;
+    }
+
+    // Ensure List.generate never exceeds bounds
+    final safeStepsLength = steps.length;
+    print('Safe steps length: $safeStepsLength');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -595,26 +637,33 @@ class _OrderHistoryState extends State<OrderHistory>
           ),
         ),
         const SizedBox(height: 8),
+        // Timeline circles and connecting lines
         Row(
-          children: List.generate(steps.length, (index) {
+          children: List.generate(safeStepsLength, (index) {
+            // Safety check for index
+            if (index >= safeStepsLength) {
+              print('WARNING: Index $index exceeds safe length $safeStepsLength');
+              return const SizedBox.shrink(); // Return empty widget
+            }
+            
             // Determine colors based on completed/active/upcoming
             Color circleColor;
             Color lineColor;
-            
+
             if (index < currentStepIndex) {
               // Completed step
               circleColor = const Color(0xFF00FF66);
               lineColor = const Color(0xFF00FF66);
             } else if (index == currentStepIndex) {
               // Current step
-              circleColor = _getStatusColor(steps[index]['status']);
+              circleColor = _getStatusColor(steps[index]['status'] as String);
               lineColor = Colors.grey.withOpacity(0.5);
             } else {
               // Upcoming step
               circleColor = Colors.grey.withOpacity(0.3);
               lineColor = Colors.grey.withOpacity(0.3);
             }
-            
+
             return Expanded(
               child: Row(
                 children: [
@@ -632,15 +681,15 @@ class _OrderHistoryState extends State<OrderHistory>
                     ),
                     child: Center(
                       child: Icon(
-                        steps[index]['icon'],
+                        steps[index]['icon'] as IconData,
                         color: circleColor,
                         size: 12,
                       ),
                     ),
                   ),
-                  
+
                   // Connecting line (except for last item)
-                  if (index < steps.length - 1)
+                  if (index < safeStepsLength - 1)
                     Expanded(
                       child: Container(
                         height: 2,
@@ -652,32 +701,36 @@ class _OrderHistoryState extends State<OrderHistory>
             );
           }),
         ),
-        
+
         // Labels
         const SizedBox(height: 4),
         Row(
-          children: List.generate(steps.length, (index) {
-            Color textColor;
+          children: List.generate(safeStepsLength, (index) {
+            // Safety check for index
+            if (index >= safeStepsLength) {
+              print('WARNING: Index $index exceeds safe length $safeStepsLength in labels');
+              return const SizedBox.shrink(); // Return empty widget
+            }
             
+            Color textColor;
+
             if (index < currentStepIndex) {
               textColor = Colors.white60;
             } else if (index == currentStepIndex) {
-              textColor = _getStatusColor(steps[index]['status']);
+              textColor = _getStatusColor(steps[index]['status'] as String);
             } else {
               textColor = Colors.white38;
             }
-            
+
             return Expanded(
               child: Center(
                 child: Text(
-                  steps[index]['label'],
+                  steps[index]['label'] as String,
                   style: TextStyle(
                     fontFamily: 'PixelFont',
                     fontSize: 10,
                     color: textColor,
-                    fontWeight: index == currentStepIndex 
-                        ? FontWeight.bold 
-                        : FontWeight.normal,
+                    fontWeight: index == currentStepIndex ? FontWeight.bold : FontWeight.normal,
                   ),
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
@@ -688,7 +741,37 @@ class _OrderHistoryState extends State<OrderHistory>
         ),
       ],
     );
+  } catch (e, stackTrace) {
+    print('Error in _buildOrderTimeline: $e');
+    print('Stack trace: $stackTrace');
+    
+    // Fallback UI in case of error
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.amber),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Order status information unavailable',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.amber,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
   // Helper to get a user-friendly status label
   String _getStatusLabel(String status) {
@@ -853,9 +936,9 @@ class _OrderHistoryState extends State<OrderHistory>
         buttonIcon = Icons.rate_review;
         onPressed = () => _writeReview(order);
         break;
-      case 'delivered':  // Changed from 'completed'
+      case 'delivered': // Changed from 'completed'
         buttonText = 'ORDER DETAILS';
-        buttonColor = const Color(0xFF00FF66);  // Green
+        buttonColor = const Color(0xFF00FF66); // Green
         buttonIcon = Icons.check_circle;
         onPressed = () => _viewOrderDetails(order);
         break;
@@ -942,7 +1025,8 @@ class _OrderHistoryState extends State<OrderHistory>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                  const Icon(Icons.info_outline,
+                      color: Colors.orange, size: 16),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -993,10 +1077,12 @@ class _OrderHistoryState extends State<OrderHistory>
 
   // Add this method to handle the actual cancellation
   Future<void> _cancelOrder(Map<String, dynamic> order) async {
-    final documentId = order['documentId'];
-    
     try {
+      final documentId = order['documentId'];
+
       // Show loading indicator
+      if (!mounted) return;
+      
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -1021,133 +1107,280 @@ class _OrderHistoryState extends State<OrderHistory>
         ),
       );
 
-      // Update order status to 'cancellation'
-      await updateOrderStatus(documentId, 'Cancellation');
-      
-      // Dismiss loading dialog
-      Navigator.of(context, rootNavigator: true).pop();
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Order cancelled successfully',
-            style: TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Optionally refresh the page or navigate to the Cancellation tab
-      _tabController.animateTo(_tabs.indexOf('Cancellation'));
-      
+      try {
+        // Update order status to 'cancellation'
+        await updateOrderStatus(documentId, 'Cancellation');
+
+        // Dismiss loading dialog
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Order cancelled successfully',
+                style: TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // Navigate to the Cancellation tab
+        if (mounted) {
+          int cancellationIndex = -1;
+          try {
+            cancellationIndex = _tabs.indexOf('Cancellation');
+          } catch (e) {
+            print('Error finding Cancellation tab: $e');
+          }
+          safeTabNavigate(cancellationIndex);
+        }
+      } catch (e) {
+        // Dismiss loading dialog if there's an error
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to cancel order: $e',
+                style: const TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      // Dismiss loading dialog if there's an error
-      Navigator.of(context, rootNavigator: true).pop();
-      
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to cancel order: $e',
-            style: const TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('Error in _cancelOrder: $e');
+      // Make sure dialog is dismissed
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
     }
   }
+
+// Fix the _handlePayment method to properly handle COD orders
 void _handlePayment(Map<String, dynamic> order) async {
-  // Show loading dialog
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) => AlertDialog(
-      backgroundColor: const Color(0xFF1A1A2E),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Processing payment...',
-            style: TextStyle(
-              fontFamily: 'PixelFont',
-              color: Colors.white70,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontFamily: 'PixelFont',
-              color: Colors.cyan,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
   try {
-    // Simulate payment processing delay
-    await Future.delayed(const Duration(seconds: 2));
+    final paymentMethod = order['paymentMethod'] as String? ?? '';
+    final isCOD = paymentMethod.toLowerCase().contains('cod') || 
+                  paymentMethod.toLowerCase().contains('cash on delivery');
+    
+    // Show loading dialog
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF0077)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Processing payment...',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total: \$${order['totalPrice'].toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontFamily: 'PixelFont',
+                color: Colors.cyan,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
 
-    // Update order status to 'to ship'
-    final documentId = order['documentId'];
-    await updateOrderStatus(documentId, 'To Ship');
+    try {
+      // Simulate payment processing delay
+      await Future.delayed(const Duration(seconds: 2));
 
-    // Update payment details in Firestore
+      // Update order status to 'to ship'
+      final documentId = order['documentId'];
+      await updateOrderStatus(documentId, 'To Ship');
+
+      // Update payment details in Firestore
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('orders')
+            .doc(documentId)
+            .update({
+          'paymentStatus': 'completed',
+          'paymentDate': DateTime.now().toIso8601String(),
+          'paymentMethod': isCOD ? 'Cash on Delivery (COD)' : 'Online Payment',
+        });
+      }
+
+      // Dismiss loading dialog
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payment successful! Your order will be processed shortly.',
+              style: TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // Safely navigate to the "To Ship" tab
+      if (mounted) {
+        int toShipIndex = -1;
+        try {
+          toShipIndex = _tabs.indexOf('To Ship');
+        } catch (e) {
+          print('Error finding To Ship tab: $e');
+          toShipIndex = -1;
+        }
+        
+        safeTabNavigate(toShipIndex);
+      }
+    } catch (e) {
+      print('Error in payment processing: $e');
+      // Dismiss loading dialog
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Payment failed: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    print('Error in _handlePayment: $e');
+    // Make sure dialog is dismissed if something went wrong
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+}
+
+// Fix the updateOrderStatus method to handle special COD case
+  Future<void> updateOrderStatus(String orderId, String newStatus) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance
+    if (user == null) return;
+
+    try {
+      // 1. Get the status value from your map
+      String firestoreStatus =
+          _tabToStatusMap[newStatus] ?? newStatus.toLowerCase();
+
+      // 2. Get the order document first to check if it's COD
+      final orderDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('orders')
-          .doc(documentId)
-          .update({
-        'paymentStatus': 'completed',
-        'paymentDate': DateTime.now().toIso8601String(),
-      });
+          .doc(orderId)
+          .get();
+
+      if (orderDoc.exists) {
+        final data = orderDoc.data();
+        final paymentMethod = data?['paymentMethod'] as String? ?? '';
+        final isCOD = paymentMethod.toLowerCase().contains('cod') ||
+            paymentMethod.toLowerCase().contains('cash on delivery');
+
+        // 3. Update in user's orders collection with special handling for COD
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('orders')
+            .doc(orderId)
+            .update({
+          'status': firestoreStatus,
+          // For COD orders going to 'to ship', mark payment as completed automatically
+          if (isCOD && firestoreStatus == 'to ship') ...{
+            'paymentStatus': 'completed',
+            'paymentDate': DateTime.now().toIso8601String(),
+          }
+        });
+
+        // 4. Update in global orders collection if needed
+        final orderRef = await FirebaseFirestore.instance
+            .collection('orders')
+            .where('orderId', isEqualTo: data?['orderId'])
+            .limit(1)
+            .get();
+
+        if (orderRef.docs.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('orders')
+              .doc(orderRef.docs.first.id)
+              .update({
+            'status': firestoreStatus,
+            if (isCOD && firestoreStatus == 'to ship') ...{
+              'paymentStatus': 'completed',
+              'paymentDate': DateTime.now().toIso8601String(),
+            }
+          });
+        }
+
+        // 5. Show success message if context is still valid
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Order status updated to $newStatus',
+                style: const TextStyle(fontFamily: 'PixelFont'),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error updating order status: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to update order status: $e',
+              style: const TextStyle(fontFamily: 'PixelFont'),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-
-    // Dismiss loading dialog
-    Navigator.of(context, rootNavigator: true).pop();
-
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Payment successful! Your order will be processed shortly.',
-          style: TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    // Navigate to the "To Ship" tab
-    _tabController.animateTo(_tabs.indexOf('To Ship'));
-
-  } catch (e) {
-    // Dismiss loading dialog
-    Navigator.of(context, rootNavigator: true).pop();
-
-    // Show error message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Payment failed: $e',
-          style: const TextStyle(fontFamily: 'PixelFont'),
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
+
   void _viewOrderDetails(Map<String, dynamic> order) {
     Navigator.push(
       context,
@@ -1180,69 +1413,20 @@ void _handlePayment(Map<String, dynamic> order) async {
   }
 
   void _viewReturnRequest(Map<String, dynamic> order) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Viewing return/refund request...'),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
-    _viewOrderDetails(order);
+    try {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Viewing return/refund request...'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      _viewOrderDetails(order);
+    } catch (e) {
+      print('Error in _viewReturnRequest: $e');
+    }
   }
 
   // Add this method to your OrderHistory class to update order status
-  Future<void> updateOrderStatus(String orderId, String newStatus) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      // 1. Get the status value from your map
-      String firestoreStatus = _tabToStatusMap[newStatus] ?? newStatus.toLowerCase();
-      
-      // 2. Update in user's orders collection
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('orders')
-          .doc(orderId)
-          .update({'status': firestoreStatus});
-      
-      // 3. Update in global orders collection if needed
-      // This is useful for admin/seller access to orders
-      final orderRef = await FirebaseFirestore.instance
-          .collection('orders')
-          .where('orderId', isEqualTo: orderId)
-          .limit(1)
-          .get();
-      
-      if (orderRef.docs.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection('orders')
-            .doc(orderRef.docs.first.id)
-            .update({'status': firestoreStatus});
-      }
-      
-      // 4. Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Order status updated to $newStatus',
-            style: const TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-    } catch (e) {
-      print('Error updating order status: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to update order status: $e',
-            style: const TextStyle(fontFamily: 'PixelFont'),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 }

@@ -54,7 +54,7 @@ class _StoreProfileState extends State<StoreProfile> {
 
     try {
       print('Fetching products for seller ID: ${widget.sellerId}');
-      
+
       // Query products by the seller ID with proper field name
       final productsQuery = await _firestore
           .collection('products')
@@ -64,11 +64,13 @@ class _StoreProfileState extends State<StoreProfile> {
       if (productsQuery.docs.isEmpty) {
         print('No products found for seller: ${widget.sellerId}');
       } else {
-        print('Found ${productsQuery.docs.length} products for seller: ${widget.sellerId}');
-        
+        print(
+            'Found ${productsQuery.docs.length} products for seller: ${widget.sellerId}');
+
         // Debug information to help troubleshoot
         for (var doc in productsQuery.docs) {
-          print('Product: ${doc.id} - ${doc.data()['title']} - SellerId: ${doc.data()['sellerId']}');
+          print(
+              'Product: ${doc.id} - ${doc.data()['title']} - SellerId: ${doc.data()['sellerId']}');
         }
       }
 
@@ -78,7 +80,7 @@ class _StoreProfileState extends State<StoreProfile> {
           // Make sure we're mapping the correct field names from Firestore
           return {
             'id': doc.id,
-            'name': data['title'] ?? 'Unknown Product',
+            'name': data['name'] ?? 'Unknown Product',
             'price': data['price'] ?? 0.0,
             'imageUrl': data['imageUrl'] ?? '',
             'rating': data['rating'] ?? 0.0,

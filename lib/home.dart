@@ -1364,23 +1364,7 @@ void _showMenuDialog() {
                 ),
               ),
             ),
-            InkWell(
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.pop(context);
-                // Navigate to login screen
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Text(
-                  'Your store',
-                  style: pixelFontStyle(
-                    fontSize: 16,
-                    color: Colors.pink.shade300,
-                  ),
-                ),
-              ),
-            ),
+
             const SizedBox(height: 16),
           ],
         ),

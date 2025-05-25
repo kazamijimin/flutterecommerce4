@@ -1,1 +1,21 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"ecommerce-95195","appId":"1:125507097199:android:ce72ae523c0ae87b90739a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"ecommerce-95195","configurations":{"android":"1:125507097199:android:ce72ae523c0ae87b90739a"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "ecommerce-95195",
+          "appId": "1:125507097199:android:ce72ae523c0ae87b90739a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "ecommerce-95195",
+          "configurations": {
+            "android": "1:125507097199:android:ce72ae523c0ae87b90739a"
+          }
+        }
+      }
+    }
+  }
+}

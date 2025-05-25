@@ -534,7 +534,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                 children: [
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Price: ¥${product['price']}',
+                                    'Price: PHP ${product['price']}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontFamily: 'PixelFont',

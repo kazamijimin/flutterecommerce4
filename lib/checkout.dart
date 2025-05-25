@@ -1064,6 +1064,7 @@ _buildSectionCard(
   }
 
   Map<String, dynamic> _paymentDetails = {};
+// Update this function in your CheckoutPage class
 Future<void> _confirmOrder() async {
   // Validate that an address is selected
   if (_selectedAddress.isEmpty) {
@@ -1090,7 +1091,8 @@ Future<void> _confirmOrder() async {
       final random = Random();
       final orderId = List.generate(12, (_) => random.nextInt(10)).join();
 
-      final itemsWithSellerId = await _addSellerIdsToItems(widget.selectedItems);
+      // Make sure all items have productId - this is the critical fix
+      final itemsWithIds = await _ensureItemsHaveIds(widget.selectedItems);
 
       // Determine initial order status based on payment method
       String initialStatus;
@@ -1109,7 +1111,7 @@ Future<void> _confirmOrder() async {
         'shippingOption': _selectedShippingOption,
         'shippingAddress': _selectedAddress,
         'orderDate': DateTime.now().toIso8601String(),
-        'items': itemsWithSellerId,
+        'items': itemsWithIds,
         'status': initialStatus,
         'userId': user.uid,
       };
@@ -1184,56 +1186,112 @@ Future<void> _confirmOrder() async {
     });
   }
 }
-  // Add this new method to process wallet payments
-  Future<void> _processWalletPayment(String userId) async {
-    try {
-      final walletRef =
-          FirebaseFirestore.instance.collection('wallets').doc(userId);
-
-      // Use a transaction to ensure the payment process is atomic
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final walletDoc = await transaction.get(walletRef);
-
-        if (!walletDoc.exists) {
-          throw Exception('Wallet not found');
-        }
-
-        final currentBalance = walletDoc.data()?['balance'] ?? 0.0;
-
-        if (currentBalance < _totalPayment) {
-          throw Exception('Insufficient balance');
-        }
-
-        // Deduct the payment amount from wallet
-        transaction.update(walletRef, {'balance': currentBalance - _totalPayment});
-      });
-
-      // Add transaction record
-      await walletRef.collection('transactions').add({
-        'amount': _totalPayment,
-        'type': 'debit',
-        'description': 'Payment for Order',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Update the payment details for the order
-      _paymentDetails = {
-        'method': 'E-Wallet',
-        'amount': _totalPayment,
-        'timestamp': DateTime.now().toIso8601String(),
-        'status': 'completed',
-      };
-
-      // Update local wallet balance
-      setState(() {
-        _walletBalance -= _totalPayment;
-      });
-    } catch (e) {
-      print('Error processing wallet payment: $e');
-      throw e; // Re-throw to be caught by the parent method
+// Add this method to handle wallet payments 
+Future<bool> _processWalletPayment(String userId) async {
+  try {
+    // Check if wallet balance is sufficient
+    if (_walletBalance < _totalPayment) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Insufficient wallet balance',
+            style: TextStyle(fontFamily: 'PixelFont'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
     }
-  }
 
+    // Deduct payment from wallet
+    final newBalance = _walletBalance - _totalPayment;
+    
+    // Update wallet balance in Firestore
+    await FirebaseFirestore.instance
+        .collection('wallets')
+        .doc(userId)
+        .update({'balance': newBalance});
+    
+    // Update local balance state
+    setState(() {
+      _walletBalance = newBalance;
+    });
+    
+    // Add transaction record
+    await FirebaseFirestore.instance
+        .collection('wallets')
+        .doc(userId)
+        .collection('transactions')
+        .add({
+          'type': 'payment',
+          'amount': _totalPayment,
+          'description': 'Payment for order - ${widget.selectedItems.length} items',
+          'timestamp': FieldValue.serverTimestamp(),
+          'balanceAfter': newBalance,
+        });
+    
+    // Success
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Payment processed successfully from wallet',
+          style: TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+    
+    return true;
+  } catch (e) {
+    print('Error processing wallet payment: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Failed to process wallet payment: $e',
+          style: const TextStyle(fontFamily: 'PixelFont'),
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return false;
+  }
+}
+// Add this new method to ensure all items have productId values
+Future<List<Map<String, dynamic>>> _ensureItemsHaveIds(List<Map<String, dynamic>> items) async {
+  List<Map<String, dynamic>> updatedItems = [];
+  
+  for (var item in items) {
+    Map<String, dynamic> updatedItem = Map<String, dynamic>.from(item);
+    
+    // If productId is null or missing, generate a unique ID
+    if (!item.containsKey('productId') || item['productId'] == null) {
+      // Try to find product by title
+      try {
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('products')
+            .where('name', isEqualTo: item['title'])
+            .limit(1)
+            .get();
+            
+        if (querySnapshot.docs.isNotEmpty) {
+          // Use the found product's ID
+          updatedItem['productId'] = querySnapshot.docs.first.id;
+        } else {
+          // Generate a fallback ID if product not found
+          updatedItem['productId'] = 'generated-${DateTime.now().millisecondsSinceEpoch}-${updatedItems.length}';
+        }
+      } catch (e) {
+        print('Error finding product by title: $e');
+        // Generate a fallback ID if there's an error
+        updatedItem['productId'] = 'generated-${DateTime.now().millisecondsSinceEpoch}-${updatedItems.length}';
+      }
+    }
+    
+    updatedItems.add(updatedItem);
+  }
+  
+  return updatedItems;
+}
   // Add this method after _confirmOrder
   void _showOrderSuccessDialog(String orderId) {
     showDialog(

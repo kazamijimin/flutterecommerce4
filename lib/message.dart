@@ -201,34 +201,27 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _startChat(String userId, String userName) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
-
-    final conversationId = currentUser.uid.compareTo(userId) < 0
-        ? '${currentUser.uid}_$userId'
-        : '${userId}_${currentUser.uid}';
-
-    final conversationRef = _firestore.collection('conversations').doc(conversationId);
-    final conversationSnapshot = await conversationRef.get();
-
-    if (!conversationSnapshot.exists) {
-      await conversationRef.set({
-        'participants': [currentUser.uid, userId],
-        'lastMessage': '',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    }
-
+  void _startChat(String userId, String userName) {
+    // Navigate directly to the chat detail page WITHOUT creating a conversation document
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatDetailPage(
-          conversationId: conversationId,
+          conversationId: _generateConversationId(userId),
           recipientId: userId,
+          recipientName: userName,
         ),
       ),
     );
+  }
+
+  // Add this helper method to generate conversation IDs consistently
+  String _generateConversationId(String otherUserId) {
+    final currentUserId = _auth.currentUser!.uid;
+    // Create a deterministic conversation ID based on user IDs
+    return currentUserId.compareTo(otherUserId) < 0
+        ? '${currentUserId}_$otherUserId'
+        : '${otherUserId}_$currentUserId';
   }
 
   @override
@@ -816,6 +809,27 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _messageController.clear();
 
     try {
+      // Check if conversation document exists
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .get();
+    
+      // If conversation doesn't exist, create it first
+      if (!conversationDoc.exists) {
+        await _firestore.collection('conversations').doc(widget.conversationId).set({
+          'participants': [user.uid, widget.recipientId],
+          'lastMessage': message,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Just update the existing conversation
+        await _firestore.collection('conversations').doc(widget.conversationId).update({
+          'lastMessage': message,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+
       // Add message to the conversation's messages subcollection
       await _firestore
           .collection('conversations')
@@ -825,12 +839,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         'senderId': user.uid,
         'recipientId': widget.recipientId,
         'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Update the conversation's last message and timestamp
-      await _firestore.collection('conversations').doc(widget.conversationId).update({
-        'lastMessage': message,
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -1049,34 +1057,24 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   }
 }
 
-void startStoreChat(BuildContext context, String sellerId, String sellerName) async {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final currentUser = _auth.currentUser;
+void startStoreChat(BuildContext context, String sellerId, String sellerName) {
+  final FirebaseAuth auth = FirebaseAuth.instance;
+  final currentUser = auth.currentUser;
   if (currentUser == null) return;
 
+  // Generate conversation ID
   final conversationId = currentUser.uid.compareTo(sellerId) < 0
       ? '${currentUser.uid}_$sellerId'
       : '${sellerId}_${currentUser.uid}';
 
-  final conversationRef = _firestore.collection('conversations').doc(conversationId);
-  final conversationSnapshot = await conversationRef.get();
-
-  if (!conversationSnapshot.exists) {
-    await conversationRef.set({
-      'participants': [currentUser.uid, sellerId],
-      'lastMessage': '',
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
+  // Navigate directly without creating the conversation document
   Navigator.push(
     context,
     MaterialPageRoute(
       builder: (context) => ChatDetailPage(
         conversationId: conversationId,
         recipientId: sellerId,
-        recipientName: sellerName, // <-- Pass store name here
+        recipientName: sellerName,
       ),
     ),
   );

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +8,8 @@ import 'package:flutterecommerce4/home.dart'; // Import HomePage
 import 'firebase_options.dart';
 import 'theme_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
+import 'package:flutterecommerce4/widgets/no_internet_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +27,46 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _hasInternet = true;
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConnectivity();
+    _connectivitySubscription = Connectivity()
+        .onConnectivityChanged
+        .listen(_updateConnectionStatus);
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      _updateConnectionStatus(result);
+    } on PlatformException catch (e) {
+      print('Could not check connectivity status: ${e.toString()}');
+    }
+  }
+
+  void _updateConnectionStatus(ConnectivityResult result) {
+    setState(() {
+      _hasInternet = result != ConnectivityResult.none;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +75,14 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: themeProvider.currentTheme,
-      home: _getInitialScreen(), // Dynamically determine the initial screen
+      home: _hasInternet 
+          ? _getInitialScreen()
+          : Scaffold(
+              backgroundColor: const Color(0xFF0F0F1B),
+              body: NoInternetWidget(
+                onRetry: _initConnectivity,
+              ),
+            ),
     );
   }
 

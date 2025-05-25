@@ -127,8 +127,14 @@ Future<void> _checkFriendStatus() async {
 }
   Future<void> _sendFriendRequest() async {
     if (_currentUserId == null || _profileData == null) return;
+  
+    // Show confirmation dialog before sending request
+    bool shouldSend = await _showFriendRequestConfirmationDialog();
+    if (!shouldSend) return;
 
     try {
+      final timestamp = FieldValue.serverTimestamp();
+      
       // Create friend request in sender's collection
       await _firestore
           .collection('users')
@@ -137,8 +143,9 @@ Future<void> _checkFriendStatus() async {
           .doc(_profileData?['uid'])
           .set({
         'status': 'pending',
-        'timestamp': FieldValue.serverTimestamp(),
-        'lastInteraction': FieldValue.serverTimestamp(),
+        'timestamp': timestamp,
+        'lastInteraction': timestamp,
+        'senderId': _currentUserId,  // Add senderId to identify who sent the request
       });
 
       // Create friend request in receiver's collection
@@ -149,8 +156,9 @@ Future<void> _checkFriendStatus() async {
           .doc(_currentUserId)
           .set({
         'status': 'pending',
-        'timestamp': FieldValue.serverTimestamp(),
-        'lastInteraction': FieldValue.serverTimestamp(),
+        'timestamp': timestamp,
+        'lastInteraction': timestamp,
+        'senderId': _currentUserId,  // Add senderId to identify who sent the request
       });
 
       // Update status locally
@@ -158,12 +166,8 @@ Future<void> _checkFriendStatus() async {
         _friendStatus = 'pending';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Friend request sent!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Show success message
+      _showFriendRequestSuccessDialog();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -172,6 +176,191 @@ Future<void> _checkFriendStatus() async {
         ),
       );
     }
+  }
+
+  Future<bool> _showFriendRequestConfirmationDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.cyan, width: 2),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with icon
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.cyan.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    color: Colors.cyan,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Title
+                Text(
+                  'Send Friend Request',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Message
+                Text(
+                  'Do you want to send a friend request to ${widget.username}?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'PixelFont',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Cancel button
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey.shade800,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'PixelFont',
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    
+                    // Confirm button
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.cyan,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      ),
+                      child: const Text(
+                        'Send Request',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'PixelFont',
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ) ?? false; // Default to false if dialog is dismissed
+}
+
+  void _showFriendRequestSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.green, width: 2),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success icon
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Title
+                const Text(
+                  'Request Sent!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'PixelFont',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Message
+                Text(
+                  'Your friend request to ${widget.username} has been sent. You\'ll be notified when they accept.',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'PixelFont',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // OK button
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'PixelFont',
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildProfileHeader() {

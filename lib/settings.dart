@@ -12,6 +12,7 @@ import 'team_members.dart';
 import 'help_center.dart';
 import 'rate_us.dart';
 import 'account_deletion.dart';
+import 'profile.dart';
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
@@ -136,7 +137,10 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSettingTile(
             title: 'My Profile',
             onTap: () {
-              // Navigate to My Profile
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
             },
           ),
           _buildSettingTile(
@@ -153,7 +157,8 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BankAccountsPage()),
+                MaterialPageRoute(
+                    builder: (context) => const BankAccountsPage()),
               );
             },
           ),

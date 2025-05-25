@@ -14,6 +14,8 @@ import 'settings.dart'; // Import the SettingsScreen
 import 'shop.dart'; // Import the Shop screen
 import 'address.dart'; // Import the AddressPage
 import 'friends.dart'; // Import the FriendsPage
+import 'product_details.dart'; // Import ProductDetails screen
+
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
@@ -271,7 +273,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-
+void _navigateToGamesLibrary() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const OrderHistory()),
+  );
+}
   void _navigateToFriends() {
     Navigator.push(
       context,
@@ -662,11 +669,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   // Total Games Card
                   Expanded(
-                    child: _buildStatsCard(
-                      'Total Games',
-                      '$totalPurchases',
-                      Icons.games,
-                      Colors.pink.shade400,
+                    child: GestureDetector(
+                      onTap: _navigateToGamesLibrary,
+                      child: _buildStatsCard(
+                        'Total Games',
+                        '$totalPurchases',
+                        Icons.games,
+                        Colors.pink.shade400,
+                        isButton: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -700,6 +711,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            // Find Friends section
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.tertiary.withOpacity(0.6),
+                    AppColors.primary.withOpacity(0.6)
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.2),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _navigateToFriends,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.person_add,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Find New Friends',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontFamily: 'PixelFont',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Connect with other gamers',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 14,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white.withOpacity(0.8),
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
 
@@ -900,7 +992,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Cyberpunk Games v1.0',
+                'GameBox v1.0',
                 style: TextStyle(
                   color: Colors.grey.shade700,
                   fontSize: 12,
@@ -1020,81 +1112,104 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Improved favorite item card
   Widget _buildFavoriteItem(Map<String, dynamic> item) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade800),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-            spreadRadius: 1,
+    return GestureDetector(
+      onTap: () {
+        // Navigate to the product details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(
+              productId: item['id'], // Pass the product ID
+              imageUrl: item['imageUrl'] ?? '', // Pass the product image URL
+              title:
+                  item['title'] ?? 'Unknown Product', // Pass the product title
+              price: item['price'] ?? '0.00', // Pass the product price
+              description: item['description'] ??
+                  'No description available', // Pass the product description
+              sellerId: item['sellerId'] ?? '', // Pass the seller ID
+              category:
+                  item['category'] ?? 'Unknown', // Pass the product category
+              stockCount: item['stockCount'] ?? 51, // Pass the stock count
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Favorite item image
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: item['imageUrl'] != null && item['imageUrl'].isNotEmpty
-                      ? Image.network(
-                          item['imageUrl'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _placeholder(item['title']);
-                          },
-                        )
-                      : _placeholder(item['title']),
-                ),
-                // Favorite icon overlay
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.star,
-                        color: Colors.yellow.shade400, size: 16),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade800),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Favorite item image
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
+                    child:
+                        item['imageUrl'] != null && item['imageUrl'].isNotEmpty
+                            ? Image.network(
+                                item['imageUrl'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _placeholder(item['title']);
+                                },
+                              )
+                            : _placeholder(item['title']),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Favorite item title
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-            child: Text(
-              item['title'],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontFamily: 'PixelFont',
-                fontWeight: FontWeight.bold,
+                  // Favorite icon overlay
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.star,
+                          color: Colors.yellow.shade400, size: 16),
+                    ),
+                  ),
+                ],
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+            // Favorite item title
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(12)),
+              ),
+              child: Text(
+                item['title'],
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontFamily: 'PixelFont',
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
