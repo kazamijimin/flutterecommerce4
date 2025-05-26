@@ -49,11 +49,11 @@ class _LibraryPageState extends State<LibraryPage>
         return;
       }
 
-      // Get all orders with status 'delivered'
+      // Get all orders with status 'delivered' or 'to review'
       final orderSnapshot = await FirebaseFirestore.instance
           .collection('orders')
           .where('userId', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'delivered')
+          .where('status', whereIn: ['delivered', 'to review']) // Changed this line
           .get();
 
       List<Map<String, dynamic>> products = [];
@@ -1059,7 +1059,7 @@ class _LibraryPageState extends State<LibraryPage>
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Products you purchase will appear here after delivery',
+              'Products that are delivered or pending review will appear here',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'PixelFont',

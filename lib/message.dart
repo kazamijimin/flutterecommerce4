@@ -8,6 +8,10 @@ import 'category.dart';
 import 'profile.dart';
 import 'see_all_recommend.dart';
 import 'shop.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+
 class ChatPage extends StatefulWidget {
   const ChatPage({Key? key}) : super(key: key);
 
@@ -772,6 +776,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   Map<String, dynamic>? _recipientData;
   bool _isLoading = true;
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -849,6 +855,156 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     }
   }
 
+  Future<void> _sendImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      // Upload image to Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('chat_images')
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final uploadTask = await storageRef.putFile(File(image.path));
+      final imageUrl = await uploadTask.ref.getDownloadURL();
+
+      // Send message with image URL
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Check if conversation exists
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .get();
+
+      if (!conversationDoc.exists) {
+        await _firestore.collection('conversations').doc(widget.conversationId).set({
+          'participants': [user.uid, widget.recipientId],
+          'lastMessage': '📷 Image',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await _firestore.collection('conversations').doc(widget.conversationId).update({
+          'lastMessage': '📷 Image',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Add message with image
+      await _firestore
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .collection('messages')
+          .add({
+        'senderId': user.uid,
+        'recipientId': widget.recipientId,
+        'message': '',
+        'imageUrl': imageUrl,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+    } catch (e) {
+      print('Error sending image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send image')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  // Modify the message bubble builder in the StreamBuilder to handle images
+  Widget _buildMessageBubble(Map<String, dynamic> messageData, bool isCurrentUser) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Column(
+        crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isCurrentUser) _buildAvatar(_recipientData),
+              if (!isCurrentUser) const SizedBox(width: 8),
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.7,
+                ),
+                padding: messageData['imageUrl'] != null 
+                    ? const EdgeInsets.all(4)
+                    : const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isCurrentUser ? Colors.cyan : Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: messageData['imageUrl'] != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: messageData['imageUrl'],
+                          placeholder: (context, url) => const SizedBox(
+                            height: 200,
+                            child: Center(
+                              child: CircularProgressIndicator(color: Colors.white),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.error,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        messageData['message'] ?? '',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+              ),
+              if (isCurrentUser) const SizedBox(width: 8),
+              if (isCurrentUser) _buildAvatar(null),
+            ],
+          ),
+          const SizedBox(height: 2),
+          if (messageData['timestamp'] != null)
+            Padding(
+              padding: EdgeInsets.only(
+                left: isCurrentUser ? 0 : 32,
+                right: isCurrentUser ? 32 : 0,
+              ),
+              child: Text(
+                DateFormat('h:mm a').format(messageData['timestamp'].toDate()),
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(Map<String, dynamic>? userData) {
+    return CircleAvatar(
+      radius: 12,
+      backgroundColor: Colors.grey.shade800,
+      backgroundImage: userData?['photoURL'] != null
+          ? CachedNetworkImageProvider(userData!['photoURL'])
+          : null,
+      child: userData?['photoURL'] == null
+          ? const Icon(Icons.person, color: Colors.white, size: 12)
+          : null,
+    );
+  }
+
+  // Update the build method to use the new message bubble builder and add loading indicator
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -929,70 +1085,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      child: Column(
-                        crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (!isCurrentUser)
-                                CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor: Colors.grey.shade800,
-                                  backgroundImage: _recipientData?['photoURL'] != null
-                                      ? CachedNetworkImageProvider(_recipientData!['photoURL'])
-                                      : null,
-                                  child: _recipientData?['photoURL'] == null
-                                      ? const Icon(Icons.person, color: Colors.white, size: 12)
-                                      : null,
-                                ),
-                              if (!isCurrentUser) const SizedBox(width: 8),
-                              Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isCurrentUser ? Colors.cyan : Colors.grey.shade800,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Text(
-                                  messageData['message'] ?? '',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                              if (isCurrentUser) const SizedBox(width: 8),
-                              if (isCurrentUser)
-                                CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor: Colors.grey.shade800,
-                                  backgroundImage: _auth.currentUser?.photoURL != null
-                                      ? NetworkImage(_auth.currentUser!.photoURL!)
-                                      : null,
-                                  child: _auth.currentUser?.photoURL == null
-                                      ? const Icon(Icons.person, color: Colors.white, size: 12)
-                                      : null,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          if (messageTime != null)
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: isCurrentUser ? 0 : 32,
-                                right: isCurrentUser ? 32 : 0,
-                              ),
-                              child: Text(
-                                DateFormat('h:mm a').format(messageTime.toDate()),
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      child: _buildMessageBubble(messageData, isCurrentUser),
                     );
                   },
                 );
@@ -1006,12 +1099,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.photo, color: Colors.grey),
-                  onPressed: () {
-                    // TODO: Implement image sending functionality
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Image upload coming soon!')),
-                    );
-                  },
+                  onPressed: _isUploading ? null : _sendImage,
                 ),
                 Expanded(
                   child: TextField(
@@ -1048,6 +1136,19 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     ),
                   ),
                 ),
+                // Add loading indicator if uploading
+                if (_isUploading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.cyan,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
