@@ -16,7 +16,7 @@ import 'address.dart'; // Import the AddressPage
 import 'friends.dart'; // Import the FriendsPage
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'widgets/no_internet_widget.dart';
-
+import 'library_page.dart';
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
@@ -296,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 void _navigateToGamesLibrary() {
   Navigator.push(
     context,
-    MaterialPageRoute(builder: (context) => const OrderHistory()),
+    MaterialPageRoute(builder: (context) => const LibraryPage()),
   );
 }
   void _navigateToFriends() {

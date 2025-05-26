@@ -766,6 +766,58 @@ class OrderStatus extends StatelessWidget {
                               );
                             }).toList(),
 
+                            // Show review if it exists
+                            if (orderData.containsKey('review') && orderData['review'] != null)
+                              Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.rate_review, color: Color(0xFF00FF66), size: 18),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Customer Review',
+                                          style: TextStyle(
+                                            fontFamily: 'PixelFont',
+                                            color: Colors.greenAccent.shade100,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (orderData['review']['rating'] != null)
+                                          Row(
+                                            children: [
+                                              Icon(Icons.star, color: Colors.amber, size: 16),
+                                              Text(
+                                                orderData['review']['rating'].toString(),
+                                                style: const TextStyle(color: Colors.amber, fontFamily: 'PixelFont'),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      orderData['review']['review'] ?? '',
+                                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                                    ),
+                                    if (orderData['review']['reviewedAt'] != null)
+                                      Text(
+                                        'Reviewed on: ${orderData['review']['reviewedAt'].toString().substring(0, 10)}',
+                                        style: const TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'PixelFont'),
+                                      ),
+                                  ],
+                                ),
+                              ),
+
                             // Action buttons
                             // Action buttons
                             // Action buttons - Fix overflow by using a Wrap widget

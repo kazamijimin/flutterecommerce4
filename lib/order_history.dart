@@ -555,6 +555,57 @@ class _OrderHistoryState extends State<OrderHistory>
                 ],
               ),
             ),
+            // Review section
+            if (order.containsKey('review') && order['review'] != null)
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.rate_review, color: Color(0xFF00FF66), size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Your Review',
+                          style: TextStyle(
+                            fontFamily: 'PixelFont',
+                            color: Colors.greenAccent.shade100,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (order['review']['rating'] != null)
+                          Row(
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                              Text(
+                                order['review']['rating'].toString(),
+                                style: const TextStyle(color: Colors.amber, fontFamily: 'PixelFont'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      order['review']['review'] ?? '',
+                      style: const TextStyle(color: Colors.white, fontFamily: 'PixelFont'),
+                    ),
+                    if (order['review']['reviewedAt'] != null)
+                      Text(
+                        'Reviewed on: ${order['review']['reviewedAt'].toString().substring(0, 10)}',
+                        style: const TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'PixelFont'),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -1063,7 +1114,7 @@ class _OrderHistoryState extends State<OrderHistory>
         );
       case 'to review':
         buttonText = 'WRITE REVIEW';
-        buttonColor = const Color(0xFF00FF66);
+        buttonColor = const Color.fromARGB(255, 174, 255, 0);
         buttonIcon = Icons.rate_review;
         onPressed = () => _writeReview(order);
         break;
@@ -1760,14 +1811,146 @@ class _OrderHistoryState extends State<OrderHistory>
     );
   }
 
-  void _writeReview(Map<String, dynamic> order) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Opening review form...'),
-        backgroundColor: Color(0xFF00FF66),
-      ),
+  void _writeReview(Map<String, dynamic> order) async {
+    final TextEditingController _reviewController = TextEditingController();
+    double _rating = 5.0;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF00FF66), width: 1),
+            ),
+            title: const Text(
+              'Write a Review',
+              style: TextStyle(
+                fontFamily: 'PixelFont',
+                color: Color(0xFF00FF66),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _reviewController,
+                  maxLines: 3,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Share your experience...',
+                    hintStyle: TextStyle(color: Colors.white54),
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Color(0xFF23234A),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('Rating:', style: TextStyle(color: Colors.white)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Wrap(
+                        spacing: 0,
+                        children: List.generate(5, (index) {
+                          return IconButton(
+                            icon: Icon(
+                              index < _rating ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 20, // <-- Smaller star size
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setState(() {
+                                _rating = index + 1.0;
+                              });
+                            },
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _rating.toStringAsFixed(1),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CANCEL', style: TextStyle(color: Colors.cyan)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) return;
+                  final reviewText = _reviewController.text.trim();
+                  if (reviewText.isEmpty) return;
+
+                  final reviewData = {
+                    'review': reviewText,
+                    'rating': _rating,
+                    'reviewedAt': DateTime.now().toIso8601String(),
+                    'reviewerId': user.uid,
+                    'reviewerName': user.displayName ?? 'Anonymous',
+                  };
+
+                  // User's order
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('orders')
+                      .doc(order['documentId'])
+                      .update({
+                        'review': reviewData,
+                        'status': 'delivered', // Move to completed/delivered
+                      });
+
+                  // Global order
+                  final globalOrder = await FirebaseFirestore.instance
+                      .collection('orders')
+                      .where('orderId', isEqualTo: order['orderId'])
+                      .limit(1)
+                      .get();
+                  if (globalOrder.docs.isNotEmpty) {
+                    await FirebaseFirestore.instance
+                        .collection('orders')
+                        .doc(globalOrder.docs.first.id)
+                        .update({
+                          'review': reviewData,
+                          'status': 'delivered',
+                        });
+                  }
+
+                  Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Review submitted!', style: TextStyle(fontFamily: 'PixelFont')),
+                        backgroundColor: Color(0xFF00FF66),
+                      ),
+                    );
+                    // Move to Delivered tab
+                    safeTabNavigate(_tabs.indexOf('Delivered'));
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF66)),
+                child: const Text('SUBMIT', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
     );
-    _viewOrderDetails(order);
   }
 
   void _viewReturnRequest(Map<String, dynamic> order) {

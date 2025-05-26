@@ -25,7 +25,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // Change to 4
     _loadStats();
   }
 
@@ -616,6 +616,66 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  Future<void> _toggleArchiveStatus(String productId, bool currentStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .update({'archived': !currentStatus});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(currentStatus ? 'Product unarchived' : 'Product archived'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _confirmDeleteProduct(BuildContext context, String productId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Delete Product', style: TextStyle(color: Colors.red)),
+        content: const Text(
+          'Are you sure you want to permanently delete this product?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteProduct(productId);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteProduct(String productId) async {
+    try {
+      await FirebaseFirestore.instance.collection('products').doc(productId).delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product deleted'), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -642,6 +702,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             Tab(text: 'OVERVIEW', icon: Icon(Icons.dashboard)),
             Tab(text: 'SELLER APPS', icon: Icon(Icons.store)),
             Tab(text: 'USERS', icon: Icon(Icons.people)),
+            Tab(text: 'PRODUCTS', icon: Icon(Icons.shopping_bag)), // Add this
           ],
         ),
         actions: [
@@ -1196,6 +1257,148 @@ class _AdminDashboardState extends State<AdminDashboard>
                               tooltip: 'Restrict Account',
                             ),
                     ),
+                  );
+                },
+              );
+            },
+          ),
+
+          // PRODUCTS TAB
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('products').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFF0077)),
+                );
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No products found',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                );
+              }
+              final products = snapshot.data!.docs;
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  final data = product.data() as Map<String, dynamic>;
+                  final bool isArchived = data['archived'] == true;
+
+                  return Stack(
+                    children: [
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: const Color(0xFF1A1A2E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF333355), width: 1.5),
+                        ),
+                        child: ListTile(
+                          leading: Stack(
+                            children: [
+                              data['imageUrl'] != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        data['imageUrl'],
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const Icon(Icons.image, color: Colors.white, size: 48),
+                              if (isArchived)
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.6),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        'ARCHIVED',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          fontFamily: 'PixelFont',
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          title: Text(
+                            data['name'] ?? data['description'] ?? 'Unknown Product',
+                            style: TextStyle(
+                              color: isArchived ? Colors.grey : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'PixelFont',
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '₱${data['price']?.toString() ?? '0.00'}',
+                                style: TextStyle(
+                                  color: isArchived ? Colors.grey : Colors.cyan,
+                                  fontFamily: 'PixelFont',
+                                ),
+                              ),
+                              Text(
+                                'Category: ${data['category'] ?? 'Unknown'}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontFamily: 'PixelFont',
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                'Stock: ${data['stockCount'] ?? 0}',
+                                style: const TextStyle(
+                                  color: Colors.orange,
+                                  fontFamily: 'PixelFont',
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                'Seller: ${data['storeName'] ?? data['sellerId'] ?? 'Unknown'}',
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontFamily: 'PixelFont',
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  isArchived ? Icons.unarchive : Icons.archive,
+                                  color: isArchived ? Colors.green : Colors.amber,
+                                ),
+                                tooltip: isArchived ? 'Unarchive' : 'Archive',
+                                onPressed: () => _toggleArchiveStatus(product.id, isArchived),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                tooltip: 'Delete',
+                                onPressed: () => _confirmDeleteProduct(context, product.id),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               );

@@ -26,7 +26,7 @@ class SeeAllProductsScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('products')
-            .orderBy('createdAt', descending: true)
+            .where('archived', isEqualTo: false) // Only show non-archived products
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
