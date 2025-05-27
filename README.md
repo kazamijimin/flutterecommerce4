@@ -64,11 +64,13 @@ GameBox is a feature-rich Flutter e-commerce application specifically designed f
   - `/components`: Reusable UI components
   - `/services`: Business logic and Firebase services
   - `/widgets`: Shared widget components
+  - `/lib`: All of the pages included
 - assets: Static resources like images and fonts
 
 ## Screenshots
 
-[Screenshots would be placed here]
+- 📖 [Screenshot](https://docs.google.com/document/d/1NNu-wh_jZbhkzuqPq3J4Ii3gRQLWh_zi/edit?usp=drive_link&ouid=110917087363371222445&rtpof=true&sd=true)
+
 
 ## Contributing
 
