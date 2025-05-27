@@ -17,6 +17,9 @@ import 'friends.dart'; // Import the FriendsPage
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'widgets/no_internet_widget.dart';
 import 'library_page.dart';
+import 'package:video_player/video_player.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
 class AppColors {
   // Primary colors
   static final Color background = Colors.black;
@@ -462,6 +465,69 @@ void _navigateToGamesLibrary() {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showVideoAd() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => VideoAdPlayer(
+        videoPath: '500613558_29495697700074065_7512666864724735442_n.mp4',
+        onVideoComplete: () {
+          Navigator.pop(context); // Close video player
+          // Show reward dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: Colors.grey.shade900,
+              title: const Text(
+                'Congratulations!',
+                style: TextStyle(
+                  fontFamily: 'PixelFont',
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.card_giftcard,
+                    color: Color(0xFFFF0077),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'You\'ve earned a reward!\nClaim your PHP 500 voucher now.',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text(
+                    'CLAIM',
+                    style: TextStyle(
+                      fontFamily: 'PixelFont',
+                      color: Color(0xFFFF0077),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // Add logic to credit the voucher to user's account
+                  },
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1010,6 +1076,16 @@ void _navigateToGamesLibrary() {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  _buildNavButton(
+                    'Watch Ad for Rewards',
+                    _showVideoAd,
+                    icon: Icons.play_circle_filled,
+                    gradient: LinearGradient(
+                      colors: [Colors.purple.shade700, Colors.pink.shade700],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1444,5 +1520,219 @@ void _navigateToGamesLibrary() {
         );
       },
     );
+  }
+}
+
+// Add VideoAdPlayer widget class
+class VideoAdPlayer extends StatefulWidget {
+  final String videoPath;
+  final VoidCallback onVideoComplete;
+
+  const VideoAdPlayer({
+    Key? key,
+    required this.videoPath,
+    required this.onVideoComplete,
+  }) : super(key: key);
+
+  @override
+  State<VideoAdPlayer> createState() => _VideoAdPlayerState();
+}
+
+class _VideoAdPlayerState extends State<VideoAdPlayer> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('video_ads/${widget.videoPath}');
+      final url = await ref.getDownloadURL();
+
+      _controller = VideoPlayerController.network(url)
+        ..initialize().then((_) {
+          setState(() {
+            _isInitialized = true;
+          });
+          _controller.play();
+        });
+
+      _controller.addListener(() {
+        if (_controller.value.position >= _controller.value.duration) {
+          widget.onVideoComplete();
+        }
+      });
+    } catch (e) {
+      print('Error loading video: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.grey.shade900,
+            title: const Text(
+              'Error',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            content: const Text(
+              'Failed to load video ad. Please try again later.',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'PixelFont',
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Colors.cyan,
+                    fontFamily: 'PixelFont',
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 300,
+          height: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: Colors.cyan,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85, // 85% of screen width
+        constraints: BoxConstraints(
+          maxWidth: 400, // Maximum width
+          maxHeight: MediaQuery.of(context).size.height * 0.7, // Maximum 70% of screen height
+        ),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey.shade800,
+            width: 2,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Video title bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade900,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.grey.shade800,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.play_circle_filled,
+                      color: Colors.red,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Advertisement',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'PixelFont',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Skip button
+                    TextButton(
+                      onPressed: widget.onVideoComplete,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.grey.shade700,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Text(
+                          'Skip Ad',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'PixelFont',
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Video player
+              AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              ),
+              // Progress bar
+              LinearProgressIndicator(
+                value: _controller.value.isInitialized
+                    ? _controller.value.position.inMilliseconds /
+                        _controller.value.duration.inMilliseconds
+                    : 0.0,
+                backgroundColor: Colors.grey.shade900,
+                color: Colors.red,
+                minHeight: 4,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }

@@ -1,10 +1,16 @@
-Collecting workspace information# GameBox - E-commerce Platform for Gamers
+# GameBox - E-commerce Platform for Gamers
 
 ![GameBox Logo](assets/images/cover.jpg)
 
 ## Overview
 
 GameBox is a feature-rich Flutter e-commerce application specifically designed for gamers. It offers a comprehensive digital marketplace where users can discover, purchase, and manage games across various platforms and genres. With its cyberpunk-themed design and intuitive interface, GameBox delivers an immersive shopping experience for the gaming community.
+
+## Download and Resources
+
+- 📱 [Download GameBox APK](https://drive.google.com/file/d/1YAqFK8diHliX9Ym8q_OLBjbv83ITRwgK/view?usp=drive_link)
+- 📖 [Project Documentation](https://docs.google.com/document/d/1NNu-wh_jZbhkzuqPq3J4Ii3gRQLWh_zi/edit?usp=drive_link&ouid=110917087363371222445&rtpof=true&sd=true)
+- 🎥 [Video Advertisement](https://drive.google.com/file/d/1fqbgZTPFowwd7GjfMEYS8goZf0K9kpE6/view?usp=drive_link)
 
 ## Key Features
 
