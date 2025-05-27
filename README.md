@@ -11,7 +11,7 @@ GameBox is a feature-rich Flutter e-commerce application specifically designed f
 - 📱 [Download GameBox APK](https://drive.google.com/file/d/1YAqFK8diHliX9Ym8q_OLBjbv83ITRwgK/view?usp=drive_link)
 - 📖 [Project Documentation](https://docs.google.com/document/d/1NNu-wh_jZbhkzuqPq3J4Ii3gRQLWh_zi/edit?usp=drive_link&ouid=110917087363371222445&rtpof=true&sd=true)
 - 🎥 [Video Advertisement](https://drive.google.com/file/d/1fqbgZTPFowwd7GjfMEYS8goZf0K9kpE6/view?usp=drive_link)
--📦 [PPT] (https://www.canva.com/design/DAGogcst0Gs/DoXu1i23lse17e25Wa5G8A/edit?utm_content=DAGogcst0Gs&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+-📦 [PPT Presentation](https://www.canva.com/design/DAGogcst0Gs/DoXu1i23lse17e25Wa5G8A/edit?utm_content=DAGogcst0Gs&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 ## Key Features
 
 - **User Authentication**: Secure login and signup with email/password and Google authentication
